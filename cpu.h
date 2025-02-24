@@ -5,7 +5,7 @@
 namespace GameBoy {
     class CPU {
     private:
-        // Game Boy is little-endian - lower byte stored first in memory for these combination registers
+        // Game Boy is little-endian - operations with combination registers expect lower byte first in memory
         union {
             struct {
                 std::uint8_t f;
@@ -37,10 +37,10 @@ namespace GameBoy {
         std::uint16_t sp{};
         std::uint16_t pc{};
 
-        using InstructionFunc = void(*)(CPU&);
-        static const InstructionFunc instructionTable[256];
+        std::uint64_t cyclesElapsed{};
 
-        static void nop(CPU& cpu);
+        void nop_00();
+        void ld_01();
 
     public:
         void executeInstruction(std::uint8_t opcode);
