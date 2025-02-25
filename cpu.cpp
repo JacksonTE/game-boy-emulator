@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <iostream>
 #include "cpu.h"
 
@@ -20,6 +21,35 @@ namespace GameBoy {
                     break;
             }
         }
+    }
+
+    void CPU::printInternalValues() const {
+        std::cout << "================== CPU Registers ==================" << std::endl;
+        std::cout << std::hex << std::uppercase;
+        std::cout << std::setfill('0');
+
+        std::cout << "AF: 0x" << std::setw(4) << af
+                  << "   (A: 0x" << std::setw(2) << static_cast<int>(a)
+                  << ", F: 0x" << std::setw(2) << static_cast<int>(f) << ")" << std::endl;
+
+        std::cout << "BC: 0x" << std::setw(4) << bc
+                  << "   (B: 0x" << std::setw(2) << static_cast<int>(b)
+                  << ", C: 0x" << std::setw(2) << static_cast<int>(c) << ")" << std::endl;
+
+        std::cout << "DE: 0x" << std::setw(4) << de
+                  << "   (D: 0x" << std::setw(2) << static_cast<int>(d)
+                  << ", E: 0x" << std::setw(2) << static_cast<int>(e) << ")" << std::endl;
+
+        std::cout << "HL: 0x" << std::setw(4) << hl
+                  << "   (H: 0x" << std::setw(2) << static_cast<int>(h)
+                  << ", L: 0x" << std::setw(2) << static_cast<int>(l) << ")" << std::endl;
+
+        std::cout << "SP: 0x" << std::setw(4) << sp << std::endl;
+        std::cout << "PC: 0x" << std::setw(4) << pc << std::endl;
+
+        std::cout << std::dec;
+        std::cout << "Cycles Elapsed: " << cyclesElapsed << std::endl;
+        std::cout << "===================================================" << std::endl;
     }
 
     void CPU::nop00() {
