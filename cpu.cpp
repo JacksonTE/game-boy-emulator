@@ -6,13 +6,14 @@ namespace GameBoy {
         if (opcode != 0xCB) {
             switch (opcode) {
                 case 0x00: nop00(); break;
+                case 0x01: ld01(); break;
                 default:
                     std::cerr << "Unimplemented instruction: 0x" << std::hex << static_cast<int>(opcode) << std::endl;
                     break;
             }
         }
         else {
-            std::uint8_t prefixedOpcode; // TODO get next byte in memory
+            std::uint8_t prefixedOpcode = memory[pc + 1];
             switch (prefixedOpcode) {
                 default:
                     std::cerr << "Unimplemented instruction: 0xCB" << std::hex << static_cast<int>(prefixedOpcode) << std::endl;
@@ -27,7 +28,7 @@ namespace GameBoy {
     }
 
     void CPU::ld01() {
-        // TODO get operand from memory
+        bc = memory.read16(pc + 1);
         pc += 3;
         cyclesElapsed += 12;
     }

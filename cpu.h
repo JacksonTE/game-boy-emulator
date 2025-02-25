@@ -1,13 +1,20 @@
 #pragma once
 
+#include "memory.h"
 #include <cstdint>
 
 namespace GameBoy {
     class CPU {
     public:
+        CPU(Memory mem) : memory(mem) {}
         void executeInstruction(std::uint8_t opcode);
 
     private:
+        Memory memory;
+        std::uint64_t cyclesElapsed{};
+
+        // 8-bit registers can be accessed individually or together through their corresponding 16-bit register pair
+        // The first letter of each register pair is its MSB, and the second letter is its LSB
         union {
             struct {
                 std::uint8_t a;
@@ -38,8 +45,6 @@ namespace GameBoy {
         };
         std::uint16_t sp{};
         std::uint16_t pc{};
-
-        std::uint64_t cyclesElapsed{};
 
         void nop00();
         void ld01();
