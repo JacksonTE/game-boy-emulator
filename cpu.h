@@ -4,33 +4,35 @@
 
 namespace GameBoy {
     class CPU {
+    public:
+        void executeInstruction(std::uint8_t opcode);
+
     private:
-        // Game Boy is little-endian - operations with combination registers expect lower byte first in memory
         union {
             struct {
-                std::uint8_t f;
                 std::uint8_t a;
+                std::uint8_t f;
             };
             std::uint16_t af{};
         };
         union {
             struct {
-                std::uint8_t c;
                 std::uint8_t b;
+                std::uint8_t c;
             };
             std::uint16_t bc{};
         };
         union {
             struct {
-                std::uint8_t e;
                 std::uint8_t d;
+                std::uint8_t e;
             };
             std::uint16_t de{};
         };
         union {
             struct {
-                std::uint8_t l;
                 std::uint8_t h;
+                std::uint8_t l;
             };
             std::uint16_t hl{};
         };
@@ -39,10 +41,7 @@ namespace GameBoy {
 
         std::uint64_t cyclesElapsed{};
 
-        void nop_00();
-        void ld_01();
-
-    public:
-        void executeInstruction(std::uint8_t opcode);
+        void nop00();
+        void ld01();
     };
 }
