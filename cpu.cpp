@@ -8,13 +8,15 @@ namespace GameBoy {
             switch (opcode) {
                 case 0x00: nop00(); break;
                 case 0x01: ld01(); break;
+                case 0x02: ld02(); break;
+                case 0x03: inc03(); break;
                 default:
                     std::cerr << "Unimplemented instruction: 0x" << std::hex << static_cast<int>(opcode) << std::endl;
                     break;
             }
         }
         else {
-            std::uint8_t prefixedOpcode = memory[pc + 1];
+            std::uint8_t prefixedOpcode = memory.read8(pc + 1);
             switch (prefixedOpcode) {
                 default:
                     std::cerr << "Unimplemented instruction: 0xCB" << std::hex << static_cast<int>(prefixedOpcode) << std::endl;
@@ -61,5 +63,17 @@ namespace GameBoy {
         bc = memory.read16(pc + 1);
         pc += 3;
         cyclesElapsed += 12;
+    }
+
+    void CPU::ld02() {
+        memory.write8(bc, a);
+        pc += 1;
+        cyclesElapsed += 8;
+    }
+
+    void CPU::inc03() {
+        bc++;
+        pc += 1;
+        cyclesElapsed += 8;
     }
 }

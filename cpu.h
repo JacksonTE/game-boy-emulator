@@ -19,7 +19,7 @@ namespace GameBoy {
         union {
             struct {
                 std::uint8_t a;
-                std::uint8_t f;
+                std::uint8_t f; // Flags register - only bits 7-4 are used (3-0 will always be zero)
             };
             std::uint16_t af{};
         };
@@ -44,10 +44,12 @@ namespace GameBoy {
             };
             std::uint16_t hl{};
         };
-        std::uint16_t sp{};
-        std::uint16_t pc{};
+        std::uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
+        std::uint16_t pc{}; // Program Counter, address of the next instruction to execute
 
         void nop00();
         void ld01();
+        void ld02();
+        void inc03();
     };
 }

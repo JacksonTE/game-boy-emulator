@@ -1,12 +1,12 @@
 #include "memory.h"
 
 namespace GameBoy {
-    std::uint8_t Memory::operator[](std::uint16_t address) const {
+    std::uint8_t Memory::read8(std::uint16_t address) const {
         return placeholderMemory[address];
     }
 
-    std::uint8_t& Memory::operator[](std::uint16_t address) {
-        return placeholderMemory[address];
+    void Memory::write8(std::uint16_t address, std::uint8_t value) {
+        placeholderMemory[address] = value;
     }
 
     std::uint16_t Memory::read16(std::uint16_t address) const {
