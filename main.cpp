@@ -4,10 +4,10 @@
 int main() {
     GameBoy::Memory memory;
     GameBoy::CPU cpu(memory);
-    cpu.printInternalValues();
-    cpu.executeInstruction(0x00);
-    cpu.printInternalValues();
-    cpu.executeInstruction(0x01);
-    cpu.printInternalValues();
+    cpu.print_internal_values();
+    cpu.execute_instruction(0x00);
+    cpu.print_internal_values();
+    cpu.execute_instruction(0x01);
+    cpu.print_internal_values();
     return 0;
 }
