@@ -52,6 +52,9 @@ namespace GameBoy {
         std::uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
         std::uint16_t pc{}; // Program Counter, address of the next instruction to execute
 
+        void inc_reg_8(uint8_t &reg);
+        void dec_reg_8(uint8_t &reg);
+
         void nop_0x00();
         void ld_bc_imm_0x01();
         void ld_mem_bc_a_0x02();
@@ -60,5 +63,13 @@ namespace GameBoy {
         void dec_b_0x05();
         void ld_b_imm_0x06();
         void rlca_0x07();
+        void ld_mem_imm_sp_0x08();
+        void add_hl_bc_0x09();
+        void ld_a_mem_bc_0x0a();
+        void dec_bc_0x0b();
+        void inc_c_0x0c();
+        void dec_c_0x0d();
+        void ld_c_imm_0x0e();
+        void rrca_0x0f();
     };
 }
