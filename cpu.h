@@ -58,5 +58,7 @@ namespace GameBoy {
         void inc_bc_0x03();
         void inc_b_0x04();
         void dec_b_0x05();
+        void ld_b_imm_0x06();
+        void rlca_0x07();
     };
 }

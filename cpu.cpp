@@ -12,16 +12,20 @@ namespace GameBoy {
                 case 0x03: inc_bc_0x03(); break;
                 case 0x04: inc_b_0x04(); break;
                 case 0x05: dec_b_0x05(); break;
+                case 0x06: ld_b_imm_0x06(); break;
+                case 0x07: rlca_0x07(); break;
                 default:
-                    std::cerr << "Unimplemented instruction: 0x" << std::hex << static_cast<int>(opcode) << std::endl;
+                    std::cerr << std::hex << std::uppercase << std::setfill('0');
+                    std::cerr << "Unimplemented instruction: 0x" << std::setw(2) << static_cast<int>(opcode) << std::endl;
                     break;
             }
         }
         else {
-            std::uint8_t prefixedOpcode = memory.read_8(pc + 1);
-            switch (prefixedOpcode) {
+            std::uint8_t prefixed_opcode = memory.read_8(pc + 1);
+            switch (prefixed_opcode) {
                 default:
-                    std::cerr << "Unimplemented instruction: 0xCB" << std::hex << static_cast<int>(prefixedOpcode) << std::endl;
+                    std::cerr << std::hex << std::uppercase << std::setfill('0');
+                    std::cerr << "Unimplemented instruction: 0xCB" << std::setw(2) << static_cast<int>(prefixed_opcode) << std::endl;
                     break;
             }
         }
@@ -80,20 +84,36 @@ namespace GameBoy {
     }
 
     void CPU::inc_b_0x04() {
+        bool half_carry = ((b & 0x0F) == 0x0F);
         b++;
-        f &= ~FLAG_Z & ~FLAG_N & ~FLAG_H;
-        f |= (b == 0) * FLAG_Z;
-        f |= ((b & 0x0F) == 0) * FLAG_H;
+        f = (b == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
+        f &= ~FLAG_N;
+        f = half_carry ? (f | FLAG_H) : (f & ~FLAG_H);
         pc += 1;
         cycles_elapsed += 4;
     }
 
     void CPU::dec_b_0x05() {
+        bool half_carry = ((b & 0x0F) == 0x00);
         b--;
-        f &= ~FLAG_Z & ~FLAG_H;
-        f |= (b == 0) * FLAG_Z;
+        f = (b == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
         f |= FLAG_N;
-        f |= ((b & 0x0F) == 0x0F) * FLAG_H;
+        f = half_carry ? (f | FLAG_H) : (f & ~FLAG_H);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::ld_b_imm_0x06() {
+        b = memory.read_8(pc + 1);
+        pc += 2;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::rlca_0x07() {
+        bool carry = ((a & 0x80) != 0x00);
+        a = (a << 1) | (a >> 7);
+        f &= ~(FLAG_Z | FLAG_N | FLAG_H);
+        f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
         pc += 1;
         cycles_elapsed += 4;
     }
