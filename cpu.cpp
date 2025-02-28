@@ -29,7 +29,7 @@ namespace GameBoy {
             }
         }
         else {
-            std::uint8_t prefixed_opcode = memory.read_8(pc + 1);
+            std::uint8_t prefixed_opcode{memory.read_8(pc + 1)};
             switch (prefixed_opcode) {
                 default:
                     std::cerr << std::hex << std::uppercase << std::setfill('0');
@@ -69,19 +69,17 @@ namespace GameBoy {
     }
 
     void CPU::inc_reg_8(uint8_t &reg) {
-        bool half_carry = ((reg & 0x0F) == 0x0F);
         reg++;
         f = (reg == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
         f &= ~FLAG_N;
-        f = half_carry ? (f | FLAG_H) : (f & ~FLAG_H);
+        f = ((reg & 0x0F) == 0x00) ? (f | FLAG_H) : (f & ~FLAG_H);
     }
 
     void CPU::dec_reg_8(uint8_t &reg) {
-        bool half_carry = ((reg & 0x0F) == 0x00);
         reg--;
         f = (reg == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
         f |= FLAG_N;
-        f = half_carry ? (f | FLAG_H) : (f & ~FLAG_H);
+        f = ((reg & 0x0F) == 0x0F) ? (f | FLAG_H) : (f & ~FLAG_H);
     }
 
     void CPU::nop_0x00() {
@@ -126,10 +124,9 @@ namespace GameBoy {
     }
 
     void CPU::rlca_0x07() {
-        bool carry = ((a & 0b10000000) == 0b10000000);
         a = (a << 1) | (a >> 7);
         f &= ~(FLAG_Z | FLAG_N | FLAG_H);
-        f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
+        f = ((a & 0x01) == 0x01) ? (f | FLAG_C) : (f & ~FLAG_C);
         pc += 1;
         cycles_elapsed += 4;
     }
@@ -141,13 +138,11 @@ namespace GameBoy {
     }
 
     void CPU::add_hl_bc_0x09() {
-        std::uint32_t result = hl + bc;
-        bool half_carry = (((hl & 0x0FFF) + (bc & 0x0FFF)) > 0x0FFF);
-        bool carry = result > 0xFFFF;
-        hl = static_cast<uint16_t>(result);
+        std::uint16_t previous_hl{hl};
+        hl += bc;
         f &= ~FLAG_N;
-        f = half_carry ? (f | FLAG_H) : (f & ~FLAG_H);
-        f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
+        f = (((previous_hl & 0x0FFF) + (bc & 0x0FFF)) > 0x0FFF) ? (f | FLAG_H) : (f & ~FLAG_H);
+        f = (previous_hl > hl) ? (f | FLAG_C) : (f & ~FLAG_C);
         pc += 1;
         cycles_elapsed += 8;
     }
@@ -183,10 +178,9 @@ namespace GameBoy {
     }
 
     void CPU::rrca_0x0f() {
-        bool carry = ((a & 0b00000001) == 0b00000001);
         a = (a >> 1) | (a << 7);
         f &= ~(FLAG_Z | FLAG_N | FLAG_H);
-        f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
+        f = ((a & 0x08) == 0x08) ? (f | FLAG_C) : (f & ~FLAG_C);
         pc += 1;
         cycles_elapsed += 4;
     }
