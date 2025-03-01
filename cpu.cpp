@@ -22,6 +22,22 @@ namespace GameBoy {
                 case 0x0d: dec_c_0x0d(); break;
                 case 0x0e: ld_c_imm_0x0e(); break;
                 case 0x0f: rrca_0x0f(); break;
+                case 0x10: stop_imm_0x10(); break;
+                case 0x11: ld_de_imm_0x11(); break;
+                case 0x12: ld_mem_de_a_0x12(); break;
+                case 0x13: inc_de_0x13(); break;
+                case 0x14: inc_d_0x14(); break;
+                case 0x15: dec_d_0x15(); break;
+                case 0x16: ld_d_imm_0x16(); break;
+                case 0x17: rla_0x17(); break;
+                case 0x18: jr_sign_imm_0x18(); break;
+                case 0x19: add_hl_de_0x19(); break;
+                case 0x1a: ld_a_mem_de_0x1a(); break;
+                case 0x1b: dec_de_0x1b(); break;
+                case 0x1c: inc_e_0x1c(); break;
+                case 0x1d: dec_e_0x1d(); break;
+                case 0x1e: ld_e_imm_0x1e(); break;
+                case 0x1f: rra_0x1f(); break;
                 default:
                     std::cerr << std::hex << std::uppercase << std::setfill('0');
                     std::cerr << "Unimplemented instruction: 0x" << std::setw(2) << static_cast<int>(opcode) << std::endl;
@@ -39,7 +55,7 @@ namespace GameBoy {
         }
     }
 
-    void CPU::print_internal_values() const {
+    void CPU::print_values() const {
         std::cout << "================== CPU Registers ==================" << std::endl;
         std::cout << std::hex << std::uppercase;
         std::cout << std::setfill('0');
@@ -80,6 +96,16 @@ namespace GameBoy {
         f = (reg == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
         f |= FLAG_N;
         f = ((reg & 0x0F) == 0x0F) ? (f | FLAG_H) : (f & ~FLAG_H);
+    }
+
+    void CPU::add_hl_reg_16(uint16_t &reg) {
+        std::uint16_t previous_hl{hl};
+        hl += reg;
+        f &= ~FLAG_N;
+        f = (((previous_hl & 0x0FFF) + (reg & 0x0FFF)) > 0x0FFF) ? (f | FLAG_H) : (f & ~FLAG_H);
+        f = (previous_hl > hl) ? (f | FLAG_C) : (f & ~FLAG_C);
+        pc += 1;
+        cycles_elapsed += 8;
     }
 
     void CPU::nop_0x00() {
@@ -126,7 +152,7 @@ namespace GameBoy {
     void CPU::rlca_0x07() {
         a = (a << 1) | (a >> 7);
         f &= ~(FLAG_Z | FLAG_N | FLAG_H);
-        f = ((a & 0x01) == 0x01) ? (f | FLAG_C) : (f & ~FLAG_C);
+        f = ((a & 0b00000001) == 0b00000001) ? (f | FLAG_C) : (f & ~FLAG_C);
         pc += 1;
         cycles_elapsed += 4;
     }
@@ -138,11 +164,7 @@ namespace GameBoy {
     }
 
     void CPU::add_hl_bc_0x09() {
-        std::uint16_t previous_hl{hl};
-        hl += bc;
-        f &= ~FLAG_N;
-        f = (((previous_hl & 0x0FFF) + (bc & 0x0FFF)) > 0x0FFF) ? (f | FLAG_H) : (f & ~FLAG_H);
-        f = (previous_hl > hl) ? (f | FLAG_C) : (f & ~FLAG_C);
+        add_hl_reg_16(bc);
         pc += 1;
         cycles_elapsed += 8;
     }
@@ -180,7 +202,109 @@ namespace GameBoy {
     void CPU::rrca_0x0f() {
         a = (a >> 1) | (a << 7);
         f &= ~(FLAG_Z | FLAG_N | FLAG_H);
-        f = ((a & 0x08) == 0x08) ? (f | FLAG_C) : (f & ~FLAG_C);
+        f = ((a & 0b10000000) == 0b10000000) ? (f | FLAG_C) : (f & ~FLAG_C);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::stop_imm_0x10() {
+        stopped = true;
+        pc += 2; // Immediate isn't actually read and is skipped over, usually will be 0x00
+        cycles_elapsed += 4;
+    }
+
+    void CPU::ld_de_imm_0x11() {
+        de = memory.read_16(pc + 1);
+        pc += 3;
+        cycles_elapsed += 12;
+    }
+
+    void CPU::ld_mem_de_a_0x12() {
+        memory.write_8(de, a);
+        pc += 1;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::inc_de_0x13() {
+        de++;
+        pc += 1;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::inc_d_0x14() {
+        inc_reg_8(d);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::dec_d_0x15() {
+        dec_reg_8(d);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::ld_d_imm_0x16() {
+        d = memory.read_8(pc + 1);
+        pc += 2;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::rla_0x17() {
+        bool carry{(a & 0b10000000) == 0b10000000};
+        a = (a << 1) | ((f & FLAG_C) >> 4);
+        f &= ~(FLAG_Z | FLAG_N | FLAG_H);
+        f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::jr_sign_imm_0x18() {
+        std::int8_t offset{static_cast<std::int8_t>(memory.read_8(pc + 1))};
+        pc += 2 + offset;
+        cycles_elapsed += 12;
+    }
+
+    void CPU::add_hl_de_0x19() {
+        add_hl_reg_16(de);
+        pc += 1;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::ld_a_mem_de_0x1a() {
+        a = memory.read_8(de);
+        pc += 1;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::dec_de_0x1b() {
+        de--;
+        pc += 1;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::inc_e_0x1c() {
+        inc_reg_8(e);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::dec_e_0x1d() {
+        dec_reg_8(e);
+        pc += 1;
+        cycles_elapsed += 4;
+    }
+
+    void CPU::ld_e_imm_0x1e() {
+        e = memory.read_8(pc + 1);
+        pc += 2;
+        cycles_elapsed += 8;
+    }
+
+    void CPU::rra_0x1f() {
+        bool carry{(a & 0b00000001) == 0b00000001};
+        a = (a >> 1) | ((f & FLAG_C) << 3);
+        f &= ~(FLAG_Z | FLAG_N | FLAG_H);
+        f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
         pc += 1;
         cycles_elapsed += 4;
     }

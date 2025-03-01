@@ -14,11 +14,12 @@ namespace GameBoy {
         CPU(Memory mem) : memory{mem} {}
 
         void execute_instruction(std::uint8_t opcode);
-        void print_internal_values() const;
+        void print_values() const;
 
     private:
         Memory memory;
         std::uint64_t cycles_elapsed{};
+        bool stopped{};
 
         // 8-bit registers can be accessed individually or together through their corresponding 16-bit register pair
         // The first letter of each register pair is its most significant byte and the second is its least significant byte
@@ -55,6 +56,7 @@ namespace GameBoy {
 
         void inc_reg_8(uint8_t &reg);
         void dec_reg_8(uint8_t &reg);
+        void add_hl_reg_16(uint16_t &reg);
 
         void nop_0x00();
         void ld_bc_imm_0x01();
@@ -72,5 +74,21 @@ namespace GameBoy {
         void dec_c_0x0d();
         void ld_c_imm_0x0e();
         void rrca_0x0f();
+        void stop_imm_0x10();
+        void ld_de_imm_0x11();
+        void ld_mem_de_a_0x12();
+        void inc_de_0x13();
+        void inc_d_0x14();
+        void dec_d_0x15();
+        void ld_d_imm_0x16();
+        void rla_0x17();
+        void jr_sign_imm_0x18();
+        void add_hl_de_0x19();
+        void ld_a_mem_de_0x1a();
+        void dec_de_0x1b();
+        void inc_e_0x1c();
+        void dec_e_0x1d();
+        void ld_e_imm_0x1e();
+        void rra_0x1f();
     };
 }
