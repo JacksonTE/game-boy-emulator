@@ -61,7 +61,7 @@ private:
     void ld_reg_8_imm_8(std::uint8_t &reg_8);
     void ld_reg_8_mem_reg_16(std::uint8_t &reg_8, const std::uint16_t &reg_16);
     void ld_reg_16_imm_16(std::uint16_t &reg_16);
-    void ld_mem_reg_16_reg_8(std::uint16_t &reg_16, const std::uint8_t &reg_8);
+    void ld_mem_reg_16_reg_8(const std::uint16_t &reg_16, const std::uint8_t &reg_8);
     void add_hl_reg_16(const std::uint16_t &reg_16);
     void jr_cond_sign_imm_8(bool condition);
 
@@ -118,6 +118,22 @@ private:
     void dec_l_0x2d();
     void ld_l_imm_8_0x2e();
     void cpl_0x2f();
+    void jr_nc_sign_imm_8_0x30();
+    void ld_sp_imm_16_0x31();
+    void ld_mem_hld_a_0x32();
+    void inc_sp_0x33();
+    void inc_mem_hl_0x34();
+    void dec_mem_hl_0x35();
+    void ld_mem_hl_imm_8_0x36();
+    void scf_0x37();
+    void jr_c_sign_imm_8_0x38();
+    void add_hl_sp_0x39();
+    void ld_a_mem_hld_0x3a();
+    void dec_sp_0x3b();
+    void inc_a_0x3c();
+    void dec_a_0x3d();
+    void ld_a_imm_8_0x3e();
+    void ccf_0x3f();
 };
 
 } // namespace GameBoy

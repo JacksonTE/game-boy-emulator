@@ -55,6 +55,22 @@ void CPU::execute_instruction(std::uint8_t opcode) {
             case 0x2d: dec_l_0x2d(); break;
             case 0x2e: ld_l_imm_8_0x2e(); break;
             case 0x2f: cpl_0x2f(); break;
+            case 0x30: jr_nc_sign_imm_8_0x30(); break;
+            case 0x31: ld_sp_imm_16_0x31(); break;
+            case 0x32: ld_mem_hld_a_0x32(); break;
+            case 0x33: inc_sp_0x33(); break;
+            case 0x34: inc_mem_hl_0x34(); break;
+            case 0x35: dec_mem_hl_0x35(); break;
+            case 0x36: ld_mem_hl_imm_8_0x36(); break;
+            case 0x37: scf_0x37(); break;
+            case 0x38: jr_c_sign_imm_8_0x38(); break;
+            case 0x39: add_hl_sp_0x39(); break;
+            case 0x3a: ld_a_mem_hld_0x3a(); break;
+            case 0x3b: dec_sp_0x3b(); break;
+            case 0x3c: inc_a_0x3c(); break;
+            case 0x3d: dec_a_0x3d(); break;
+            case 0x3e: ld_a_imm_8_0x3e(); break;
+            case 0x3f: ccf_0x3f(); break;
             default:
                 std::cerr << std::hex << std::setfill('0');
                 std::cerr << "Unimplemented instruction: 0x" << std::setw(2) << static_cast<int>(opcode) << "\n";
@@ -152,17 +168,17 @@ void CPU::ld_reg_16_imm_16(std::uint16_t &reg_16) {
     cycles_elapsed += 12;
 }
 
-void CPU::ld_mem_reg_16_reg_8(std::uint16_t &reg_16, const std::uint8_t &reg_8) {
+void CPU::ld_mem_reg_16_reg_8(const std::uint16_t &reg_16, const std::uint8_t &reg_8) {
     memory.write_8(reg_16, reg_8);
     pc += 1;
     cycles_elapsed += 8;
 }
 
-void CPU::add_hl_reg_16(const std::uint16_t &reg_8) {
+void CPU::add_hl_reg_16(const std::uint16_t &reg_16) {
     std::uint16_t previous_hl{hl};
-    hl += reg_8;
+    hl += reg_16;
     f &= ~FLAG_N;
-    f = (((previous_hl & 0x0FFF) + (reg_8 & 0x0FFF)) > 0x0FFF) ? (f | FLAG_H) : (f & ~FLAG_H);
+    f = (((previous_hl & 0x0FFF) + (reg_16 & 0x0FFF)) > 0x0FFF) ? (f | FLAG_H) : (f & ~FLAG_H);
     f = (previous_hl > hl) ? (f | FLAG_C) : (f & ~FLAG_C);
     pc += 1;
     cycles_elapsed += 8;
@@ -415,7 +431,95 @@ void CPU::ld_l_imm_8_0x2e() {
 
 void CPU::cpl_0x2f() {
     a = ~a;
-    f |= FLAG_N | FLAG_H;
+    f |= (FLAG_N | FLAG_H);
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::jr_nc_sign_imm_8_0x30() {
+    jr_cond_sign_imm_8((f & FLAG_C) == 0);
+}
+
+void CPU::ld_sp_imm_16_0x31() {
+    ld_reg_16_imm_16(sp);
+}
+
+void CPU::ld_mem_hld_a_0x32() {
+    ld_mem_reg_16_reg_8(hl, a);
+    hl--;
+}
+
+void CPU::inc_sp_0x33() {
+    inc_reg_16(sp);
+}
+
+void CPU::inc_mem_hl_0x34() {
+    uint8_t value = memory.read_8(hl);
+    value++;
+    memory.write_8(hl, value);
+    f = (value == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
+    f &= ~FLAG_N;
+    f = ((value & 0x0F) == 0x00) ? (f | FLAG_H) : (f & ~FLAG_H);
+    pc += 1;
+    cycles_elapsed += 12;
+}
+
+void CPU::dec_mem_hl_0x35() {
+    uint8_t value = memory.read_8(hl);
+    value--;
+    memory.write_8(hl, value);
+    f = (value == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
+    f |= FLAG_N;
+    f = ((value & 0x0F) == 0x0F) ? (f | FLAG_H) : (f & ~FLAG_H);
+    pc += 1;
+    cycles_elapsed += 12;
+}
+
+void CPU::ld_mem_hl_imm_8_0x36() {
+    memory.write_8(hl, memory.read_8(pc + 1));
+    pc += 2;
+    cycles_elapsed += 12;
+}
+
+void CPU::scf_0x37() {
+    f &= ~(FLAG_N | FLAG_H);
+    f |= FLAG_C;
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::jr_c_sign_imm_8_0x38() {
+    jr_cond_sign_imm_8((f & FLAG_C) != 0);
+}
+
+void CPU::add_hl_sp_0x39() {
+    add_hl_reg_16(sp);
+}
+
+void CPU::ld_a_mem_hld_0x3a() {
+    ld_reg_8_mem_reg_16(a, hl);
+    hl--;
+}
+
+void CPU::dec_sp_0x3b() {
+    dec_reg_16(sp);
+}
+
+void CPU::inc_a_0x3c() {
+    inc_reg_8(a);
+}
+
+void CPU::dec_a_0x3d() {
+    dec_reg_8(a);
+}
+
+void CPU::ld_a_imm_8_0x3e() {
+    ld_reg_8_imm_8(a);
+}
+
+void CPU::ccf_0x3f() {
+    f &= ~(FLAG_N | FLAG_H);
+    f ^= FLAG_C;
     pc += 1;
     cycles_elapsed += 4;
 }
