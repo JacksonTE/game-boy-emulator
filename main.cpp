@@ -4,7 +4,6 @@
 int main() {
     GameBoy::Memory memory{};
     GameBoy::CPU cpu{memory};
-    cpu.print_values();
     cpu.execute_instruction(0x00);
     cpu.print_values();
     cpu.execute_instruction(0x01);
