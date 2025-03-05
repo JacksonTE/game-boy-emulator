@@ -12,7 +12,6 @@ constexpr std::uint8_t FLAG_C{1 << 4}; // Carry (from bit 7-8, or sometimes from
 class CPU {
 public:
     CPU(Memory mem) : memory{mem} {}
-
     void execute_instruction(std::uint8_t opcode);
     void print_values() const;
 
@@ -60,10 +59,10 @@ private:
     void add_hl_reg_16(const uint16_t &reg);
 
     // Instruction functions named after their mnemonic and suffixed with their opcode
-    // imm_n - next n bits in memory (i.e. memory[pc + 1])
-    // sign_imm_8 - next byte in memory treated as a signed offset stored in 2s complement
-    // mem_ - the following register/immediate refers to a location in memory (e.g. mem_bc means memory[bc])
-    // r_i - increment register r after operation (e.g. ld_mem_hl_i_a means increment hl after load)
+    // imm_n - Next n bits in memory (i.e. memory[pc + 1])
+    // sign_imm_8 - Next byte in memory treated as a signed offset stored in 2s complement
+    // mem_ - The following register/immediate refers to a location in memory (e.g. mem_bc means memory[bc])
+    // r_i - Increment register r after operation (e.g. ld_mem_hl_i_a means increment hl after load)
     void nop_0x00();
     void ld_bc_imm_16_0x01();
     void ld_mem_bc_a_0x02();
@@ -102,6 +101,16 @@ private:
     void inc_hl_0x23();
     void inc_h_0x24();
     void dec_h_0x25();
+    void ld_h_imm_8_0x26();
+    void daa_0x27();
+    void jr_z_sign_imm_8_0x28();
+    void add_hl_hl_0x29();
+    void ld_a_mem_hl_i_0x2a();
+    void dec_hl_0x2b();
+    void inc_l_0x2c();
+    void dec_l_0x2d();
+    void ld_l_imm_8_0x2e();
+    void cpl_0x2f();
 };
 
 } // namespace GameBoy

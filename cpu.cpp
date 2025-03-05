@@ -45,6 +45,16 @@ void CPU::execute_instruction(std::uint8_t opcode) {
             case 0x23: inc_hl_0x23(); break;
             case 0x24: inc_h_0x24(); break;
             case 0x25: dec_h_0x25(); break;
+            case 0x26: ld_h_imm_8_0x26(); break;
+            case 0x27: daa_0x27(); break;
+            case 0x28: jr_z_sign_imm_8_0x28(); break;
+            case 0x29: add_hl_hl_0x29(); break;
+            case 0x2a: ld_a_mem_hl_i_0x2a(); break;
+            case 0x2b: dec_hl_0x2b(); break;
+            case 0x2c: inc_l_0x2c(); break;
+            case 0x2d: dec_l_0x2d(); break;
+            case 0x2e: ld_l_imm_8_0x2e(); break;
+            case 0x2f: cpl_0x2f(); break;
             default:
                 std::cerr << std::hex << std::setfill('0');
                 std::cerr << "Unimplemented instruction: 0x" << std::setw(2) << static_cast<int>(opcode) << "\n";
@@ -110,8 +120,6 @@ void CPU::add_hl_reg_16(const uint16_t &reg) {
     f &= ~FLAG_N;
     f = (((previous_hl & 0x0FFF) + (reg & 0x0FFF)) > 0x0FFF) ? (f | FLAG_H) : (f & ~FLAG_H);
     f = (previous_hl > hl) ? (f | FLAG_C) : (f & ~FLAG_C);
-    pc += 1;
-    cycles_elapsed += 8;
 }
 
 void CPU::nop_0x00() {
@@ -357,5 +365,89 @@ void CPU::dec_h_0x25() {
     pc += 1;
     cycles_elapsed += 4;
 }
+
+void CPU::ld_h_imm_8_0x26() {
+    h = memory.read_8(pc + 1);
+    pc += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::daa_0x27() {
+    // Previous operation was between two binary coded decimals (BCDs) and this corrects register a back to BCD format
+    const bool previous_addition{(f & FLAG_N) == 0};
+    bool carry{false};
+    uint8_t correction{0};
+    if ((f & FLAG_H) || (previous_addition && (a & 0x0F) > 0x09)) {
+        correction |= 0x06;
+    }
+    if ((f & FLAG_C) || (previous_addition && a > 0x99)) {
+        correction |= 0x60;
+        carry = previous_addition;
+    }
+    a = previous_addition ? (a + correction) : (a - correction);
+    f = (a == 0) ? (f | FLAG_Z) : (f & ~FLAG_Z);
+    f &= ~FLAG_H;
+    f = carry ? (f | FLAG_C) : (f & ~FLAG_C);
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::jr_z_sign_imm_8_0x28() {
+    if ((f & FLAG_Z) != 0) {
+        int8_t offset{static_cast<int8_t>(memory.read_8(pc + 1))};
+        pc += 2 + offset;
+        cycles_elapsed += 12;
+    }
+    else {
+        pc += 2;
+        cycles_elapsed += 8;
+    }
+}
+
+void CPU::add_hl_hl_0x29() {
+    add_hl_reg_16(hl);
+    pc += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::ld_a_mem_hl_i_0x2a() {
+    a = memory.read_8(hl);
+    hl++;
+    pc += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::dec_hl_0x2b() {
+    hl--;
+    pc += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::inc_l_0x2c() {
+    inc_reg_8(l);
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::dec_l_0x2d() {
+    dec_reg_8(l);
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::ld_l_imm_8_0x2e() {
+    l = memory.read_8(pc + 1);
+    pc += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::cpl_0x2f() {
+    a = ~a;
+    f |= FLAG_N | FLAG_H;
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+
 
 } // namespace GameBoy
