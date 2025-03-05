@@ -54,15 +54,22 @@ private:
     std::uint16_t pc{}; // Program Counter, address of the next instruction to execute
 
     // Shared logic for instruction functions
-    void inc_reg_8(uint8_t &reg);
-    void dec_reg_8(uint8_t &reg);
-    void add_hl_reg_16(const uint16_t &reg);
+    void inc_reg_8(std::uint8_t &reg_8);
+    void dec_reg_8(std::uint8_t &reg_8);
+    void inc_reg_16(std::uint16_t &reg_16);
+    void dec_reg_16(std::uint16_t &reg_16);
+    void ld_reg_8_imm_8(std::uint8_t &reg_8);
+    void ld_reg_8_mem_reg_16(std::uint8_t &reg_8, const std::uint16_t &reg_16);
+    void ld_reg_16_imm_16(std::uint16_t &reg_16);
+    void ld_mem_reg_16_reg_8(std::uint16_t &reg_16, const std::uint8_t &reg_8);
+    void add_hl_reg_16(const std::uint16_t &reg_16);
+    void jr_cond_sign_imm_8(bool condition);
 
     // Instruction functions named after their mnemonic and suffixed with their opcode
     // imm_n - Next n bits in memory (i.e. memory[pc + 1])
     // sign_imm_8 - Next byte in memory treated as a signed offset stored in 2s complement
     // mem_ - The following register/immediate refers to a location in memory (e.g. mem_bc means memory[bc])
-    // r_i - Increment register r after operation (e.g. ld_mem_hl_i_a means increment hl after load)
+    // regi/regd - Increment/decrement register reg after operation (e.g. ld_mem_hli_a means increment hl after load)
     void nop_0x00();
     void ld_bc_imm_16_0x01();
     void ld_mem_bc_a_0x02();
@@ -97,7 +104,7 @@ private:
     void rra_0x1f();
     void jr_nz_sign_imm_8_0x20();
     void ld_hl_imm_16_0x21();
-    void ld_mem_hl_i_a_0x22();
+    void ld_mem_hli_a_0x22();
     void inc_hl_0x23();
     void inc_h_0x24();
     void dec_h_0x25();
@@ -105,7 +112,7 @@ private:
     void daa_0x27();
     void jr_z_sign_imm_8_0x28();
     void add_hl_hl_0x29();
-    void ld_a_mem_hl_i_0x2a();
+    void ld_a_mem_hli_0x2a();
     void dec_hl_0x2b();
     void inc_l_0x2c();
     void dec_l_0x2d();
