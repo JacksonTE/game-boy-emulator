@@ -1,23 +1,24 @@
 #pragma once
+
 #include <cstdint>
 #include "memory.h"
 
 namespace GameBoy {
 
-constexpr std::uint8_t FLAG_Z{1 << 7}; // Zero - set after arithmetic result is zero, cleared when result is nonzero
-constexpr std::uint8_t FLAG_N{1 << 6}; // Subtract - set after subtraction/decrement/compare, cleared after addition/increment/logical operation (and LD HL, SP + e8)
-constexpr std::uint8_t FLAG_H{1 << 5}; // Half-Carry (from bit 3-4, or sometimes from 11 to 12) - set when addition causes carry or subtraction requires borrow, cleared otherwise
-constexpr std::uint8_t FLAG_C{1 << 4}; // Carry (from bit 7-8, or sometimes from 15-16) - set when addition causes carry, subtraction requires borrow, or bit shifted out, cleared otherwise
+constexpr uint8_t FLAG_Z{1 << 7}; // Zero - set after arithmetic result is zero, cleared when result is nonzero
+constexpr uint8_t FLAG_N{1 << 6}; // Subtract - set after subtraction/decrement/compare, cleared after addition/increment/logical operation (and LD HL, SP + e8)
+constexpr uint8_t FLAG_H{1 << 5}; // Half-Carry (from bit 3-4, or sometimes from 11 to 12) - set when addition causes carry or subtraction requires borrow, cleared otherwise
+constexpr uint8_t FLAG_C{1 << 4}; // Carry (from bit 7-8, or sometimes from 15-16) - set when addition causes carry, subtraction requires borrow, or bit shifted out, cleared otherwise
 
 class CPU {
 public:
     CPU(Memory mem) : memory{mem} {}
-    void execute_instruction(std::uint8_t opcode);
+    void execute_instruction(uint8_t opcode);
     void print_values() const;
 
 private:
     Memory memory;
-    std::uint64_t cycles_elapsed{};
+    uint64_t cycles_elapsed{};
     bool stopped{};
     bool halted{};
 
@@ -25,49 +26,53 @@ private:
     // The first letter of each register pair is its most significant byte and the second is its least significant byte
     union {
         struct {
-            std::uint8_t a;
-            std::uint8_t f; // Flags register - only bits 7-4 are used (3-0 will always be zero)
+            uint8_t a;
+            uint8_t f; // Flags register - only bits 7-4 are used (3-0 will always be zero)
         };
-        std::uint16_t af{};
+        uint16_t af{};
     };
     union {
         struct {
-            std::uint8_t b;
-            std::uint8_t c;
+            uint8_t b;
+            uint8_t c;
         };
-        std::uint16_t bc{};
+        uint16_t bc{};
     };
     union {
         struct {
-            std::uint8_t d;
-            std::uint8_t e;
+            uint8_t d;
+            uint8_t e;
         };
-        std::uint16_t de{};
+        uint16_t de{};
     };
     union {
         struct {
-            std::uint8_t h;
-            std::uint8_t l;
+            uint8_t h;
+            uint8_t l;
         };
-        std::uint16_t hl{};
+        uint16_t hl{};
     };
-    std::uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
-    std::uint16_t pc{}; // Program Counter, address of the next instruction to execute
+    uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
+    uint16_t pc{}; // Program Counter, address of the next instruction to execute
 
-    // Shared logic for instruction functions
-    void inc_reg_8(std::uint8_t &reg_8);
-    void dec_reg_8(std::uint8_t &reg_8);
-    void inc_reg_16(std::uint16_t &reg_16);
-    void dec_reg_16(std::uint16_t &reg_16);
-    void ld_reg_8_reg_8(std::uint8_t &reg_8_dest, const std::uint8_t &reg_8_src);
-    void ld_reg_8_imm_8(std::uint8_t &reg_8_dest);
-    void ld_reg_8_mem_reg_16(std::uint8_t &reg_8_dest, const std::uint16_t &reg_16_src_addr);
-    void ld_reg_16_imm_16(std::uint16_t &reg_16_dest);
-    void ld_mem_reg_16_reg_8(const std::uint16_t &reg_16_dest_addr, const std::uint8_t &reg_8_src);
-    void add_hl_reg_16(const std::uint16_t &reg_16);
+    // Instruction Helpers
+    void set_flags_z_n_h_c(bool cond_z, bool cond_n, bool cond_h, bool cond_c);
+    void inc_reg_8(uint8_t &reg);
+    void dec_reg_8(uint8_t &reg);
+    void inc_reg_16(uint16_t &reg);
+    void dec_reg_16(uint16_t &reg);
+    void ld_reg_8_reg_8(uint8_t &dest, const uint8_t &src);
+    void ld_reg_8_imm_8(uint8_t &dest);
+    void ld_reg_8_mem_reg_16(uint8_t &dest, const uint16_t &src_addr);
+    void ld_reg_16_imm_16(uint16_t &dest);
+    void ld_mem_reg_16_reg_8(const uint16_t &dest_addr, const uint8_t &src);
+    void add_reg_8_reg_8(uint8_t &op_1, const uint8_t &op_2);
+    void add_hl_reg_16(const uint16_t &reg);
+    void adc_reg_8_reg_8(uint8_t &op_1, const uint8_t &op_2);
+    void sub_a_reg_8(const uint8_t &reg);
     void jr_cond_sign_imm_8(bool condition);
 
-    // Instruction functions named after their mnemonic and suffixed with their opcode
+    // Instruction functions suffixed with their opcode
     // imm_n - Next n bits in memory (i.e. memory[pc + 1])
     // sign_imm_8 - Next byte in memory treated as a signed offset stored in 2s complement
     // mem_ - The following register/immediate refers to a location in memory (e.g. mem_bc means memory[bc])
