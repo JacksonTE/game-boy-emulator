@@ -56,7 +56,7 @@ private:
     uint16_t pc{}; // Program Counter, address of the next instruction to execute
 
     // Instruction Helpers
-    void set_flags_z_n_h_c(bool cond_z, bool cond_n, bool cond_h, bool cond_c);
+    void set_flags_z_n_h_c(bool set_z, bool set_n, bool set_h, bool set_c);
     void inc_reg_8(uint8_t &reg);
     void dec_reg_8(uint8_t &reg);
     void inc_reg_16(uint16_t &reg);
@@ -66,10 +66,15 @@ private:
     void ld_reg_8_mem_reg_16(uint8_t &dest, const uint16_t &src_addr);
     void ld_reg_16_imm_16(uint16_t &dest);
     void ld_mem_reg_16_reg_8(const uint16_t &dest_addr, const uint8_t &src);
-    void add_reg_8_reg_8(uint8_t &op_1, const uint8_t &op_2);
+    void add_a_reg_8(const uint8_t &reg);
     void add_hl_reg_16(const uint16_t &reg);
-    void adc_reg_8_reg_8(uint8_t &op_1, const uint8_t &op_2);
+    void adc_a_reg_8(const uint8_t &reg);
     void sub_a_reg_8(const uint8_t &reg);
+    void sbc_a_reg_8(const uint8_t &reg);
+    void and_a_reg_8(const uint8_t &reg);
+    void xor_a_reg_8(const uint8_t &reg);
+    void or_a_reg_8(const uint8_t &reg);
+    void cp_a_reg_8(const uint8_t &reg);
     void jr_cond_sign_imm_8(bool condition);
 
     // Instruction functions suffixed with their opcode
@@ -205,6 +210,70 @@ private:
     void ld_a_l_0x7d();
     void ld_a_mem_hl_0x7e();
     void ld_a_a_0x7f();
+    void add_a_b_0x80();
+    void add_a_c_0x81();
+    void add_a_d_0x82();
+    void add_a_e_0x83();
+    void add_a_h_0x84();
+    void add_a_l_0x85();
+    void add_a_mem_hl_0x86();
+    void add_a_a_0x87();
+    void adc_a_b_0x88();
+    void adc_a_c_0x89();
+    void adc_a_d_0x8a();
+    void adc_a_e_0x8b();
+    void adc_a_h_0x8c();
+    void adc_a_l_0x8d();
+    void adc_a_mem_hl_0x8e();
+    void adc_a_a_0x8f();
+    void sub_a_b_0x90();
+    void sub_a_c_0x91();
+    void sub_a_d_0x92();
+    void sub_a_e_0x93();
+    void sub_a_h_0x94();
+    void sub_a_l_0x95();
+    void sub_a_mem_hl_0x96();
+    void sub_a_a_0x97();
+    void sbc_a_b_0x98();
+    void sbc_a_c_0x99();
+    void sbc_a_d_0x9a();
+    void sbc_a_e_0x9b();
+    void sbc_a_h_0x9c();
+    void sbc_a_l_0x9d();
+    void sbc_a_mem_hl_0x9e();
+    void sbc_a_a_0x9f();
+    void and_a_b_0xa0();
+    void and_a_c_0xa1();
+    void and_a_d_0xa2();
+    void and_a_e_0xa3();
+    void and_a_h_0xa4();
+    void and_a_l_0xa5();
+    void and_a_mem_hl_0xa6();
+    void and_a_a_0xa7();
+    void xor_a_b_0xa8();
+    void xor_a_c_0xa9();
+    void xor_a_d_0xaa();
+    void xor_a_e_0xab();
+    void xor_a_h_0xac();
+    void xor_a_l_0xad();
+    void xor_a_mem_hl_0xae();
+    void xor_a_a_0xaf();
+    void or_a_b_0xb0();
+    void or_a_c_0xb1();
+    void or_a_d_0xb2();
+    void or_a_e_0xb3();
+    void or_a_h_0xb4();
+    void or_a_l_0xb5();
+    void or_a_mem_hl_0xb6();
+    void or_a_a_0xb7();
+    void cp_a_b_0xb8();
+    void cp_a_c_0xb9();
+    void cp_a_d_0xba();
+    void cp_a_e_0xbb();
+    void cp_a_h_0xbc();
+    void cp_a_l_0xbd();
+    void cp_a_mem_hl_0xbe();
+    void cp_a_a_0xbf();
 };
 
 } // namespace GameBoy
