@@ -4,6 +4,44 @@
 
 namespace GameBoy {
 
+void CPU::print_values() const {
+    std::cout << std::hex << std::setfill('0');
+    std::cout << "================== CPU Registers ==================\n";
+
+    std::cout << "AF: 0x" << std::setw(4) << af
+            << "   (A: 0x" << std::setw(2) << static_cast<int>(a)
+            << ", F: 0x" << std::setw(2) << static_cast<int>(f) << ")\n";
+
+    std::cout << "BC: 0x" << std::setw(4) << bc
+            << "   (B: 0x" << std::setw(2) << static_cast<int>(b)
+            << ", C: 0x" << std::setw(2) << static_cast<int>(c) << ")\n";
+
+    std::cout << "DE: 0x" << std::setw(4) << de
+            << "   (D: 0x" << std::setw(2) << static_cast<int>(d)
+            << ", E: 0x" << std::setw(2) << static_cast<int>(e) << ")\n";
+
+    std::cout << "HL: 0x" << std::setw(4) << hl
+            << "   (H: 0x" << std::setw(2) << static_cast<int>(h)
+            << ", L: 0x" << std::setw(2) << static_cast<int>(l) << ")\n";
+
+    std::cout << "SP: 0x" << std::setw(4) << sp << "\n";
+    std::cout << "PC: 0x" << std::setw(4) << pc << "\n";
+
+    std::cout << std::dec;
+    std::cout << "Cycles Elapsed: " << cycles_elapsed << "\n";
+    std::cout << "===================================================\n";
+}
+
+void CPU::execute_instruction(uint8_t opcode) {
+    if (opcode != 0xCB) {
+        (this->*instruction_table[opcode])();
+    }
+    else {
+        uint8_t cb_opcode{memory.read_8(pc + 1)};
+        (this->*cb_instruction_table[cb_opcode])();
+    }
+}
+
 const CPU::Instruction CPU::instruction_table[256] = {
     &CPU::nop_0x00,
     &CPU::ld_bc_imm_16_0x01,
@@ -201,44 +239,6 @@ const CPU::Instruction CPU::instruction_table[256] = {
 
 const CPU::Instruction CPU::cb_instruction_table[256] = {
 };
-
-void CPU::execute_instruction(uint8_t opcode) {
-    if (opcode != 0xCB) {
-        (this->*instruction_table[opcode])();
-    }
-    else {
-        uint8_t cb_opcode{memory.read_8(pc + 1)};
-        (this->*cb_instruction_table[cb_opcode])();
-    }
-}
-
-void CPU::print_values() const {
-    std::cout << std::hex << std::setfill('0');
-    std::cout << "================== CPU Registers ==================\n";
-
-    std::cout << "AF: 0x" << std::setw(4) << af
-            << "   (A: 0x" << std::setw(2) << static_cast<int>(a)
-            << ", F: 0x" << std::setw(2) << static_cast<int>(f) << ")\n";
-
-    std::cout << "BC: 0x" << std::setw(4) << bc
-            << "   (B: 0x" << std::setw(2) << static_cast<int>(b)
-            << ", C: 0x" << std::setw(2) << static_cast<int>(c) << ")\n";
-
-    std::cout << "DE: 0x" << std::setw(4) << de
-            << "   (D: 0x" << std::setw(2) << static_cast<int>(d)
-            << ", E: 0x" << std::setw(2) << static_cast<int>(e) << ")\n";
-
-    std::cout << "HL: 0x" << std::setw(4) << hl
-            << "   (H: 0x" << std::setw(2) << static_cast<int>(h)
-            << ", L: 0x" << std::setw(2) << static_cast<int>(l) << ")\n";
-
-    std::cout << "SP: 0x" << std::setw(4) << sp << "\n";
-    std::cout << "PC: 0x" << std::setw(4) << pc << "\n";
-
-    std::cout << std::dec;
-    std::cout << "Cycles Elapsed: " << cycles_elapsed << "\n";
-    std::cout << "===================================================\n";
-}
 
 /******************************
  *    Instruction Helpers

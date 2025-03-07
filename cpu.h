@@ -13,15 +13,11 @@ constexpr uint8_t FLAG_C{1 << 4}; // Carry (from bit 7-8, or sometimes from 15-1
 class CPU {
 public:
     CPU(Memory mem) : memory{mem} {}
-    void execute_instruction(uint8_t opcode);
     void print_values() const;
+    void execute_instruction(uint8_t opcode);
 
 private:
-    using Instruction = void (CPU::*)();
-    static const Instruction instruction_table[256];
-    static const Instruction cb_instruction_table[256];
     Memory memory;
-    uint64_t cycles_elapsed{};
     bool stopped{};
     bool halted{};
 
@@ -58,6 +54,11 @@ private:
     };
     uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
     uint16_t pc{}; // Program Counter, address of the next instruction byte to execute from memory
+    uint64_t cycles_elapsed{};
+
+    using Instruction = void (CPU::*)();
+    static const Instruction instruction_table[256];
+    static const Instruction cb_instruction_table[256];
 
     // Instruction Helpers
     void set_flags_z_n_h_c(bool set_z, bool set_n, bool set_h, bool set_c);
