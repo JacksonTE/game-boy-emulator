@@ -4,215 +4,211 @@
 
 namespace GameBoy {
 
+const CPU::Instruction CPU::instruction_table[256] = {
+    &CPU::nop_0x00,
+    &CPU::ld_bc_imm_16_0x01,
+    &CPU::ld_mem_bc_a_0x02,
+    &CPU::inc_bc_0x03,
+    &CPU::inc_b_0x04,
+    &CPU::dec_b_0x05,
+    &CPU::ld_b_imm_8_0x06,
+    &CPU::rlca_0x07,
+    &CPU::ld_mem_imm_16_sp_0x08,
+    &CPU::add_hl_bc_0x09,
+    &CPU::ld_a_mem_bc_0x0a,
+    &CPU::dec_bc_0x0b,
+    &CPU::inc_c_0x0c,
+    &CPU::dec_c_0x0d,
+    &CPU::ld_c_imm_8_0x0e,
+    &CPU::rrca_0x0f,
+    &CPU::stop_imm_8_0x10,
+    &CPU::ld_de_imm_16_0x11,
+    &CPU::ld_mem_de_a_0x12,
+    &CPU::inc_de_0x13,
+    &CPU::inc_d_0x14,
+    &CPU::dec_d_0x15,
+    &CPU::ld_d_imm_8_0x16,
+    &CPU::rla_0x17,
+    &CPU::jr_sign_imm_8_0x18,
+    &CPU::add_hl_de_0x19,
+    &CPU::ld_a_mem_de_0x1a,
+    &CPU::dec_de_0x1b,
+    &CPU::inc_e_0x1c,
+    &CPU::dec_e_0x1d,
+    &CPU::ld_e_imm_8_0x1e,
+    &CPU::rra_0x1f,
+    &CPU::jr_nz_sign_imm_8_0x20,
+    &CPU::ld_hl_imm_16_0x21,
+    &CPU::ld_mem_hli_a_0x22,
+    &CPU::inc_hl_0x23,
+    &CPU::inc_h_0x24,
+    &CPU::dec_h_0x25,
+    &CPU::ld_h_imm_8_0x26,
+    &CPU::daa_0x27,
+    &CPU::jr_z_sign_imm_8_0x28,
+    &CPU::add_hl_hl_0x29,
+    &CPU::ld_a_mem_hli_0x2a,
+    &CPU::dec_hl_0x2b,
+    &CPU::inc_l_0x2c,
+    &CPU::dec_l_0x2d,
+    &CPU::ld_l_imm_8_0x2e,
+    &CPU::cpl_0x2f,
+    &CPU::jr_nc_sign_imm_8_0x30,
+    &CPU::ld_sp_imm_16_0x31,
+    &CPU::ld_mem_hld_a_0x32,
+    &CPU::inc_sp_0x33,
+    &CPU::inc_mem_hl_0x34,
+    &CPU::dec_mem_hl_0x35,
+    &CPU::ld_mem_hl_imm_8_0x36,
+    &CPU::scf_0x37,
+    &CPU::jr_c_sign_imm_8_0x38,
+    &CPU::add_hl_sp_0x39,
+    &CPU::ld_a_mem_hld_0x3a,
+    &CPU::dec_sp_0x3b,
+    &CPU::inc_a_0x3c,
+    &CPU::dec_a_0x3d,
+    &CPU::ld_a_imm_8_0x3e,
+    &CPU::ccf_0x3f,
+    &CPU::ld_b_b_0x40,
+    &CPU::ld_b_c_0x41,
+    &CPU::ld_b_d_0x42,
+    &CPU::ld_b_e_0x43,
+    &CPU::ld_b_h_0x44,
+    &CPU::ld_b_l_0x45,
+    &CPU::ld_b_mem_hl_0x46,
+    &CPU::ld_b_a_0x47,
+    &CPU::ld_c_b_0x48,
+    &CPU::ld_c_c_0x49,
+    &CPU::ld_c_d_0x4a,
+    &CPU::ld_c_e_0x4b,
+    &CPU::ld_c_h_0x4c,
+    &CPU::ld_c_l_0x4d,
+    &CPU::ld_c_mem_hl_0x4e,
+    &CPU::ld_c_a_0x4f,
+    &CPU::ld_d_b_0x50,
+    &CPU::ld_d_c_0x51,
+    &CPU::ld_d_d_0x52,
+    &CPU::ld_d_e_0x53,
+    &CPU::ld_d_h_0x54,
+    &CPU::ld_d_l_0x55,
+    &CPU::ld_d_mem_hl_0x56,
+    &CPU::ld_d_a_0x57,
+    &CPU::ld_e_b_0x58,
+    &CPU::ld_e_c_0x59,
+    &CPU::ld_e_d_0x5a,
+    &CPU::ld_e_e_0x5b,
+    &CPU::ld_e_h_0x5c,
+    &CPU::ld_e_l_0x5d,
+    &CPU::ld_e_mem_hl_0x5e,
+    &CPU::ld_e_a_0x5f,
+    &CPU::ld_h_b_0x60,
+    &CPU::ld_h_c_0x61,
+    &CPU::ld_h_d_0x62,
+    &CPU::ld_h_e_0x63,
+    &CPU::ld_h_h_0x64,
+    &CPU::ld_h_l_0x65,
+    &CPU::ld_h_mem_hl_0x66,
+    &CPU::ld_h_a_0x67,
+    &CPU::ld_l_b_0x68,
+    &CPU::ld_l_c_0x69,
+    &CPU::ld_l_d_0x6a,
+    &CPU::ld_l_e_0x6b,
+    &CPU::ld_l_h_0x6c,
+    &CPU::ld_l_l_0x6d,
+    &CPU::ld_l_mem_hl_0x6e,
+    &CPU::ld_l_a_0x6f,
+    &CPU::ld_mem_hl_b_0x70,
+    &CPU::ld_mem_hl_c_0x71,
+    &CPU::ld_mem_hl_d_0x72,
+    &CPU::ld_mem_hl_e_0x73,
+    &CPU::ld_mem_hl_h_0x74,
+    &CPU::ld_mem_hl_l_0x75,
+    &CPU::halt_0x76,
+    &CPU::ld_mem_hl_a_0x77,
+    &CPU::ld_a_b_0x78,
+    &CPU::ld_a_c_0x79,
+    &CPU::ld_a_d_0x7a,
+    &CPU::ld_a_e_0x7b,
+    &CPU::ld_a_h_0x7c,
+    &CPU::ld_a_l_0x7d,
+    &CPU::ld_a_mem_hl_0x7e,
+    &CPU::ld_a_a_0x7f,
+    &CPU::add_a_b_0x80,
+    &CPU::add_a_c_0x81,
+    &CPU::add_a_d_0x82,
+    &CPU::add_a_e_0x83,
+    &CPU::add_a_h_0x84,
+    &CPU::add_a_l_0x85,
+    &CPU::add_a_mem_hl_0x86,
+    &CPU::add_a_a_0x87,
+    &CPU::adc_a_b_0x88,
+    &CPU::adc_a_c_0x89,
+    &CPU::adc_a_d_0x8a,
+    &CPU::adc_a_e_0x8b,
+    &CPU::adc_a_h_0x8c,
+    &CPU::adc_a_l_0x8d,
+    &CPU::adc_a_mem_hl_0x8e,
+    &CPU::adc_a_a_0x8f,
+    &CPU::sub_a_b_0x90,
+    &CPU::sub_a_c_0x91,
+    &CPU::sub_a_d_0x92,
+    &CPU::sub_a_e_0x93,
+    &CPU::sub_a_h_0x94,
+    &CPU::sub_a_l_0x95,
+    &CPU::sub_a_mem_hl_0x96,
+    &CPU::sub_a_a_0x97,
+    &CPU::sbc_a_b_0x98,
+    &CPU::sbc_a_c_0x99,
+    &CPU::sbc_a_d_0x9a,
+    &CPU::sbc_a_e_0x9b,
+    &CPU::sbc_a_h_0x9c,
+    &CPU::sbc_a_l_0x9d,
+    &CPU::sbc_a_mem_hl_0x9e,
+    &CPU::sbc_a_a_0x9f,
+    &CPU::and_a_b_0xa0,
+    &CPU::and_a_c_0xa1,
+    &CPU::and_a_d_0xa2,
+    &CPU::and_a_e_0xa3,
+    &CPU::and_a_h_0xa4,
+    &CPU::and_a_l_0xa5,
+    &CPU::and_a_mem_hl_0xa6,
+    &CPU::and_a_a_0xa7,
+    &CPU::xor_a_b_0xa8,
+    &CPU::xor_a_c_0xa9,
+    &CPU::xor_a_d_0xaa,
+    &CPU::xor_a_e_0xab,
+    &CPU::xor_a_h_0xac,
+    &CPU::xor_a_l_0xad,
+    &CPU::xor_a_mem_hl_0xae,
+    &CPU::xor_a_a_0xaf,
+    &CPU::or_a_b_0xb0,
+    &CPU::or_a_c_0xb1,
+    &CPU::or_a_d_0xb2,
+    &CPU::or_a_e_0xb3,
+    &CPU::or_a_h_0xb4,
+    &CPU::or_a_l_0xb5,
+    &CPU::or_a_mem_hl_0xb6,
+    &CPU::or_a_a_0xb7,
+    &CPU::cp_a_b_0xb8,
+    &CPU::cp_a_c_0xb9,
+    &CPU::cp_a_d_0xba,
+    &CPU::cp_a_e_0xbb,
+    &CPU::cp_a_h_0xbc,
+    &CPU::cp_a_l_0xbd,
+    &CPU::cp_a_mem_hl_0xbe,
+    &CPU::cp_a_a_0xbf,
+};
+
+const CPU::Instruction CPU::cb_instruction_table[256] = {
+};
+
 void CPU::execute_instruction(uint8_t opcode) {
     if (opcode != 0xCB) {
-        switch (opcode) {
-            case 0x00: nop_0x00(); break;
-            case 0x01: ld_bc_imm_16_0x01(); break;
-            case 0x02: ld_mem_bc_a_0x02(); break;
-            case 0x03: inc_bc_0x03(); break;
-            case 0x04: inc_b_0x04(); break;
-            case 0x05: dec_b_0x05(); break;
-            case 0x06: ld_b_imm_8_0x06(); break;
-            case 0x07: rlca_0x07(); break;
-            case 0x08: ld_mem_imm_16_sp_0x08(); break;
-            case 0x09: add_hl_bc_0x09(); break;
-            case 0x0a: ld_a_mem_bc_0x0a(); break;
-            case 0x0b: dec_bc_0x0b(); break;
-            case 0x0c: inc_c_0x0c(); break;
-            case 0x0d: dec_c_0x0d(); break;
-            case 0x0e: ld_c_imm_8_0x0e(); break;
-            case 0x0f: rrca_0x0f(); break;
-            case 0x10: stop_imm_8_0x10(); break;
-            case 0x11: ld_de_imm_16_0x11(); break;
-            case 0x12: ld_mem_de_a_0x12(); break;
-            case 0x13: inc_de_0x13(); break;
-            case 0x14: inc_d_0x14(); break;
-            case 0x15: dec_d_0x15(); break;
-            case 0x16: ld_d_imm_8_0x16(); break;
-            case 0x17: rla_0x17(); break;
-            case 0x18: jr_sign_imm_8_0x18(); break;
-            case 0x19: add_hl_de_0x19(); break;
-            case 0x1a: ld_a_mem_de_0x1a(); break;
-            case 0x1b: dec_de_0x1b(); break;
-            case 0x1c: inc_e_0x1c(); break;
-            case 0x1d: dec_e_0x1d(); break;
-            case 0x1e: ld_e_imm_8_0x1e(); break;
-            case 0x1f: rra_0x1f(); break;
-            case 0x20: jr_nz_sign_imm_8_0x20(); break;
-            case 0x21: ld_hl_imm_16_0x21(); break;
-            case 0x22: ld_mem_hli_a_0x22(); break;
-            case 0x23: inc_hl_0x23(); break;
-            case 0x24: inc_h_0x24(); break;
-            case 0x25: dec_h_0x25(); break;
-            case 0x26: ld_h_imm_8_0x26(); break;
-            case 0x27: daa_0x27(); break;
-            case 0x28: jr_z_sign_imm_8_0x28(); break;
-            case 0x29: add_hl_hl_0x29(); break;
-            case 0x2a: ld_a_mem_hli_0x2a(); break;
-            case 0x2b: dec_hl_0x2b(); break;
-            case 0x2c: inc_l_0x2c(); break;
-            case 0x2d: dec_l_0x2d(); break;
-            case 0x2e: ld_l_imm_8_0x2e(); break;
-            case 0x2f: cpl_0x2f(); break;
-            case 0x30: jr_nc_sign_imm_8_0x30(); break;
-            case 0x31: ld_sp_imm_16_0x31(); break;
-            case 0x32: ld_mem_hld_a_0x32(); break;
-            case 0x33: inc_sp_0x33(); break;
-            case 0x34: inc_mem_hl_0x34(); break;
-            case 0x35: dec_mem_hl_0x35(); break;
-            case 0x36: ld_mem_hl_imm_8_0x36(); break;
-            case 0x37: scf_0x37(); break;
-            case 0x38: jr_c_sign_imm_8_0x38(); break;
-            case 0x39: add_hl_sp_0x39(); break;
-            case 0x3a: ld_a_mem_hld_0x3a(); break;
-            case 0x3b: dec_sp_0x3b(); break;
-            case 0x3c: inc_a_0x3c(); break;
-            case 0x3d: dec_a_0x3d(); break;
-            case 0x3e: ld_a_imm_8_0x3e(); break;
-            case 0x3f: ccf_0x3f(); break;
-            case 0x40: ld_b_b_0x40(); break;
-            case 0x41: ld_b_c_0x41(); break;
-            case 0x42: ld_b_d_0x42(); break;
-            case 0x43: ld_b_e_0x43(); break;
-            case 0x44: ld_b_h_0x44(); break;
-            case 0x45: ld_b_l_0x45(); break;
-            case 0x46: ld_b_mem_hl_0x46(); break;
-            case 0x47: ld_b_a_0x47(); break;
-            case 0x48: ld_c_b_0x48(); break;
-            case 0x49: ld_c_c_0x49(); break;
-            case 0x4a: ld_c_d_0x4a(); break;
-            case 0x4b: ld_c_e_0x4b(); break;
-            case 0x4c: ld_c_h_0x4c(); break;
-            case 0x4d: ld_c_l_0x4d(); break;
-            case 0x4e: ld_c_mem_hl_0x4e(); break;
-            case 0x4f: ld_c_a_0x4f(); break;
-            case 0x50: ld_d_b_0x50(); break;
-            case 0x51: ld_d_c_0x51(); break;
-            case 0x52: ld_d_d_0x52(); break;
-            case 0x53: ld_d_e_0x53(); break;
-            case 0x54: ld_d_h_0x54(); break;
-            case 0x55: ld_d_l_0x55(); break;
-            case 0x56: ld_d_mem_hl_0x56(); break;
-            case 0x57: ld_d_a_0x57(); break;
-            case 0x58: ld_e_b_0x58(); break;
-            case 0x59: ld_e_c_0x59(); break;
-            case 0x5a: ld_e_d_0x5a(); break;
-            case 0x5b: ld_e_e_0x5b(); break;
-            case 0x5c: ld_e_h_0x5c(); break;
-            case 0x5d: ld_e_l_0x5d(); break;
-            case 0x5e: ld_e_mem_hl_0x5e(); break;
-            case 0x5f: ld_e_a_0x5f(); break;
-            case 0x60: ld_h_b_0x60(); break;
-            case 0x61: ld_h_c_0x61(); break;
-            case 0x62: ld_h_d_0x62(); break;
-            case 0x63: ld_h_e_0x63(); break;
-            case 0x64: ld_h_h_0x64(); break;
-            case 0x65: ld_h_l_0x65(); break;
-            case 0x66: ld_h_mem_hl_0x66(); break;
-            case 0x67: ld_h_a_0x67(); break;
-            case 0x68: ld_l_b_0x68(); break;
-            case 0x69: ld_l_c_0x69(); break;
-            case 0x6a: ld_l_d_0x6a(); break;
-            case 0x6b: ld_l_e_0x6b(); break;
-            case 0x6c: ld_l_h_0x6c(); break;
-            case 0x6d: ld_l_l_0x6d(); break;
-            case 0x6e: ld_l_mem_hl_0x6e(); break;
-            case 0x6f: ld_l_a_0x6f(); break;
-            case 0x70: ld_mem_hl_b_0x70(); break;
-            case 0x71: ld_mem_hl_c_0x71(); break;
-            case 0x72: ld_mem_hl_d_0x72(); break;
-            case 0x73: ld_mem_hl_e_0x73(); break;
-            case 0x74: ld_mem_hl_h_0x74(); break;
-            case 0x75: ld_mem_hl_l_0x75(); break;
-            case 0x76: halt_0x76(); break;
-            case 0x77: ld_mem_hl_a_0x77(); break;
-            case 0x78: ld_a_b_0x78(); break;
-            case 0x79: ld_a_c_0x79(); break;
-            case 0x7a: ld_a_d_0x7a(); break;
-            case 0x7b: ld_a_e_0x7b(); break;
-            case 0x7c: ld_a_h_0x7c(); break;
-            case 0x7d: ld_a_l_0x7d(); break;
-            case 0x7e: ld_a_mem_hl_0x7e(); break;
-            case 0x7f: ld_a_a_0x7f(); break;
-            case 0x80: add_a_b_0x80(); break;
-            case 0x81: add_a_c_0x81(); break;
-            case 0x82: add_a_d_0x82(); break;
-            case 0x83: add_a_e_0x83(); break;
-            case 0x84: add_a_h_0x84(); break;
-            case 0x85: add_a_l_0x85(); break;
-            case 0x86: add_a_mem_hl_0x86(); break;
-            case 0x87: add_a_a_0x87(); break;
-            case 0x88: adc_a_b_0x88(); break;
-            case 0x89: adc_a_c_0x89(); break;
-            case 0x8a: adc_a_d_0x8a(); break;
-            case 0x8b: adc_a_e_0x8b(); break;
-            case 0x8c: adc_a_h_0x8c(); break;
-            case 0x8d: adc_a_l_0x8d(); break;
-            case 0x8e: adc_a_mem_hl_0x8e(); break;
-            case 0x8f: adc_a_a_0x8f(); break;
-            case 0x90: sub_a_b_0x90(); break;
-            case 0x91: sub_a_c_0x91(); break;
-            case 0x92: sub_a_d_0x92(); break;
-            case 0x93: sub_a_e_0x93(); break;
-            case 0x94: sub_a_h_0x94(); break;
-            case 0x95: sub_a_l_0x95(); break;
-            case 0x96: sub_a_mem_hl_0x96(); break;
-            case 0x97: sub_a_a_0x97(); break;
-            case 0x98: sbc_a_b_0x98(); break;
-            case 0x99: sbc_a_c_0x99(); break;
-            case 0x9a: sbc_a_d_0x9a(); break;
-            case 0x9b: sbc_a_e_0x9b(); break;
-            case 0x9c: sbc_a_h_0x9c(); break;
-            case 0x9d: sbc_a_l_0x9d(); break;
-            case 0x9e: sbc_a_mem_hl_0x9e(); break;
-            case 0x9f: sbc_a_a_0x9f(); break;
-            case 0xa0: and_a_b_0xa0(); break;
-            case 0xa1: and_a_c_0xa1(); break;
-            case 0xa2: and_a_d_0xa2(); break;
-            case 0xa3: and_a_e_0xa3(); break;
-            case 0xa4: and_a_h_0xa4(); break;
-            case 0xa5: and_a_l_0xa5(); break;
-            case 0xa6: and_a_mem_hl_0xa6(); break;
-            case 0xa7: and_a_a_0xa7(); break;
-            case 0xa8: xor_a_b_0xa8(); break;
-            case 0xa9: xor_a_c_0xa9(); break;
-            case 0xaa: xor_a_d_0xaa(); break;
-            case 0xab: xor_a_e_0xab(); break;
-            case 0xac: xor_a_h_0xac(); break;
-            case 0xad: xor_a_l_0xad(); break;
-            case 0xae: xor_a_mem_hl_0xae(); break;
-            case 0xaf: xor_a_a_0xaf(); break;
-            case 0xb0: or_a_b_0xb0(); break;
-            case 0xb1: or_a_c_0xb1(); break;
-            case 0xb2: or_a_d_0xb2(); break;
-            case 0xb3: or_a_e_0xb3(); break;
-            case 0xb4: or_a_h_0xb4(); break;
-            case 0xb5: or_a_l_0xb5(); break;
-            case 0xb6: or_a_mem_hl_0xb6(); break;
-            case 0xb7: or_a_a_0xb7(); break;
-            case 0xb8: cp_a_b_0xb8(); break;
-            case 0xb9: cp_a_c_0xb9(); break;
-            case 0xba: cp_a_d_0xba(); break;
-            case 0xbb: cp_a_e_0xbb(); break;
-            case 0xbc: cp_a_h_0xbc(); break;
-            case 0xbd: cp_a_l_0xbd(); break;
-            case 0xbe: cp_a_mem_hl_0xbe(); break;
-            case 0xbf: cp_a_a_0xbf(); break;
-            default:
-                std::cerr << std::hex << std::setfill('0');
-                std::cerr << "Unimplemented instruction: 0x" << std::setw(2) << static_cast<int>(opcode) << "\n";
-                break;
-        }
+        (this->*instruction_table[opcode])();
     }
     else {
-        uint8_t prefixed_opcode{memory.read_8(pc + 1)};
-        switch (prefixed_opcode) {
-            default:
-                std::cerr << std::hex << std::setfill('0');
-                std::cerr << "Unimplemented prefixed instruction: 0xCB" << std::setw(2) << static_cast<int>(prefixed_opcode) << "\n";
-                break;
-        }
+        uint8_t cb_opcode{memory.read_8(pc + 1)};
+        (this->*cb_instruction_table[cb_opcode])();
     }
 }
 

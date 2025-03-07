@@ -17,6 +17,9 @@ public:
     void print_values() const;
 
 private:
+    using Instruction = void (CPU::*)();
+    static const Instruction instruction_table[256];
+    static const Instruction cb_instruction_table[256];
     Memory memory;
     uint64_t cycles_elapsed{};
     bool stopped{};
@@ -24,36 +27,37 @@ private:
 
     // 8-bit registers can be accessed individually or together through their corresponding 16-bit register pair
     // The first letter of each register pair is its most significant byte and the second is its least significant byte
+    // *** Struct ordering currently assumes this runs on a little-endian system ***
     union {
         struct {
-            uint8_t a;
             uint8_t f; // Flags register - only bits 7-4 are used (3-0 will always be zero)
+            uint8_t a;
         };
         uint16_t af{};
     };
     union {
         struct {
-            uint8_t b;
             uint8_t c;
+            uint8_t b;
         };
         uint16_t bc{};
     };
     union {
         struct {
-            uint8_t d;
             uint8_t e;
+            uint8_t d;
         };
         uint16_t de{};
     };
     union {
         struct {
-            uint8_t h;
             uint8_t l;
+            uint8_t h;
         };
         uint16_t hl{};
     };
     uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
-    uint16_t pc{}; // Program Counter, address of the next instruction to execute
+    uint16_t pc{}; // Program Counter, address of the next instruction byte to execute from memory
 
     // Instruction Helpers
     void set_flags_z_n_h_c(bool set_z, bool set_n, bool set_h, bool set_c);
@@ -77,7 +81,7 @@ private:
     void cp_a_reg_8(const uint8_t &reg);
     void jr_cond_sign_imm_8(bool condition);
 
-    // Instruction functions suffixed with their opcode
+    // Instructions suffixed with their opcode
     // imm_n - Next n bits in memory (i.e. memory[pc + 1])
     // sign_imm_8 - Next byte in memory treated as a signed offset stored in 2s complement
     // mem_ - The following register/immediate refers to a location in memory (e.g. mem_bc means memory[bc])
