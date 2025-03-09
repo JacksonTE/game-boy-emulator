@@ -8,21 +8,21 @@ void CPU::print_values() const {
     std::cout << std::hex << std::setfill('0');
     std::cout << "================== CPU Registers ==================\n";
 
-    std::cout << "AF: 0x" << std::setw(4) << af
-            << "   (A: 0x" << std::setw(2) << static_cast<int>(a)
-            << ", F: 0x" << std::setw(2) << static_cast<int>(f) << ")\n";
+    std::cout << "AF: 0x" << std::setw(4) << af << "   "
+              << "(A: 0x" << std::setw(2) << static_cast<int>(a)
+              << ", F: 0x" << std::setw(2) << static_cast<int>(f) << ")\n";
 
-    std::cout << "BC: 0x" << std::setw(4) << bc
-            << "   (B: 0x" << std::setw(2) << static_cast<int>(b)
-            << ", C: 0x" << std::setw(2) << static_cast<int>(c) << ")\n";
+    std::cout << "BC: 0x" << std::setw(4) << bc << "   "
+              << "(B: 0x" << std::setw(2) << static_cast<int>(b)
+              << ", C: 0x" << std::setw(2) << static_cast<int>(c) << ")\n";
 
-    std::cout << "DE: 0x" << std::setw(4) << de
-            << "   (D: 0x" << std::setw(2) << static_cast<int>(d)
-            << ", E: 0x" << std::setw(2) << static_cast<int>(e) << ")\n";
+    std::cout << "DE: 0x" << std::setw(4) << de << "   "
+              << "(D: 0x" << std::setw(2) << static_cast<int>(d)
+              << ", E: 0x" << std::setw(2) << static_cast<int>(e) << ")\n";
 
-    std::cout << "HL: 0x" << std::setw(4) << hl
-            << "   (H: 0x" << std::setw(2) << static_cast<int>(h)
-            << ", L: 0x" << std::setw(2) << static_cast<int>(l) << ")\n";
+    std::cout << "HL: 0x" << std::setw(4) << hl << "   "
+              << "(H: 0x" << std::setw(2) << static_cast<int>(h)
+              << ", L: 0x" << std::setw(2) << static_cast<int>(l) << ")\n";
 
     std::cout << "SP: 0x" << std::setw(4) << sp << "\n";
     std::cout << "PC: 0x" << std::setw(4) << pc << "\n";
@@ -33,12 +33,12 @@ void CPU::print_values() const {
 }
 
 void CPU::execute_instruction(uint8_t opcode) {
-    if (opcode != 0xCB) {
+    if (opcode != 0xcb) {
         (this->*instruction_table[opcode])();
-    }
-    else {
-        uint8_t cb_opcode{memory.read_8(pc + 1)};
-        (this->*cb_instruction_table[cb_opcode])();
+    } else {
+        (this->*prefixed_instruction_table[memory.read_8(pc + 1)])();
+        pc += 2; // All prefixed instructions are 2 bytes
+        cycles_elapsed += 8; // Majority take 8 cycles, others add remainder in instruction
     }
 }
 
@@ -235,20 +235,65 @@ const CPU::Instruction CPU::instruction_table[256] = {
     &CPU::cp_a_l_0xbd,
     &CPU::cp_a_mem_hl_0xbe,
     &CPU::cp_a_a_0xbf,
+    &CPU::ret_nz_0xc0,
+    &CPU::pop_bc_0xc1,
+    &CPU::jp_nz_imm16_0xc2,
+    &CPU::jp_imm16_0xc3,
+    &CPU::call_nz_imm16_0xc4,
+    &CPU::push_bc_0xc5,
+    &CPU::add_a_imm8_0xc6,
+    &CPU::rst_0x00_0xc7,
+    &CPU::ret_z_0xc8,
+    &CPU::ret_0xc9,
+    &CPU::jp_z_imm16_0xca,
+    &CPU::unsupported_opcode, // 0xCB is only used to prefix an extended instruction
+    &CPU::call_z_imm16_0xcc,
+    // TODO implement remaining cases
 };
 
-const CPU::Instruction CPU::cb_instruction_table[256] = {
+const CPU::Instruction CPU::prefixed_instruction_table[256] = {
+    // TODO implement remaining cases
 };
 
-/******************************
- *    Instruction Helpers
- ******************************/
+// ===============================
+// ===== Instruction Helpers =====
+// ===============================
 
 void CPU::set_flags_z_n_h_c(bool set_z, bool set_n, bool set_h, bool set_c) {
     f = (set_z ? FLAG_Z : 0) |
         (set_n ? FLAG_N : 0) |
         (set_h ? FLAG_H : 0) |
         (set_c ? FLAG_C : 0);
+}
+
+void CPU::ld_reg8_reg8(uint8_t &dest, const uint8_t &src) {
+    dest = src;
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::ld_reg8_imm8(uint8_t &dest) {
+    dest = memory.read_8(pc + 1);
+    pc += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::ld_reg8_mem_reg16(uint8_t &dest, const uint16_t &src_addr) {
+    dest = memory.read_8(src_addr);
+    pc += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::ld_mem_reg16_reg8(const uint16_t &dest_addr, const uint8_t &src) {
+    memory.write_8(dest_addr, src);
+    pc += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::ld_reg16_imm16(uint16_t &dest) {
+    dest = memory.read_16(pc + 1);
+    pc += 3;
+    cycles_elapsed += 12;
 }
 
 void CPU::inc_reg8(uint8_t &reg) {
@@ -279,32 +324,11 @@ void CPU::dec_reg16(uint16_t &reg) {
     cycles_elapsed += 8;
 }
 
-void CPU::ld_reg8_reg8(uint8_t &dest, const uint8_t &src) {
-    dest = src;
-    pc += 1;
-    cycles_elapsed += 4;
-}
-
-void CPU::ld_reg8_imm8(uint8_t &dest) {
-    dest = memory.read_8(pc + 1);
-    pc += 2;
-    cycles_elapsed += 8;
-}
-
-void CPU::ld_reg8_mem_reg16(uint8_t &dest, const uint16_t &src_addr) {
-    dest = memory.read_8(src_addr);
-    pc += 1;
-    cycles_elapsed += 8;
-}
-
-void CPU::ld_reg16_imm16(uint16_t &dest) {
-    dest = memory.read_16(pc + 1);
-    pc += 3;
-    cycles_elapsed += 12;
-}
-
-void CPU::ld_mem_reg16_reg8(const uint16_t &dest_addr, const uint8_t &src) {
-    memory.write_8(dest_addr, src);
+void CPU::add_hl_reg16(const uint16_t &reg) {
+    const bool half_carry{((hl & 0x0FFF) + (reg & 0x0FFF)) > 0x0FFF};
+    const bool carry{(static_cast<uint32_t>(hl) + reg) > 0xFFFF};
+    hl += reg;
+    set_flags_z_n_h_c(f & FLAG_Z, false, half_carry, carry);
     pc += 1;
     cycles_elapsed += 8;
 }
@@ -316,15 +340,6 @@ void CPU::add_a_reg8(const uint8_t &reg) {
     set_flags_z_n_h_c(a == 0, false, half_carry, carry);
     pc += 1;
     cycles_elapsed += 4;
-}
-
-void CPU::add_hl_reg16(const uint16_t &reg) {
-    const bool half_carry{((hl & 0x0FFF) + (reg & 0x0FFF)) > 0x0FFF};
-    const bool carry{(static_cast<uint32_t>(hl) + reg) > 0xFFFF};
-    hl += reg;
-    set_flags_z_n_h_c(f & FLAG_Z, false, half_carry, carry);
-    pc += 1;
-    cycles_elapsed += 8;
 }
 
 void CPU::adc_a_reg8(const uint8_t &reg) {
@@ -389,16 +404,76 @@ void CPU::jr_cond_sign_imm8(bool condition) {
     if (condition) {
         pc += 2 + static_cast<int8_t>(memory.read_8(pc + 1));
         cycles_elapsed += 12;
-    }
-    else {
+    } else {
         pc += 2;
         cycles_elapsed += 8;
     }
 }
 
-/******************************
- *    Opcode Functions
- ******************************/
+void CPU::jp_cond_imm16(bool condition) {
+    if (condition) {
+        pc = memory.read_16(pc + 1);
+        cycles_elapsed += 16;
+    } else {
+        pc += 3;
+        cycles_elapsed += 12;
+    }
+}
+
+void CPU::call_cond_imm16(bool condition) {
+    if (condition) {
+        sp -= 2;
+        memory.write_16(sp, pc + 3); // Return address pushed onto stack
+        pc = memory.read_16(pc + 1);
+        cycles_elapsed += 24;
+    } else {
+        pc += 3;
+        cycles_elapsed += 12;
+    }
+}
+
+void CPU::ret_cond(bool condition) {
+    if (condition) {
+        // Return address from call/restart popped from stack, continue from there
+        pc = memory.read_16(sp);
+        sp += 2;
+        cycles_elapsed += 20;
+    } else {
+        pc += 1;
+        cycles_elapsed += 8;
+    }
+}
+
+void CPU::push_reg16(const uint16_t &reg) {
+    sp -= 2;
+    memory.write_16(sp, reg);
+    pc += 1;
+    cycles_elapsed += 16;
+}
+
+void CPU::pop_reg16(uint16_t &reg) {
+    reg = memory.read_16(sp);
+    sp += 2;
+    pc += 1;
+    cycles_elapsed += 12;
+}
+
+void CPU::rst_addr(uint16_t addr) {
+    sp -= 2;
+    memory.write_16(sp, pc + 1); // Return address pushed onto stack
+    pc = addr;
+    cycles_elapsed += 16;
+}
+
+// ========================
+// ===== Instructions =====
+// ========================
+
+void CPU::unsupported_opcode() {
+    std::cerr << std::hex << std::setfill('0');
+    std::cerr << "Unsupported opcode encountered at PC = 0x"
+              << std::setw(4) << pc << "\n";
+}
 
 void CPU::nop_0x00() {
     pc += 1;
@@ -517,10 +592,10 @@ void CPU::dec_h_0x25() { dec_reg8(h); }
 void CPU::ld_h_imm8_0x26() { ld_reg8_imm8(h); }
 
 void CPU::daa_0x27() {
-    // Previous operation was between two binary coded decimals (BCDs) and this corrects register a back to BCD format
     const bool previous_addition{!(f & FLAG_N)};
     bool carry{false};
     uint8_t correction{0};
+    // Previous operation was between two binary coded decimals (BCDs) and this corrects register A back to BCD format
     if ((f & FLAG_H) || (previous_addition && ((a & 0x0F) > 0x09))) {
         correction |= 0x06;
     }
@@ -769,8 +844,8 @@ void CPU::add_a_h_0x84() { add_a_reg8(h); }
 void CPU::add_a_l_0x85() { add_a_reg8(l); }
 
 void CPU::add_a_mem_hl_0x86() {
-    add_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    add_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::add_a_a_0x87() { add_a_reg8(a); }
@@ -788,8 +863,8 @@ void CPU::adc_a_h_0x8c() { adc_a_reg8(h); }
 void CPU::adc_a_l_0x8d() { adc_a_reg8(l); }
 
 void CPU::adc_a_mem_hl_0x8e() {
-    adc_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    adc_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::adc_a_a_0x8f() { adc_a_reg8(a); }
@@ -807,8 +882,8 @@ void CPU::sub_a_h_0x94() { sub_a_reg8(h); }
 void CPU::sub_a_l_0x95() { sub_a_reg8(l); }
 
 void CPU::sub_a_mem_hl_0x96() {
-    sub_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    sub_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::sub_a_a_0x97() { sub_a_reg8(a); }
@@ -826,8 +901,8 @@ void CPU::sbc_a_h_0x9c() { sbc_a_reg8(h); }
 void CPU::sbc_a_l_0x9d() { sbc_a_reg8(l); }
 
 void CPU::sbc_a_mem_hl_0x9e() {
-    sbc_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    sbc_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::sbc_a_a_0x9f() { sbc_a_reg8(a); }
@@ -845,8 +920,8 @@ void CPU::and_a_h_0xa4() { and_a_reg8(h); }
 void CPU::and_a_l_0xa5() { and_a_reg8(l); }
 
 void CPU::and_a_mem_hl_0xa6() {
-    and_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    and_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::and_a_a_0xa7() { and_a_reg8(a); }
@@ -864,8 +939,8 @@ void CPU::xor_a_h_0xac() { xor_a_reg8(h); }
 void CPU::xor_a_l_0xad() { xor_a_reg8(l); }
 
 void CPU::xor_a_mem_hl_0xae() {
-    xor_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    xor_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::xor_a_a_0xaf() { xor_a_reg8(a); }
@@ -883,8 +958,8 @@ void CPU::or_a_h_0xb4() { or_a_reg8(h); }
 void CPU::or_a_l_0xb5() { or_a_reg8(l); }
 
 void CPU::or_a_mem_hl_0xb6() {
-    or_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    or_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::or_a_a_0xb7() { or_a_reg8(a); }
@@ -902,10 +977,45 @@ void CPU::cp_a_h_0xbc() { cp_a_reg8(h); }
 void CPU::cp_a_l_0xbd() { cp_a_reg8(l); }
 
 void CPU::cp_a_mem_hl_0xbe() {
-    cp_a_reg8(memory.read_8(hl));
-    cycles_elapsed += 4; // Takes 4 cycles more for memory read than register access
+    cp_a_reg8(memory.read_8(hl)); // Reuse because operation and flag logic is the same
+    cycles_elapsed += 4;
 }
 
 void CPU::cp_a_a_0xbf() { cp_a_reg8(a); }
+
+void CPU::ret_nz_0xc0() { ret_cond(!(f & FLAG_Z)); }
+
+void CPU::pop_bc_0xc1() { pop_reg16(bc); }
+
+void CPU::jp_nz_imm16_0xc2() { jp_cond_imm16(!(f & FLAG_Z)); }
+
+void CPU::jp_imm16_0xc3() { jp_cond_imm16(true); }
+
+void CPU::call_nz_imm16_0xc4() { call_cond_imm16(!(f & FLAG_Z)); }
+
+void CPU::push_bc_0xc5() { push_reg16(bc); }
+
+void CPU::add_a_imm8_0xc6() {
+    add_a_reg8(memory.read_8(pc + 1)); // Reuse because operation and flag logic is the same
+    pc += 1;
+    cycles_elapsed += 4;
+}
+
+void CPU::rst_0x00_0xc7() { rst_addr(0x00); }
+
+void CPU::ret_z_0xc8() { ret_cond(f & FLAG_Z); }
+
+void CPU::ret_0xc9() {
+    // Return address from call/restart popped from stack, continue from there
+    pc = memory.read_16(sp);
+    sp += 2;
+    cycles_elapsed += 16;
+}
+
+void CPU::jp_z_imm16_0xca() { jp_cond_imm16(f & FLAG_Z); }
+
+// 0xCB is only used to prefix an extended instruction
+
+void CPU::call_z_imm16_0xcc() { call_cond_imm16(f & FLAG_Z); }
 
 } // namespace GameBoy

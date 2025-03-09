@@ -5,10 +5,17 @@
 
 namespace GameBoy {
 
-constexpr uint8_t FLAG_Z{1 << 7}; // Zero - set after arithmetic result is zero, cleared when result is nonzero
-constexpr uint8_t FLAG_N{1 << 6}; // Subtract - set after subtraction/decrement/compare, cleared after addition/increment/logical operation (and LD HL, SP + e8)
-constexpr uint8_t FLAG_H{1 << 5}; // Half-Carry (from bit 3-4, or sometimes from 11 to 12) - set when addition causes carry or subtraction requires borrow, cleared otherwise
-constexpr uint8_t FLAG_C{1 << 4}; // Carry (from bit 7-8, or sometimes from 15-16) - set when addition causes carry, subtraction requires borrow, or bit shifted out, cleared otherwise
+// Zero - often set after arithmetic result is zero, cleared when result is nonzero
+constexpr uint8_t FLAG_Z{1 << 7};
+
+// Subtract - often set after subtraction/decrement/compare, cleared after addition/increment/logical operation
+constexpr uint8_t FLAG_N{1 << 6};
+
+// Half-Carry (from bit 3-4 or 11-12) - often set after addition carry, subtraction borrow, and cleared otherwise
+constexpr uint8_t FLAG_H{1 << 5};
+
+// Carry (from bit 7-8 or 15-16) - often set after addition carry, subtraction borrow, bit shifted out, and cleared otherwise
+constexpr uint8_t FLAG_C{1 << 4};
 
 class CPU {
 public:
@@ -20,10 +27,10 @@ private:
     Memory memory;
     bool stopped{};
     bool halted{};
+    bool interrupts_enabled{};
 
-    // 8-bit registers can be accessed individually or together through their corresponding 16-bit register pair
-    // The first letter of each register pair is its most significant byte and the second is its least significant byte
-    // *** Struct ordering currently assumes this runs on a little-endian system ***
+    // First letter of register pair is most significant byte, second is least significant byte (ex. A high, F low)
+    // *** Register ordering within the struct currently assumes this runs on a little-endian system ***
     union {
         struct {
             uint8_t f; // Flags register - only bits 7-4 are used (3-0 will always be zero)
@@ -52,27 +59,27 @@ private:
         };
         uint16_t hl{};
     };
-    uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM
+    uint16_t sp{}; // Stack Pointer, address of the top of the stack in WRAM (grows downwards in memory)
     uint16_t pc{}; // Program Counter, address of the next instruction byte to execute from memory
     uint64_t cycles_elapsed{};
 
     using Instruction = void (CPU::*)();
     static const Instruction instruction_table[256];
-    static const Instruction cb_instruction_table[256];
+    static const Instruction prefixed_instruction_table[256];
 
     // Instruction Helpers
     void set_flags_z_n_h_c(bool set_z, bool set_n, bool set_h, bool set_c);
+    void ld_reg8_reg8(uint8_t &dest, const uint8_t &src);
+    void ld_reg8_imm8(uint8_t &dest);
+    void ld_reg8_mem_reg16(uint8_t &dest, const uint16_t &src_addr);
+    void ld_mem_reg16_reg8(const uint16_t &dest_addr, const uint8_t &src);
+    void ld_reg16_imm16(uint16_t &dest);
     void inc_reg8(uint8_t &reg);
     void dec_reg8(uint8_t &reg);
     void inc_reg16(uint16_t &reg);
     void dec_reg16(uint16_t &reg);
-    void ld_reg8_reg8(uint8_t &dest, const uint8_t &src);
-    void ld_reg8_imm8(uint8_t &dest);
-    void ld_reg8_mem_reg16(uint8_t &dest, const uint16_t &src_addr);
-    void ld_reg16_imm16(uint16_t &dest);
-    void ld_mem_reg16_reg8(const uint16_t &dest_addr, const uint8_t &src);
-    void add_a_reg8(const uint8_t &reg);
     void add_hl_reg16(const uint16_t &reg);
+    void add_a_reg8(const uint8_t &reg);
     void adc_a_reg8(const uint8_t &reg);
     void sub_a_reg8(const uint8_t &reg);
     void sbc_a_reg8(const uint8_t &reg);
@@ -81,8 +88,15 @@ private:
     void or_a_reg8(const uint8_t &reg);
     void cp_a_reg8(const uint8_t &reg);
     void jr_cond_sign_imm8(bool condition);
+    void jp_cond_imm16(bool condition);
+    void call_cond_imm16(bool condition);
+    void ret_cond(bool condition);
+    void push_reg16(const uint16_t &reg);
+    void pop_reg16(uint16_t &reg);
+    void rst_addr(uint16_t addr);
 
     // Instructions suffixed with their opcode
+    void unsupported_opcode();
     void nop_0x00();
     void ld_bc_imm16_0x01();
     void ld_mem_bc_a_0x02();
@@ -275,6 +289,19 @@ private:
     void cp_a_l_0xbd();
     void cp_a_mem_hl_0xbe();
     void cp_a_a_0xbf();
+    void ret_nz_0xc0();
+    void pop_bc_0xc1();
+    void jp_nz_imm16_0xc2();
+    void jp_imm16_0xc3();
+    void call_nz_imm16_0xc4();
+    void push_bc_0xc5();
+    void add_a_imm8_0xc6();
+    void rst_0x00_0xc7();
+    void ret_z_0xc8();
+    void ret_0xc9();
+    void jp_z_imm16_0xca();
+    // 0xCB is only used to prefix an extended instruction
+    void call_z_imm16_0xcc();
 };
 
 } // namespace GameBoy
