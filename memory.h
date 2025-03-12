@@ -1,8 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace GameBoy {
+
+constexpr size_t memory_size = 0x10000;
 
 class Memory {
 public:
@@ -13,7 +16,7 @@ public:
     void write_16(uint16_t address, uint16_t value);
 
 private:
-    uint8_t placeholder_memory[65535]{};
+    std::array<uint8_t, memory_size> placeholder_memory{};
 };
 
 } // namespace GameBoy
