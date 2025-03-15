@@ -5,7 +5,8 @@
 
 namespace GameBoy {
 
-constexpr size_t memory_size = 0x10000;
+constexpr size_t MEMORY_SIZE = 0x10000;
+constexpr uint16_t HIGH_RAM_START = 0xff00;
 
 class Memory {
 public:
@@ -16,7 +17,7 @@ public:
     void write_16(uint16_t address, uint16_t value);
 
 private:
-    std::array<uint8_t, memory_size> placeholder_memory{};
+    std::array<uint8_t, MEMORY_SIZE> placeholder_memory{};
 };
 
 } // namespace GameBoy

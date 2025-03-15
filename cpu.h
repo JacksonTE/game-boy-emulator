@@ -24,31 +24,32 @@ private:
     bool is_stopped{};
     bool is_halted{};
     bool are_interrupts_enabled{};
+    bool did_enable_interrupts_execute{};
 
     using Instruction = void (CPU::*)();
     static const Instruction instruction_table[256];
-    static const Instruction prefixed_instruction_table[256];
+    static const Instruction extended_instruction_table[256];
 
     // Instruction Helpers
     void set_flags(bool set_zero, bool set_subtract, bool set_half_carry, bool set_carry);
-    void load_register8_register8(uint8_t &destination, const uint8_t &source);
-    void load_register8_immediate8(uint8_t &destination);
-    void load_register8_memory_register16(uint8_t &destination, const uint16_t &source_address);
-    void load_memory_register16_register8(const uint16_t &destination_address, const uint8_t &source);
-    void load_register16_immediate16(uint16_t &destination);
+    void load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8);
+    void load_register8_immediate8(uint8_t &destination_register8);
+    void load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16);
+    void load_memory_register16_register8(const uint16_t &destination_address_register16, const uint8_t &source_register8);
+    void load_register16_immediate16(uint16_t &destination_register16);
     void increment_register8(uint8_t &register8);
     void decrement_register8(uint8_t &register8);
     void increment_register16(uint16_t &register16);
     void decrement_register16(uint16_t &register16);
     void add_hl_register16(const uint16_t &register16);
-    void add_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void add_with_carry_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void subtract_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void subtract_with_carry_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void and_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void xor_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void or_a_uint8(const uint8_t &value, bool is_register_input = true);
-    void compare_a_uint8(const uint8_t &value, bool is_register_input = true);
+    void add_a_register8(const uint8_t &register8);
+    void add_with_carry_a_register8(const uint8_t &register8);
+    void subtract_a_register8(const uint8_t &register8);
+    void subtract_with_carry_a_register8(const uint8_t &register8);
+    void and_a_register8(const uint8_t &register8);
+    void xor_a_register8(const uint8_t &register8);
+    void or_a_register8(const uint8_t &register8);
+    void compare_a_register8(const uint8_t &register8);
     void jump_relative_condition_signed_immediate8(bool is_condition_met);
     void jump_condition_immediate16(bool is_condition_met);
     void call_condition_immediate16(bool is_condition_met);
@@ -58,7 +59,7 @@ private:
     void restart_address(uint16_t address);
 
     // Instructions suffixed with their opcode
-    void unknown_opcode();
+    void unused_opcode();
     void no_operation_0x00();
     void load_bc_immediate16_0x01();
     void load_memory_bc_a_0x02();
@@ -270,10 +271,51 @@ private:
     void return_not_carry_0xd0();
     void pop_de_0xd1();
     void jump_not_carry_immediate16_0xd2();
-    // 0xd3 is an unused opcode for the Game Boy
+    // 0xd3 is an unused opcode
     void call_not_carry_immediate16_0xd4();
     void push_de_0xd5();
     void subtract_a_immediate8_0xd6();
+    void restart_0x10_0xd7();
+    void return_carry_0xd8();
+    void return_from_interrupt_0xd9();
+    void jump_carry_immediate16_0xda();
+    // 0xdb is an unused opcode
+    void call_carry_immediate16_0xdc();
+    // 0xdb is an unused opcode
+    void subtract_with_carry_a_immediate8_0xde();
+    void restart_0x18_0xdf();
+    void load_memory_high_ram_signed_immediate8_a_0xe0();
+    void pop_hl_0xe1();
+    void load_memory_high_ram_c_a_0xe2();
+    // 0xe3 is an unused opcode
+    // 0xe4 is an unused opcode
+    void push_hl_0xe5();
+    void and_a_immediate8_0xe6();
+    void restart_0x20_0xe7();
+    void add_sp_signed_immediate8_0xe8();
+    void jump_hl_0xe9();
+    void load_memory_immediate16_a_0xea();
+    // 0xeb is an unused opcode
+    // 0xec is an unused opcode
+    // 0xed is an unused opcode
+    void xor_a_immediate8_0xee();
+    void restart_0x28_0xef();
+    void load_a_memory_high_ram_immediate8_0xf0();
+    void pop_af_0xf1();
+    void load_a_memory_high_ram_c_0xf2();
+    void disable_interrupts_0xf3();
+    // 0xf4 is an unused opcode
+    void push_af_0xf5();
+    void or_a_immediate8_0xf6();
+    void restart_0x30_0xf7();
+    void load_hl_stack_pointer_with_signed_offset_0xf8();
+    void load_stack_pointer_hl_0xf9();
+    void load_a_memory_immediate16_0xfa();
+    void enable_interrupts_0xfb();
+    // 0xfc is an unused opcode
+    // 0xfd is an unused opcode
+    void compare_a_immediate8_0xfe();
+    void restart_0x38_0xff();
 };
 
 } // namespace GameBoy

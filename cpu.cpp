@@ -36,8 +36,12 @@ void CPU::execute_instruction(uint8_t opcode) {
     if (opcode != 0xcb) {
         (this->*instruction_table[opcode])();
     } else {
-        (this->*prefixed_instruction_table[memory.read_8(registers.program_counter + 1)])();
-        registers.program_counter += 2;
+        (this->*extended_instruction_table[memory.read_8(registers.program_counter + 1)])();
+    }
+
+    if (did_enable_interrupts_execute) {
+        are_interrupts_enabled = true;
+        did_enable_interrupts_execute = false;
     }
 }
 
@@ -245,12 +249,62 @@ const CPU::Instruction CPU::instruction_table[256] = {
     &CPU::return_zero_0xc8,
     &CPU::return_0xc9,
     &CPU::jump_zero_immediate16_0xca,
-    &CPU::unknown_opcode, // 0xcb is only used to prefix an extended instruction
+    &CPU::unused_opcode, // 0xcb is only used to prefix an extended instruction
     &CPU::call_zero_immediate16_0xcc,
-    // TODO implement remaining cases
+    &CPU::call_immediate16_0xcd,
+    &CPU::add_with_carry_a_immediate8_0xce,
+    &CPU::restart_0x08_0xcf,
+    &CPU::return_not_carry_0xd0,
+    &CPU::pop_de_0xd1,
+    &CPU::jump_not_carry_immediate16_0xd2,
+    &CPU::unused_opcode, // 0xd3 is only used to prefix an extended instruction
+    &CPU::call_not_carry_immediate16_0xd4,
+    &CPU::push_de_0xd5,
+    &CPU::subtract_a_immediate8_0xd6,
+    &CPU::restart_0x10_0xd7,
+    &CPU::return_carry_0xd8,
+    &CPU::return_from_interrupt_0xd9,
+    &CPU::jump_carry_immediate16_0xda,
+    &CPU::unused_opcode, // 0xdb is only used to prefix an extended instruction
+    &CPU::call_carry_immediate16_0xdc,
+    &CPU::unused_opcode, // 0xdd is only used to prefix an extended instruction
+    &CPU::subtract_with_carry_a_immediate8_0xde,
+    &CPU::restart_0x18_0xdf,
+    &CPU::load_memory_high_ram_signed_immediate8_a_0xe0,
+    &CPU::pop_hl_0xe1,
+    &CPU::load_memory_high_ram_c_a_0xe2,
+    &CPU::unused_opcode,
+    &CPU::unused_opcode,
+    &CPU::push_hl_0xe5,
+    &CPU::and_a_immediate8_0xe6,
+    &CPU::restart_0x20_0xe7,
+    &CPU::add_sp_signed_immediate8_0xe8,
+    &CPU::jump_hl_0xe9,
+    &CPU::load_memory_immediate16_a_0xea,
+    &CPU::unused_opcode, // 0xeb is an unused opcode
+    &CPU::unused_opcode, // 0xec is an unused opcode
+    &CPU::unused_opcode, // 0xed is an unused opcode
+    &CPU::xor_a_immediate8_0xee,
+    &CPU::restart_0x28_0xef,
+    &CPU::load_a_memory_high_ram_immediate8_0xf0,
+    &CPU::pop_af_0xf1,
+    &CPU::load_a_memory_high_ram_c_0xf2,
+    &CPU::disable_interrupts_0xf3,
+    &CPU::unused_opcode, // 0xf4 is an unused opcode
+    &CPU::push_af_0xf5,
+    &CPU::or_a_immediate8_0xf6,
+    &CPU::restart_0x30_0xf7,
+    &CPU::load_hl_stack_pointer_with_signed_offset_0xf8,
+    &CPU::load_stack_pointer_hl_0xf9,
+    &CPU::load_a_memory_immediate16_0xfa,
+    &CPU::enable_interrupts_0xfb,
+    &CPU::unused_opcode, // 0xfc is an unused opcode
+    &CPU::unused_opcode, // 0xfd is an unused opcode
+    &CPU::compare_a_immediate8_0xfe,
+    &CPU::restart_0x38_0xff
 };
 
-const CPU::Instruction CPU::prefixed_instruction_table[256] = {
+const CPU::Instruction CPU::extended_instruction_table[256] = {
     // TODO implement remaining cases
 };
 
@@ -265,38 +319,38 @@ void CPU::set_flags(bool set_zero, bool set_subtract, bool set_half_carry, bool 
                       (set_carry ? MASK_CARRY : 0);
 }
 
-void CPU::load_register8_register8(uint8_t &destination, const uint8_t &source) {
-    destination = source;
+void CPU::load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8) {
+    destination_register8 = source_register8;
     registers.program_counter += 1;
     cycles_elapsed += 4;
 }
 
-void CPU::load_register8_immediate8(uint8_t &destination) {
-    destination = memory.read_8(registers.program_counter + 1);
+void CPU::load_register8_immediate8(uint8_t &destination_register8) {
+    destination_register8 = memory.read_8(registers.program_counter + 1);
     registers.program_counter += 2;
     cycles_elapsed += 8;
 }
 
-void CPU::load_register8_memory_register16(uint8_t &destination, const uint16_t &source_address) {
-    destination = memory.read_8(source_address);
+void CPU::load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16) {
+    destination_register8 = memory.read_8(source_address_register16);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
-void CPU::load_memory_register16_register8(const uint16_t &destination_address, const uint8_t &source) {
-    memory.write_8(destination_address, source);
+void CPU::load_memory_register16_register8(const uint16_t &destination_address_register16, const uint8_t &source_register8) {
+    memory.write_8(destination_address_register16, source_register8);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
-void CPU::load_register16_immediate16(uint16_t &destination) {
-    destination = memory.read_16(registers.program_counter + 1);
+void CPU::load_register16_immediate16(uint16_t &destination_register16) {
+    destination_register16 = memory.read_16(registers.program_counter + 1);
     registers.program_counter += 3;
     cycles_elapsed += 12;
 }
 
 void CPU::increment_register8(uint8_t &register8) {
-    const bool does_half_carry_occur = (register8 & 0x0F) == 0x0F;
+    const bool does_half_carry_occur = (register8 & 0x0f) == 0x0f;
     register8++;
     set_flags(register8 == 0, false, does_half_carry_occur, registers.flags & MASK_CARRY);
     registers.program_counter += 1;
@@ -304,7 +358,7 @@ void CPU::increment_register8(uint8_t &register8) {
 }
 
 void CPU::decrement_register8(uint8_t &register8) {
-    const bool does_half_carry_occur = (register8 & 0x0F) == 0x00;
+    const bool does_half_carry_occur = (register8 & 0x0f) == 0x00;
     register8--;
     set_flags(register8 == 0, true, does_half_carry_occur, registers.flags & MASK_CARRY);
     registers.program_counter += 1;
@@ -324,100 +378,85 @@ void CPU::decrement_register16(uint16_t &register16) {
 }
 
 void CPU::add_hl_register16(const uint16_t &register16) {
-    const bool does_half_carry_occur = (registers.hl & 0x0FFF) + (register16 & 0x0FFF) > 0x0FFF;
-    const bool does_carry_occur = static_cast<uint32_t>(registers.hl) + register16 > 0xFFFF;
+    const bool does_half_carry_occur = (registers.hl & 0x0fff) + (register16 & 0x0fff) > 0x0fff;
+    const bool does_carry_occur = static_cast<uint32_t>(registers.hl) + register16 > 0xffff;
     registers.hl += register16;
     set_flags(registers.flags & MASK_ZERO, false, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
-void CPU::add_a_uint8(const uint8_t &value, bool is_register_input) {
-    const bool does_half_carry_occur = (registers.a & 0x0F) + (value & 0x0F) > 0x0F;
-    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + value > 0xFF;
-    registers.a += value;
+void CPU::add_a_register8(const uint8_t &register8) {
+    const bool does_half_carry_occur = (registers.a & 0x0f) + (register8 & 0x0f) > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + register8 > 0xff;
+    registers.a += register8;
     set_flags(registers.a == 0, false, does_half_carry_occur, does_carry_occur);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::add_with_carry_a_uint8(const uint8_t &value, bool is_register_input) {
+void CPU::add_with_carry_a_register8(const uint8_t &register8) {
     const auto carry_in = (registers.flags & MASK_CARRY) ? 1 : 0;
-    const bool does_half_carry_occur = (registers.a & 0x0F) + (value & 0x0F) + carry_in > 0x0F;
-    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + value + carry_in > 0xFF;
-    registers.a += value + carry_in;
+    const bool does_half_carry_occur = (registers.a & 0x0f) + (register8 & 0x0f) + carry_in > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + register8 + carry_in > 0xff;
+    registers.a += register8 + carry_in;
     set_flags(registers.a == 0, false, does_half_carry_occur, does_carry_occur);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::subtract_a_uint8(const uint8_t &value, bool is_register_input) {
-    const bool does_half_carry_occur = (registers.a & 0x0F) < (value & 0x0F);
-    const bool does_carry_occur = registers.a < value;
-    registers.a -= value;
+void CPU::subtract_a_register8(const uint8_t &register8) {
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (register8 & 0x0f);
+    const bool does_carry_occur = registers.a < register8;
+    registers.a -= register8;
     set_flags(registers.a == 0, true, does_half_carry_occur, does_carry_occur);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::subtract_with_carry_a_uint8(const uint8_t &value, bool is_register_input) {
+void CPU::subtract_with_carry_a_register8(const uint8_t &register8) {
     const auto carry_in = (registers.flags & MASK_CARRY) ? 1 : 0;
-    const bool does_half_carry_occur = (registers.a & 0x0F) < (value & 0x0F) + carry_in;
-    const bool does_carry_occur = registers.a < value + carry_in;
-    registers.a -= value + carry_in;
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (register8 & 0x0f) + carry_in;
+    const bool does_carry_occur = registers.a < register8 + carry_in;
+    registers.a -= register8 + carry_in;
     set_flags(registers.a == 0, true, does_half_carry_occur, does_carry_occur);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::and_a_uint8(const uint8_t &value, bool is_register_input) {
-    registers.a &= value;
+void CPU::and_a_register8(const uint8_t &register8) {
+    registers.a &= register8;
     set_flags(registers.a == 0, false, true, false);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::xor_a_uint8(const uint8_t &value, bool is_register_input) {
-    registers.a ^= value;
+void CPU::xor_a_register8(const uint8_t &register8) {
+    registers.a ^= register8;
     set_flags(registers.a == 0, false, false, false);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::or_a_uint8(const uint8_t &value, bool is_register_input) {
-    registers.a |= value;
+void CPU::or_a_register8(const uint8_t &register8) {
+    registers.a |= register8;
     set_flags(registers.a == 0, false, false, false);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
-void CPU::compare_a_uint8(const uint8_t &value, bool is_register_input) {
-    const bool does_half_carry_occur = (registers.a & 0x0F) < (value & 0x0F);
-    const bool does_carry_occur = registers.a < value;
-    set_flags(registers.a == value, true, does_half_carry_occur, does_carry_occur);
-    if (is_register_input) {
-        registers.program_counter += 1;
-        cycles_elapsed += 4;
-    }
+void CPU::compare_a_register8(const uint8_t &register8) {
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (register8 & 0x0f);
+    const bool does_carry_occur = registers.a < register8;
+    set_flags(registers.a == register8, true, does_half_carry_occur, does_carry_occur);
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
 }
 
 void CPU::jump_relative_condition_signed_immediate8(bool is_condition_met) {
     if (is_condition_met) {
-        registers.program_counter += 2 + static_cast<int8_t>(memory.read_8(registers.program_counter + 1));
+        const auto signed_offset = static_cast<int8_t>(memory.read_8(registers.program_counter + 1));
+        registers.program_counter += 2 + signed_offset;
         cycles_elapsed += 12;
     } else {
         registers.program_counter += 2;
@@ -485,10 +524,10 @@ void CPU::restart_address(uint16_t address) {
 // ===== Instructions =====
 // ========================
 
-void CPU::unknown_opcode() {
+void CPU::unused_opcode() {
     std::cerr << std::hex << std::setfill('0');
-    std::cerr << "Unknown opcode 0x" << std::setw(4) << memory.read_8(registers.program_counter)
-              << "encountered at registers.program_counter = 0x" << std::setw(4) << registers.program_counter << "\n";
+    std::cerr << "Unused opcode 0x" << std::setw(2) << memory.read_8(registers.program_counter) << " "
+              << "encountered at registers.program_counter = 0x" << std::setw(2) << registers.program_counter << "\n";
 }
 
 void CPU::no_operation_0x00() {
@@ -529,7 +568,8 @@ void CPU::rotate_left_circular_a_0x07() {
 }
 
 void CPU::load_memory_immediate16_stack_pointer_0x08() {
-    memory.write_16(memory.read_16(registers.program_counter + 1), registers.stack_pointer);
+    const auto immediate16 = memory.read_16(registers.program_counter + 1);
+    memory.write_16(immediate16, registers.stack_pointer);
     registers.program_counter += 3;
     cycles_elapsed += 20;
 }
@@ -671,9 +711,9 @@ void CPU::load_h_immediate8_0x26() {
 void CPU::decimal_adjust_a_0x27() {
     const bool was_addition_most_recent = !(registers.flags & MASK_SUBTRACT);
     bool does_carry_occur = false;
-    uint8_t correction{0};
+    uint8_t correction = 0;
     // Previous operation was between two binary coded decimals (BCDs) and this corrects register A back to BCD format
-    if ((registers.flags & MASK_HALF_CARRY) || (was_addition_most_recent && (registers.a & 0x0F) > 0x09)) {
+    if ((registers.flags & MASK_HALF_CARRY) || (was_addition_most_recent && (registers.a & 0x0f) > 0x09)) {
         correction |= 0x06;
     }
     if ((registers.flags & MASK_CARRY) || (was_addition_most_recent && registers.a > 0x99)) {
@@ -739,7 +779,7 @@ void CPU::increment_stack_pointer_0x33() {
 
 void CPU::increment_memory_hl_0x34() {
     auto memory_hl = memory.read_8(registers.hl);
-    const bool does_half_carry_occur = (memory_hl & 0x0F) == 0x0F;
+    const bool does_half_carry_occur = (memory_hl & 0x0f) == 0x0f;
     memory.write_8(registers.hl, ++memory_hl);
     set_flags(memory_hl == 0, false, does_half_carry_occur, registers.flags & MASK_CARRY);
     registers.program_counter += 1;
@@ -748,7 +788,7 @@ void CPU::increment_memory_hl_0x34() {
 
 void CPU::decrement_memory_hl_0x35() {
     auto memory_hl = memory.read_8(registers.hl);
-    const bool does_half_carry_occur = (memory_hl & 0x0F) == 0x00;
+    const bool does_half_carry_occur = (memory_hl & 0x0f) == 0x00;
     memory.write_8(registers.hl, --memory_hl);
     set_flags(memory_hl == 0, true, does_half_carry_occur, registers.flags & MASK_CARRY);
     registers.program_counter += 1;
@@ -1060,275 +1100,299 @@ void CPU::load_a_a_0x7f() {
 }
 
 void CPU::add_a_b_0x80() {
-    add_a_uint8(registers.b);
+    add_a_register8(registers.b);
 }
 
 void CPU::add_a_c_0x81() {
-    add_a_uint8(registers.c);
+    add_a_register8(registers.c);
 }
 
 void CPU::add_a_d_0x82() {
-    add_a_uint8(registers.d);
+    add_a_register8(registers.d);
 }
 
 void CPU::add_a_e_0x83() {
-    add_a_uint8(registers.e);
+    add_a_register8(registers.e);
 }
 
 void CPU::add_a_h_0x84() {
-    add_a_uint8(registers.h);
+    add_a_register8(registers.h);
 }
 
 void CPU::add_a_l_0x85() {
-    add_a_uint8(registers.l);
+    add_a_register8(registers.l);
 }
 
 void CPU::add_a_memory_hl_0x86() {
-    add_a_uint8(memory.read_8(registers.hl), false);
+    const auto memory_hl = memory.read_8(registers.hl);
+    const bool does_half_carry_occur = (registers.a & 0x0f) + (memory_hl & 0x0f) > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + memory_hl > 0xff;
+    registers.a += memory_hl;
+    set_flags(registers.a == 0, false, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::add_a_a_0x87() {
-    add_a_uint8(registers.a);
+    add_a_register8(registers.a);
 }
 
 void CPU::add_with_carry_a_b_0x88() {
-    add_with_carry_a_uint8(registers.b);
+    add_with_carry_a_register8(registers.b);
 }
 
 void CPU::add_with_carry_a_c_0x89() {
-    add_with_carry_a_uint8(registers.c);
+    add_with_carry_a_register8(registers.c);
 }
 
 void CPU::add_with_carry_a_d_0x8a() {
-    add_with_carry_a_uint8(registers.d);
+    add_with_carry_a_register8(registers.d);
 }
 
 void CPU::add_with_carry_a_e_0x8b() {
-    add_with_carry_a_uint8(registers.e);
+    add_with_carry_a_register8(registers.e);
 }
 
 void CPU::add_with_carry_a_h_0x8c() {
-    add_with_carry_a_uint8(registers.h);
+    add_with_carry_a_register8(registers.h);
 }
 
 void CPU::add_with_carry_a_l_0x8d() {
-    add_with_carry_a_uint8(registers.l);
+    add_with_carry_a_register8(registers.l);
 }
 
 void CPU::add_with_carry_a_memory_hl_0x8e() {
-    add_with_carry_a_uint8(memory.read_8(registers.hl), false);
+    const auto memory_hl = memory.read_8(registers.hl);
+    const auto carry_in = (registers.flags & MASK_CARRY) ? 1 : 0;
+    const bool does_half_carry_occur = (registers.a & 0x0f) + (memory_hl & 0x0f) + carry_in > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + memory_hl + carry_in > 0xff;
+    registers.a += memory_hl + carry_in;
+    set_flags(registers.a == 0, false, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::add_with_carry_a_a_0x8f() {
-    add_with_carry_a_uint8(registers.a);
+    add_with_carry_a_register8(registers.a);
 }
 
 void CPU::subtract_a_b_0x90() {
-    subtract_a_uint8(registers.b);
+    subtract_a_register8(registers.b);
 }
 
 void CPU::subtract_a_c_0x91() {
-    subtract_a_uint8(registers.c);
+    subtract_a_register8(registers.c);
 }
 
 void CPU::subtract_a_d_0x92() {
-    subtract_a_uint8(registers.d);
+    subtract_a_register8(registers.d);
 }
 
 void CPU::subtract_a_e_0x93() {
-    subtract_a_uint8(registers.e);
+    subtract_a_register8(registers.e);
 }
 
 void CPU::subtract_a_h_0x94() {
-    subtract_a_uint8(registers.h);
+    subtract_a_register8(registers.h);
 }
 
 void CPU::subtract_a_l_0x95() {
-    subtract_a_uint8(registers.l);
+    subtract_a_register8(registers.l);
 }
 
 void CPU::subtract_a_memory_hl_0x96() {
-    subtract_a_uint8(memory.read_8(registers.hl), false);
+    const auto memory_hl = memory.read_8(registers.hl);
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (memory_hl & 0x0f);
+    const bool does_carry_occur = registers.a < memory_hl;
+    registers.a -= memory_hl;
+    set_flags(registers.a == 0, true, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::subtract_a_a_0x97() {
-    subtract_a_uint8(registers.a);
+    subtract_a_register8(registers.a);
 }
 
 void CPU::subtract_with_carry_a_b_0x98() {
-    subtract_with_carry_a_uint8(registers.b);
+    subtract_with_carry_a_register8(registers.b);
 }
 
 void CPU::subtract_with_carry_a_c_0x99() {
-    subtract_with_carry_a_uint8(registers.c);
+    subtract_with_carry_a_register8(registers.c);
 }
 
 void CPU::subtract_with_carry_a_d_0x9a() {
-    subtract_with_carry_a_uint8(registers.d);
+    subtract_with_carry_a_register8(registers.d);
 }
 
 void CPU::subtract_with_carry_a_e_0x9b() {
-    subtract_with_carry_a_uint8(registers.e);
+    subtract_with_carry_a_register8(registers.e);
 }
 
 void CPU::subtract_with_carry_a_h_0x9c() {
-    subtract_with_carry_a_uint8(registers.h);
+    subtract_with_carry_a_register8(registers.h);
 }
 
 void CPU::subtract_with_carry_a_l_0x9d() {
-    subtract_with_carry_a_uint8(registers.l);
+    subtract_with_carry_a_register8(registers.l);
 }
 
 void CPU::subtract_with_carry_a_memory_hl_0x9e() {
-    subtract_with_carry_a_uint8(memory.read_8(registers.hl), false);
+    const auto memory_hl = memory.read_8(registers.hl);
+    const auto carry_in = (registers.flags & MASK_CARRY) ? 1 : 0;
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (memory_hl & 0x0f) + carry_in;
+    const bool does_carry_occur = registers.a < memory_hl + carry_in;
+    registers.a -= memory_hl + carry_in;
+    set_flags(registers.a == 0, true, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::subtract_with_carry_a_a_0x9f() {
-    subtract_with_carry_a_uint8(registers.a);
+    subtract_with_carry_a_register8(registers.a);
 }
 
 void CPU::and_a_b_0xa0() {
-    and_a_uint8(registers.b);
+    and_a_register8(registers.b);
 }
 
 void CPU::and_a_c_0xa1() {
-    and_a_uint8(registers.c);
+    and_a_register8(registers.c);
 }
 
 void CPU::and_a_d_0xa2() {
-    and_a_uint8(registers.d);
+    and_a_register8(registers.d);
  }
 
 void CPU::and_a_e_0xa3() {
-    and_a_uint8(registers.e);
+    and_a_register8(registers.e);
 }
 
 void CPU::and_a_h_0xa4() {
-    and_a_uint8(registers.h);
+    and_a_register8(registers.h);
 }
 
 void CPU::and_a_l_0xa5() {
-    and_a_uint8(registers.l);
+    and_a_register8(registers.l);
 }
 
 void CPU::and_a_memory_hl_0xa6() {
-    and_a_uint8(memory.read_8(registers.hl), false);
+    registers.a &= memory.read_8(registers.hl);
+    set_flags(registers.a == 0, false, true, false);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::and_a_a_0xa7() {
-    and_a_uint8(registers.a);
+    and_a_register8(registers.a);
 }
 
 void CPU::xor_a_b_0xa8() {
-    xor_a_uint8(registers.b);
+    xor_a_register8(registers.b);
 }
 
 void CPU::xor_a_c_0xa9() {
-    xor_a_uint8(registers.c);
+    xor_a_register8(registers.c);
 }
 
 void CPU::xor_a_d_0xaa() {
-    xor_a_uint8(registers.d);
+    xor_a_register8(registers.d);
 }
 
 void CPU::xor_a_e_0xab() {
-    xor_a_uint8(registers.e);
+    xor_a_register8(registers.e);
 }
 
 void CPU::xor_a_h_0xac() {
-    xor_a_uint8(registers.h);
+    xor_a_register8(registers.h);
 }
 
 void CPU::xor_a_l_0xad() {
-    xor_a_uint8(registers.l);
+    xor_a_register8(registers.l);
 }
 
 void CPU::xor_a_memory_hl_0xae() {
-    xor_a_uint8(memory.read_8(registers.hl), false);
+    registers.a ^= memory.read_8(registers.hl);
+    set_flags(registers.a == 0, false, false, false);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::xor_a_a_0xaf() {
-    xor_a_uint8(registers.a);
+    xor_a_register8(registers.a);
 }
 
 void CPU::or_a_b_0xb0() {
-    or_a_uint8(registers.b);
+    or_a_register8(registers.b);
 }
 
 void CPU::or_a_c_0xb1() {
-    or_a_uint8(registers.c);
+    or_a_register8(registers.c);
 }
 
 void CPU::or_a_d_0xb2() {
-    or_a_uint8(registers.d);
+    or_a_register8(registers.d);
 }
 
 void CPU::or_a_e_0xb3() {
-    or_a_uint8(registers.e);
+    or_a_register8(registers.e);
 }
 
 void CPU::or_a_h_0xb4() {
-    or_a_uint8(registers.h);
+    or_a_register8(registers.h);
 }
 
 void CPU::or_a_l_0xb5() {
-    or_a_uint8(registers.l);
+    or_a_register8(registers.l);
 }
 
 void CPU::or_a_memory_hl_0xb6() {
-    or_a_uint8(memory.read_8(registers.hl), false);
+    registers.a |= memory.read_8(registers.hl);
+    set_flags(registers.a == 0, false, false, false);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::or_a_a_0xb7() {
-    or_a_uint8(registers.a);
+    or_a_register8(registers.a);
 }
 
 void CPU::compare_a_b_0xb8() {
-    compare_a_uint8(registers.b);
+    compare_a_register8(registers.b);
 }
 
 void CPU::compare_a_c_0xb9() {
-    compare_a_uint8(registers.c);
+    compare_a_register8(registers.c);
 }
 
 void CPU::compare_a_d_0xba() {
-    compare_a_uint8(registers.d);
+    compare_a_register8(registers.d);
 }
 
 void CPU::compare_a_e_0xbb() {
-    compare_a_uint8(registers.e);
+    compare_a_register8(registers.e);
 }
 
 void CPU::compare_a_h_0xbc() {
-    compare_a_uint8(registers.h);
+    compare_a_register8(registers.h);
 }
 
 void CPU::compare_a_l_0xbd() {
-    compare_a_uint8(registers.l);
+    compare_a_register8(registers.l);
 }
 
 void CPU::compare_a_memory_hl_0xbe() {
-    compare_a_uint8(memory.read_8(registers.hl), false);
+    const auto memory_hl = memory.read_8(registers.hl);
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (memory_hl & 0x0f);
+    const bool does_carry_occur = registers.a < memory_hl;
+    set_flags(registers.a == memory_hl, true, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 8;
 }
 
 void CPU::compare_a_a_0xbf() {
-    compare_a_uint8(registers.a);
+    compare_a_register8(registers.a);
 }
 
 void CPU::return_not_zero_0xc0() {
@@ -1356,7 +1420,11 @@ void CPU::push_bc_0xc5() {
 }
 
 void CPU::add_a_immediate8_0xc6() {
-    add_a_uint8(memory.read_8(registers.program_counter + 1), false);
+    const auto immediate8 = memory.read_8(registers.program_counter + 1);
+    const bool does_half_carry_occur = (registers.a & 0x0f) + (immediate8 & 0x0f) > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + immediate8 > 0xff;
+    registers.a += immediate8;
+    set_flags(registers.a == 0, false, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 2;
     cycles_elapsed += 8;
 }
@@ -1390,7 +1458,12 @@ void CPU::call_immediate16_0xcd() {
 }
 
 void CPU::add_with_carry_a_immediate8_0xce() {
-    add_with_carry_a_uint8(memory.read_8(registers.program_counter + 1), false);
+    const auto immediate8 = memory.read_8(registers.program_counter + 1);
+    const auto carry_in = (registers.flags & MASK_CARRY) ? 1 : 0;
+    const bool does_half_carry_occur = (registers.a & 0x0f) + (immediate8 & 0x0f) + carry_in > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(registers.a) + immediate8 + carry_in > 0xff;
+    registers.a += immediate8 + carry_in;
+    set_flags(registers.a == 0, false, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 2;
     cycles_elapsed += 8;
 }
@@ -1411,7 +1484,7 @@ void CPU::jump_not_carry_immediate16_0xd2() {
     jump_condition_immediate16(!(registers.flags & MASK_CARRY));
 }
 
-// 0xd3 is an unused opcode for the Game Boy
+// 0xd3 is an unused opcode
 
 void CPU::call_not_carry_immediate16_0xd4() {
     call_condition_immediate16(!(registers.flags & MASK_CARRY));
@@ -1422,9 +1495,214 @@ void CPU::push_de_0xd5() {
 }
 
 void CPU::subtract_a_immediate8_0xd6() {
-    subtract_a_uint8(memory.read_8(registers.program_counter + 1), false);
+    const auto immediate8 = memory.read_8(registers.program_counter + 1);
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (immediate8 & 0x0f);
+    const bool does_carry_occur = registers.a < immediate8;
+    registers.a -= immediate8;
+    set_flags(registers.a == 0, true, does_half_carry_occur, does_carry_occur);
     registers.program_counter += 2;
     cycles_elapsed += 8;
+}
+
+void CPU::restart_0x10_0xd7() {
+    restart_address(0x10);
+}
+
+void CPU::return_carry_0xd8() {
+    return_condition(registers.flags & MASK_CARRY);
+}
+
+void CPU::return_from_interrupt_0xd9() {
+    registers.program_counter = memory.read_16(registers.stack_pointer);
+    registers.stack_pointer += 2;
+    are_interrupts_enabled = true;
+    cycles_elapsed += 16;
+}
+
+void CPU::jump_carry_immediate16_0xda() {
+    jump_condition_immediate16(registers.flags & MASK_CARRY);
+}
+
+// 0xdb is an unused opcode
+
+void CPU::call_carry_immediate16_0xdc() {
+    call_condition_immediate16(registers.flags & MASK_CARRY);
+}
+
+// 0xdd is an unused opcode
+
+void CPU::subtract_with_carry_a_immediate8_0xde() {
+    const auto immediate8 = memory.read_8(registers.program_counter + 1);
+    const auto carry_in = (registers.flags & MASK_CARRY) ? 1 : 0;
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (immediate8 & 0x0f) + carry_in;
+    const bool does_carry_occur = registers.a < immediate8 + carry_in;
+    registers.a -= immediate8 + carry_in;
+    set_flags(registers.a == 0, true, does_half_carry_occur, does_carry_occur);
+    registers.program_counter += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::restart_0x18_0xdf() {
+    restart_address(0x18);
+}
+
+void CPU::load_memory_high_ram_signed_immediate8_a_0xe0() {
+    const auto signed_offset = static_cast<uint8_t>(memory.read_8(registers.program_counter + 1));
+    memory.write_8(HIGH_RAM_START + signed_offset, registers.a);
+    registers.program_counter += 2;
+    cycles_elapsed += 12;
+}
+
+void CPU::pop_hl_0xe1() {
+    pop_register16(registers.hl);
+}
+
+void CPU::load_memory_high_ram_c_a_0xe2() {
+    memory.write_8(HIGH_RAM_START + registers.c, registers.a);
+    registers.program_counter += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::push_hl_0xe5() {
+    push_register16(registers.hl);
+}
+
+void CPU::and_a_immediate8_0xe6() {
+    registers.a &= memory.read_8(registers.program_counter + 1);
+    set_flags(registers.a == 0, false, true, false);
+    registers.program_counter += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::restart_0x20_0xe7() {
+    restart_address(0x20);
+}
+
+void CPU::add_sp_signed_immediate8_0xe8() {
+    // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
+    const auto unsigned_offset = memory.read_8(registers.program_counter + 1);
+    const bool does_half_carry_occur = (registers.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
+    const bool does_carry_occur = (registers.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
+    registers.stack_pointer += static_cast<int8_t>(unsigned_offset);
+    set_flags(false, false, does_half_carry_occur, does_carry_occur);
+    registers.program_counter += 2;
+    cycles_elapsed += 16;
+}
+
+void CPU::jump_hl_0xe9() {
+    registers.program_counter = registers.hl;
+    cycles_elapsed += 4;
+}
+
+void CPU::load_memory_immediate16_a_0xea() {
+    const auto destination_address = memory.read_16(registers.program_counter + 1);
+    memory.write_8(destination_address, registers.a);
+    registers.program_counter += 3;
+    cycles_elapsed += 16;
+}
+
+// 0xeb is an unused opcode
+
+// 0xec is an unused opcode
+
+// 0xed is an unused opcode
+
+void CPU::xor_a_immediate8_0xee() {
+    registers.a ^= memory.read_8(registers.program_counter + 1);
+    set_flags(registers.a == 0, false, false, false);
+    registers.program_counter += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::restart_0x28_0xef() {
+    restart_address(0x28);
+}
+
+void CPU::load_a_memory_high_ram_immediate8_0xf0() {
+    const auto unsigned_offset = memory.read_8(registers.program_counter + 1);
+    registers.a = memory.read_8(HIGH_RAM_START + unsigned_offset);
+    registers.program_counter += 2;
+    cycles_elapsed += 12;
+}
+
+void CPU::pop_af_0xf1() {
+    pop_register16(registers.af);
+}
+
+void CPU::load_a_memory_high_ram_c_0xf2() {
+    registers.a = memory.read_8(HIGH_RAM_START + registers.c);
+    registers.program_counter += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::disable_interrupts_0xf3() {
+    are_interrupts_enabled = false;
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
+}
+
+// 0xf4 is an unused opcode
+
+void CPU::push_af_0xf5() {
+    push_register16(registers.af);
+}
+
+void CPU::or_a_immediate8_0xf6() {
+    registers.a |= memory.read_8(registers.program_counter + 1);
+    set_flags(registers.a == 0, false, false, false);
+    registers.program_counter += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::restart_0x30_0xf7() {
+    restart_address(0x30);
+}
+
+void CPU::load_hl_stack_pointer_with_signed_offset_0xf8() {
+    // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
+    const auto unsigned_offset = memory.read_8(registers.program_counter + 1);
+    const bool does_half_carry_occur = (registers.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
+    const bool does_carry_occur = (registers.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
+    registers.hl = registers.stack_pointer + static_cast<int8_t>(unsigned_offset);
+    set_flags(false, false, does_half_carry_occur, does_carry_occur);
+    registers.program_counter += 2;
+    cycles_elapsed += 12;
+}
+
+void CPU::load_stack_pointer_hl_0xf9() {
+    registers.stack_pointer = registers.hl;
+    registers.program_counter += 1;
+    cycles_elapsed += 8;
+}
+
+void CPU::load_a_memory_immediate16_0xfa() {
+    const auto source_address = memory.read_16(registers.program_counter + 1);
+    registers.a = memory.read_8(source_address);
+    registers.program_counter += 3;
+    cycles_elapsed += 16;
+}
+
+void CPU::enable_interrupts_0xfb() {
+    did_enable_interrupts_execute = true;
+    registers.program_counter += 1;
+    cycles_elapsed += 4;
+}
+
+// 0xfc is an unused opcode
+
+// 0xfd is an unused opcode
+
+void CPU::compare_a_immediate8_0xfe() {
+    const auto immediate8 = memory.read_8(registers.program_counter + 1);
+    const bool does_half_carry_occur = (registers.a & 0x0f) < (immediate8 & 0x0f);
+    const bool does_carry_occur = registers.a < immediate8;
+    set_flags(registers.a == immediate8, true, does_half_carry_occur, does_carry_occur);
+    registers.program_counter += 2;
+    cycles_elapsed += 8;
+}
+
+void CPU::restart_0x38_0xff() {
+    restart_address(0x38);
 }
 
 } // namespace GameBoy

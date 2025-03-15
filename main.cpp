@@ -5,7 +5,7 @@ int main() {
     GameBoy::Memory memory{};
     GameBoy::CPU cpu{memory};
 
-    for (uint8_t i = 0x00; i <= 0xca; i++) {
+    for (uint8_t i = 0x00; i <= 0xfe; i++) {
         if (i != 0xcb) {
             cpu.execute_instruction(i);
         }
