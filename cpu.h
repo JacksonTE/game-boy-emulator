@@ -2,24 +2,27 @@
 
 #include <cstdint>
 #include "memory.h"
-#include "registers.h"
+#include "register_file.h"
 
 namespace GameBoy {
+    
+constexpr uint8_t FLAG_ZERO_MASK = 1 << 7;
+constexpr uint8_t FLAG_SUBTRACT_MASK = 1 << 6; // Also known as the 'N' flag
+constexpr uint8_t FLAG_HALF_CARRY_MASK = 1 << 5; // For a carry from bit 3-4 or 11-12
+constexpr uint8_t FLAG_CARRY_MASK = 1 << 4;
 
-constexpr uint8_t MASK_ZERO = 1 << 7;
-constexpr uint8_t MASK_SUBTRACT = 1 << 6; // Also known as the 'N' flag
-constexpr uint8_t MASK_HALF_CARRY = 1 << 5; // For a carry from bit 3-4 or 11-12
-constexpr uint8_t MASK_CARRY = 1 << 4;
+constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
+constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 
 class CPU {
 public:
-    CPU(Memory memory) : memory{memory} {}
+    CPU(Memory &memory) : memory{memory} {}
     void print_register_values() const;
     void execute_instruction(uint8_t opcode);
 
 private:
-    Memory memory;
-    Registers<std::endian::native> registers;
+    Memory &memory;
+    RegisterFile<std::endian::native> registers;
     uint64_t cycles_elapsed{};
     bool is_stopped{};
     bool is_halted{};
@@ -31,7 +34,9 @@ private:
     static const Instruction extended_instruction_table[256];
 
     // Instruction Helpers
-    void set_flags(bool set_zero, bool set_subtract, bool set_half_carry, bool set_carry);
+    bool is_flag_set(uint8_t flag_mask) const;
+    void update_flags(bool new_zero_state, bool new_subtract_state, bool new_half_carry_state, bool new_carry_state);
+    
     void load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8);
     void load_register8_immediate8(uint8_t &destination_register8);
     void load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16);
@@ -50,13 +55,23 @@ private:
     void xor_a_register8(const uint8_t &register8);
     void or_a_register8(const uint8_t &register8);
     void compare_a_register8(const uint8_t &register8);
-    void jump_relative_condition_signed_immediate8(bool is_condition_met);
-    void jump_condition_immediate16(bool is_condition_met);
-    void call_condition_immediate16(bool is_condition_met);
-    void return_condition(bool is_condition_met);
+    void jump_relative_conditional_signed_immediate8(bool is_condition_met);
+    void jump_conditional_immediate16(bool is_condition_met);
+    void call_conditional_immediate16(bool is_condition_met);
+    void return_conditional(bool is_condition_met);
     void push_register16(const uint16_t &register16);
     void pop_register16(uint16_t &register16);
     void restart_address(uint16_t address);
+    
+    void rotate_left_circular_register8(uint8_t &register8);
+    void rotate_right_circular_register8(uint8_t &register8);
+    void rotate_left_through_carry_register8(uint8_t &register8);
+    void rotate_right_through_carry_register8(uint8_t &register8);
+    void shift_left_arithmetic_register8(uint8_t &register8);
+    void shift_right_arithmetic_register8(uint8_t &register8);
+    void swap_register8(uint8_t &register8);
+    void shift_right_logical_register8(uint8_t &register8);
+    void bit_position_register8(uint8_t bit_position_to_test, const uint8_t &register8);
 
     // Instructions suffixed with their opcode
     void unused_opcode();
@@ -316,6 +331,8 @@ private:
     // 0xfd is an unused opcode
     void compare_a_immediate8_0xfe();
     void restart_0x38_0xff();
+
+    void rotate_left_circular_b_0xcb00();
 };
 
 } // namespace GameBoy

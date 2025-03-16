@@ -6,10 +6,10 @@
 namespace GameBoy {
 
 template <std::endian E>
-struct Registers;
+struct RegisterFile;
 
 template <>
-struct Registers<std::endian::little> {
+struct RegisterFile<std::endian::little> {
     union {
         struct {
             uint8_t flags;
@@ -43,7 +43,7 @@ struct Registers<std::endian::little> {
 };
 
 template <>
-struct Registers<std::endian::big> {
+struct RegisterFile<std::endian::big> {
     union {
         struct {
             uint8_t a;
