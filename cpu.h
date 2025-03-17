@@ -5,7 +5,7 @@
 #include "register_file.h"
 
 namespace GameBoy {
-    
+
 constexpr uint8_t FLAG_ZERO_MASK = 1 << 7;
 constexpr uint8_t FLAG_SUBTRACT_MASK = 1 << 6; // Also known as the 'N' flag
 constexpr uint8_t FLAG_HALF_CARRY_MASK = 1 << 5; // For a carry from bit 3-4 or 11-12
@@ -30,8 +30,8 @@ private:
     bool did_enable_interrupts_execute{};
 
     using Instruction = void (CPU::*)();
-    static const Instruction instruction_table[256];
-    static const Instruction extended_instruction_table[256];
+    static const Instruction instruction_table[0x100];
+    static const Instruction extended_instruction_table[0x100];
 
     // Instruction Helpers
     bool is_flag_set(uint8_t flag_mask) const;
@@ -59,19 +59,22 @@ private:
     void jump_conditional_immediate16(bool is_condition_met);
     void call_conditional_immediate16(bool is_condition_met);
     void return_conditional(bool is_condition_met);
-    void push_register16(const uint16_t &register16);
-    void pop_register16(uint16_t &register16);
+    void push_stack_register16(const uint16_t &register16);
+    void pop_stack_register16(uint16_t &register16);
     void restart_address(uint16_t address);
-    
+
     void rotate_left_circular_register8(uint8_t &register8);
     void rotate_right_circular_register8(uint8_t &register8);
     void rotate_left_through_carry_register8(uint8_t &register8);
     void rotate_right_through_carry_register8(uint8_t &register8);
     void shift_left_arithmetic_register8(uint8_t &register8);
     void shift_right_arithmetic_register8(uint8_t &register8);
-    void swap_register8(uint8_t &register8);
+    void swap_nibbles_register8(uint8_t &register8);
     void shift_right_logical_register8(uint8_t &register8);
-    void bit_position_register8(uint8_t bit_position_to_test, const uint8_t &register8);
+    void bit_test_position_register8(uint8_t bit_position_to_test, const uint8_t &register8);
+    void bit_test_position_memory_hl(uint8_t bit_position_to_test);
+    void reset_bit_position_register8(uint8_t bit_position_to_reset, uint8_t &register8);
+    void set_bit_position_register8(uint8_t bit_position_to_set, uint8_t &register8);
 
     // Instructions suffixed with their opcode
     void unused_opcode();
@@ -268,11 +271,11 @@ private:
     void compare_a_memory_hl_0xbe();
     void compare_a_a_0xbf();
     void return_not_zero_0xc0();
-    void pop_bc_0xc1();
+    void pop_stack_bc_0xc1();
     void jump_not_zero_immediate16_0xc2();
     void jump_immediate16_0xc3();
     void call_not_zero_immediate16_0xc4();
-    void push_bc_0xc5();
+    void push_stack_bc_0xc5();
     void add_a_immediate8_0xc6();
     void restart_0x00_0xc7();
     void return_zero_0xc8();
@@ -284,11 +287,11 @@ private:
     void add_with_carry_a_immediate8_0xce();
     void restart_0x08_0xcf();
     void return_not_carry_0xd0();
-    void pop_de_0xd1();
+    void pop_stack_de_0xd1();
     void jump_not_carry_immediate16_0xd2();
     // 0xd3 is an unused opcode
     void call_not_carry_immediate16_0xd4();
-    void push_de_0xd5();
+    void push_stack_de_0xd5();
     void subtract_a_immediate8_0xd6();
     void restart_0x10_0xd7();
     void return_carry_0xd8();
@@ -300,11 +303,11 @@ private:
     void subtract_with_carry_a_immediate8_0xde();
     void restart_0x18_0xdf();
     void load_memory_high_ram_signed_immediate8_a_0xe0();
-    void pop_hl_0xe1();
+    void pop_stack_hl_0xe1();
     void load_memory_high_ram_c_a_0xe2();
     // 0xe3 is an unused opcode
     // 0xe4 is an unused opcode
-    void push_hl_0xe5();
+    void push_stack_hl_0xe5();
     void and_a_immediate8_0xe6();
     void restart_0x20_0xe7();
     void add_sp_signed_immediate8_0xe8();
@@ -316,11 +319,11 @@ private:
     void xor_a_immediate8_0xee();
     void restart_0x28_0xef();
     void load_a_memory_high_ram_immediate8_0xf0();
-    void pop_af_0xf1();
+    void pop_stack_af_0xf1();
     void load_a_memory_high_ram_c_0xf2();
     void disable_interrupts_0xf3();
     // 0xf4 is an unused opcode
-    void push_af_0xf5();
+    void push_stack_af_0xf5();
     void or_a_immediate8_0xf6();
     void restart_0x30_0xf7();
     void load_hl_stack_pointer_with_signed_offset_0xf8();
@@ -332,7 +335,135 @@ private:
     void compare_a_immediate8_0xfe();
     void restart_0x38_0xff();
 
+    // Extended Instructions suffixed with their opcode
     void rotate_left_circular_b_0xcb00();
+    void rotate_left_circular_c_0xcb01();
+    void rotate_left_circular_d_0xcb02();
+    void rotate_left_circular_e_0xcb03();
+    void rotate_left_circular_h_0xcb04();
+    void rotate_left_circular_l_0xcb05();
+    void rotate_left_circular_memory_hl_0xcb06();
+    void rotate_left_circular_a_0xcb07();
+    void rotate_right_circular_b_0xcb08();
+    void rotate_right_circular_c_0xcb09();
+    void rotate_right_circular_d_0xcb0a();
+    void rotate_right_circular_e_0xcb0b();
+    void rotate_right_circular_h_0xcb0c();
+    void rotate_right_circular_l_0xcb0d();
+    void rotate_right_circular_memory_hl_0xcb0e();
+    void rotate_right_circular_a_0xcb0f();
+    void rotate_left_through_carry_b_0xcb10();
+    void rotate_left_through_carry_c_0xcb11();
+    void rotate_left_through_carry_d_0xcb12();
+    void rotate_left_through_carry_e_0xcb13();
+    void rotate_left_through_carry_h_0xcb14();
+    void rotate_left_through_carry_l_0xcb15();
+    void rotate_left_through_carry_memory_hl_0xcb16();
+    void rotate_left_through_carry_a_0xcb17();
+    void rotate_right_through_carry_b_0xcb18();
+    void rotate_right_through_carry_c_0xcb19();
+    void rotate_right_through_carry_d_0xcb1a();
+    void rotate_right_through_carry_e_0xcb1b();
+    void rotate_right_through_carry_h_0xcb1c();
+    void rotate_right_through_carry_l_0xcb1d();
+    void rotate_right_through_carry_memory_hl_0xcb1e();
+    void rotate_right_through_carry_a_0xcb1f();
+    void shift_left_arithmetic_b_0xcb20();
+    void shift_left_arithmetic_c_0xcb21();
+    void shift_left_arithmetic_d_0xcb22();
+    void shift_left_arithmetic_e_0xcb23();
+    void shift_left_arithmetic_h_0xcb24();
+    void shift_left_arithmetic_l_0xcb25();
+    void shift_left_arithmetic_memory_hl_0xcb26();
+    void shift_left_arithmetic_a_0xcb27();
+    void shift_right_arithmetic_b_0xcb28();
+    void shift_right_arithmetic_c_0xcb29();
+    void shift_right_arithmetic_d_0xcb2a();
+    void shift_right_arithmetic_e_0xcb2b();
+    void shift_right_arithmetic_h_0xcb2c();
+    void shift_right_arithmetic_l_0xcb2d();
+    void shift_right_arithmetic_memory_hl_0xcb2e();
+    void shift_right_arithmetic_a_0xcb2f();
+    void swap_nibbles_b_0xcb30();
+    void swap_nibbles_c_0xcb31();
+    void swap_nibbles_d_0xcb32();
+    void swap_nibbles_e_0xcb33();
+    void swap_nibbles_h_0xcb34();
+    void swap_nibbles_l_0xcb35();
+    void swap_nibbles_memory_hl_0xcb36();
+    void swap_nibbles_a_0xcb37();
+    void shift_right_logical_b_0xcb38();
+    void shift_right_logical_c_0xcb39();
+    void shift_right_logical_d_0xcb3a();
+    void shift_right_logical_e_0xcb3b() ;
+    void shift_right_logical_h_0xcb3c();
+    void shift_right_logical_l_0xcb3d();
+    void shift_right_logical_memory_hl_0xcb3e();
+    void shift_right_logical_a_0xcb3f();
+    void bit_test_0_b_0xcb40();
+    void bit_test_0_c_0xcb41();
+    void bit_test_0_d_0xcb42();
+    void bit_test_0_e_0xcb43();
+    void bit_test_0_h_0xcb44();
+    void bit_test_0_l_0xcb45();
+    void bit_test_0_memory_hl_0xcb46();
+    void bit_test_0_a_0xcb47();
+    void bit_test_1_b_0xcb48();
+    void bit_test_1_c_0xcb49();
+    void bit_test_1_d_0xcb4a();
+    void bit_test_1_e_0xcb4b();
+    void bit_test_1_h_0xcb4c();
+    void bit_test_1_l_0xcb4d();
+    void bit_test_1_memory_hl_0xcb4e();
+    void bit_test_1_a_0xcb4f();
+    void bit_test_2_b_0xcb50();
+    void bit_test_2_c_0xcb51();
+    void bit_test_2_d_0xcb52();
+    void bit_test_2_e_0xcb53();
+    void bit_test_2_h_0xcb54();
+    void bit_test_2_l_0xcb55();
+    void bit_test_2_memory_hl_0xcb56();
+    void bit_test_2_a_0xcb57();
+    void bit_test_3_b_0xcb58();
+    void bit_test_3_c_0xcb59();
+    void bit_test_3_d_0xcb5a();
+    void bit_test_3_e_0xcb5b();
+    void bit_test_3_h_0xcb5c();
+    void bit_test_3_l_0xcb5d();
+    void bit_test_3_memory_hl_0xcb5e();
+    void bit_test_3_a_0xcb5f();
+    void bit_test_4_b_0xcb60();
+    void bit_test_4_c_0xcb61();
+    void bit_test_4_d_0xcb62();
+    void bit_test_4_e_0xcb63();
+    void bit_test_4_h_0xcb64();
+    void bit_test_4_l_0xcb65();
+    void bit_test_4_memory_hl_0xcb66();
+    void bit_test_4_a_0xcb67();
+    void bit_test_5_b_0xcb68();
+    void bit_test_5_c_0xcb69();
+    void bit_test_5_d_0xcb6a();
+    void bit_test_5_e_0xcb6b();
+    void bit_test_5_h_0xcb6c();
+    void bit_test_5_l_0xcb6d();
+    void bit_test_5_memory_hl_0xcb6e();
+    void bit_test_5_a_0xcb6f();
+    void bit_test_6_b_0xcb70();
+    void bit_test_6_c_0xcb71();
+    void bit_test_6_d_0xcb72();
+    void bit_test_6_e_0xcb73();
+    void bit_test_6_h_0xcb74();
+    void bit_test_6_l_0xcb75();
+    void bit_test_6_memory_hl_0xcb76();
+    void bit_test_6_a_0xcb77();
+    void bit_test_7_b_0xcb78();
+    void bit_test_7_c_0xcb79();
+    void bit_test_7_d_0xcb7a();
+    void bit_test_7_e_0xcb7b();
+    void bit_test_7_h_0xcb7c();
+    void bit_test_7_l_0xcb7d();
+    void bit_test_7_memory_hl_0xcb7e();
+    void bit_test_7_a_0xcb7f();
 };
 
 } // namespace GameBoy
