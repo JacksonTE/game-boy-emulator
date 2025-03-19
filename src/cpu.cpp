@@ -9,20 +9,20 @@ void CPU::print_register_values() const {
     std::cout << "================== CPU Registers ==================\n";
 
     std::cout << "AF: 0x" << std::setw(4) << registers.af << "   "
-              << "(A: 0x" << std::setw(2) << static_cast<int>(registers.a)
-              << ", F: 0x" << std::setw(2) << static_cast<int>(registers.flags) << ")\n";
+              << "(A: 0x" << std::setw(2) << static_cast<int>(registers.a) << ","
+              << " F: 0x" << std::setw(2) << static_cast<int>(registers.flags) << ")\n";
 
     std::cout << "BC: 0x" << std::setw(4) << registers.bc << "   "
-              << "(B: 0x" << std::setw(2) << static_cast<int>(registers.b)
-              << ", C: 0x" << std::setw(2) << static_cast<int>(registers.c) << ")\n";
+              << "(B: 0x" << std::setw(2) << static_cast<int>(registers.b) << ","
+              << " C: 0x" << std::setw(2) << static_cast<int>(registers.c) << ")\n";
 
     std::cout << "DE: 0x" << std::setw(4) << registers.de << "   "
-              << "(D: 0x" << std::setw(2) << static_cast<int>(registers.d)
-              << ", E: 0x" << std::setw(2) << static_cast<int>(registers.e) << ")\n";
+              << "(D: 0x" << std::setw(2) << static_cast<int>(registers.d) << ","
+              << " E: 0x" << std::setw(2) << static_cast<int>(registers.e) << ")\n";
 
     std::cout << "HL: 0x" << std::setw(4) << registers.hl << "   "
-              << "(H: 0x" << std::setw(2) << static_cast<int>(registers.h)
-              << ", L: 0x" << std::setw(2) << static_cast<int>(registers.l) << ")\n";
+              << "(H: 0x" << std::setw(2) << static_cast<int>(registers.h) << ","
+              << " L: 0x" << std::setw(2) << static_cast<int>(registers.l) << ")\n";
 
     std::cout << "Stack Pointer: 0x" << std::setw(4) << registers.stack_pointer << "\n";
     std::cout << "Program Counter: 0x" << std::setw(4) << registers.program_counter << "\n";
