@@ -5,8 +5,8 @@
 namespace GameBoy {
 
 void CPU::print_register_values() const {
+    std::cout << "=================== CPU Registers ===================\n";
     std::cout << std::hex << std::setfill('0');
-    std::cout << "================== CPU Registers ==================\n";
 
     std::cout << "AF: 0x" << std::setw(4) << registers.af << "   "
               << "(A: 0x" << std::setw(2) << static_cast<int>(registers.a) << ","
@@ -29,24 +29,15 @@ void CPU::print_register_values() const {
 
     std::cout << std::dec;
     std::cout << "Cycles Elapsed: " << cycles_elapsed << "\n";
-    std::cout << "===================================================\n";
+    std::cout << "=====================================================\n";
 }
 
-void CPU::execute_instruction(uint8_t opcode) {
-    if (opcode != INSTRUCTION_PREFIX_BYTE) {
-        (this->*instruction_table[opcode])();
-    } else {
-        const uint8_t prefixed_opcode = memory.read_8(registers.program_counter + 1);
-        (this->*extended_instruction_table[prefixed_opcode])();
-    }
-
-    if (did_enable_interrupts_execute && opcode != ENABLE_INTERRUPTS_OPCODE) {
-        are_interrupts_enabled = true;
-        did_enable_interrupts_execute = false;
-    }
+void CPU::execute_next_instruction() {
+    uint8_t next_instruction_opcode = memory.read_8(registers.program_counter);
+    execute_instruction(next_instruction_opcode);
 }
 
-const CPU::Instruction CPU::instruction_table[0x100] = {
+const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::no_operation_0x00,
     &CPU::load_bc_immediate16_0x01,
     &CPU::load_memory_bc_a_0x02,
@@ -79,33 +70,33 @@ const CPU::Instruction CPU::instruction_table[0x100] = {
     &CPU::decrement_e_0x1d,
     &CPU::load_e_immediate8_0x1e,
     &CPU::rotate_right_through_carry_a_0x1f,
-    &CPU::jump_relative_not_zero_signed_immediate8_0x20,
+    &CPU::jump_relative_if_not_zero_signed_immediate8_0x20,
     &CPU::load_hl_immediate16_0x21,
-    &CPU::load_memory_hli_a_0x22,
+    &CPU::load_memory_post_increment_hl_a_0x22,
     &CPU::increment_hl_0x23,
     &CPU::increment_h_0x24,
     &CPU::decrement_h_0x25,
     &CPU::load_h_immediate8_0x26,
     &CPU::decimal_adjust_a_0x27,
-    &CPU::jump_relative_zero_signed_immediate8_0x28,
+    &CPU::jump_relative_if_zero_signed_immediate8_0x28,
     &CPU::add_hl_hl_0x29,
-    &CPU::load_a_memory_hli_0x2a,
+    &CPU::load_a_memory_post_increment_hl_0x2a,
     &CPU::decrement_hl_0x2b,
     &CPU::increment_l_0x2c,
     &CPU::decrement_l_0x2d,
     &CPU::load_l_immediate8_0x2e,
     &CPU::complement_a_0x2f,
-    &CPU::jump_relative_not_carry_signed_immediate8_0x30,
+    &CPU::jump_relative_if_not_carry_signed_immediate8_0x30,
     &CPU::load_stack_pointer_immediate16_0x31,
-    &CPU::load_memory_hload_a_0x32,
+    &CPU::load_memory_post_decrement_hl_a_0x32,
     &CPU::increment_stack_pointer_0x33,
     &CPU::increment_memory_hl_0x34,
     &CPU::decrement_memory_hl_0x35,
     &CPU::load_memory_hl_immediate8_0x36,
     &CPU::set_carry_flag_0x37,
-    &CPU::jump_relative_carry_signed_immediate8_0x38,
+    &CPU::jump_relative_if_carry_signed_immediate8_0x38,
     &CPU::add_hl_stack_pointer_0x39,
-    &CPU::load_a_memory_hload_0x3a,
+    &CPU::load_a_memory_post_decrement_hl_0x3a,
     &CPU::decrement_stack_pointer_0x3b,
     &CPU::increment_a_0x3c,
     &CPU::decrement_a_0x3d,
@@ -239,38 +230,38 @@ const CPU::Instruction CPU::instruction_table[0x100] = {
     &CPU::compare_a_l_0xbd,
     &CPU::compare_a_memory_hl_0xbe,
     &CPU::compare_a_a_0xbf,
-    &CPU::return_not_zero_0xc0,
+    &CPU::return_if_not_zero_0xc0,
     &CPU::pop_stack_bc_0xc1,
-    &CPU::jump_not_zero_immediate16_0xc2,
+    &CPU::jump_if_not_zero_immediate16_0xc2,
     &CPU::jump_immediate16_0xc3,
-    &CPU::call_not_zero_immediate16_0xc4,
+    &CPU::call_if_not_zero_immediate16_0xc4,
     &CPU::push_stack_bc_0xc5,
     &CPU::add_a_immediate8_0xc6,
-    &CPU::restart_0x00_0xc7,
-    &CPU::return_zero_0xc8,
+    &CPU::restart_at_0x00_0xc7,
+    &CPU::return_if_zero_0xc8,
     &CPU::return_0xc9,
-    &CPU::jump_zero_immediate16_0xca,
+    &CPU::jump_if_zero_immediate16_0xca,
     &CPU::unused_opcode, // 0xcb is only used to prefix an extended instruction
-    &CPU::call_zero_immediate16_0xcc,
+    &CPU::call_if_zero_immediate16_0xcc,
     &CPU::call_immediate16_0xcd,
     &CPU::add_with_carry_a_immediate8_0xce,
-    &CPU::restart_0x08_0xcf,
-    &CPU::return_not_carry_0xd0,
+    &CPU::restart_at_0x08_0xcf,
+    &CPU::return_if_not_carry_0xd0,
     &CPU::pop_stack_de_0xd1,
-    &CPU::jump_not_carry_immediate16_0xd2,
+    &CPU::jump_if_not_carry_immediate16_0xd2,
     &CPU::unused_opcode, // 0xd3 is only used to prefix an extended instruction
-    &CPU::call_not_carry_immediate16_0xd4,
+    &CPU::call_if_not_carry_immediate16_0xd4,
     &CPU::push_stack_de_0xd5,
     &CPU::subtract_a_immediate8_0xd6,
-    &CPU::restart_0x10_0xd7,
-    &CPU::return_carry_0xd8,
+    &CPU::restart_at_0x10_0xd7,
+    &CPU::return_if_carry_0xd8,
     &CPU::return_from_interrupt_0xd9,
-    &CPU::jump_carry_immediate16_0xda,
+    &CPU::jump_if_carry_immediate16_0xda,
     &CPU::unused_opcode, // 0xdb is only used to prefix an extended instruction
-    &CPU::call_carry_immediate16_0xdc,
+    &CPU::call_if_carry_immediate16_0xdc,
     &CPU::unused_opcode, // 0xdd is only used to prefix an extended instruction
     &CPU::subtract_with_carry_a_immediate8_0xde,
-    &CPU::restart_0x18_0xdf,
+    &CPU::restart_at_0x18_0xdf,
     &CPU::load_memory_high_ram_signed_immediate8_a_0xe0,
     &CPU::pop_stack_hl_0xe1,
     &CPU::load_memory_high_ram_c_a_0xe2,
@@ -278,7 +269,7 @@ const CPU::Instruction CPU::instruction_table[0x100] = {
     &CPU::unused_opcode,
     &CPU::push_stack_hl_0xe5,
     &CPU::and_a_immediate8_0xe6,
-    &CPU::restart_0x20_0xe7,
+    &CPU::restart_at_0x20_0xe7,
     &CPU::add_sp_signed_immediate8_0xe8,
     &CPU::jump_hl_0xe9,
     &CPU::load_memory_immediate16_a_0xea,
@@ -286,7 +277,7 @@ const CPU::Instruction CPU::instruction_table[0x100] = {
     &CPU::unused_opcode, // 0xec is an unused opcode
     &CPU::unused_opcode, // 0xed is an unused opcode
     &CPU::xor_a_immediate8_0xee,
-    &CPU::restart_0x28_0xef,
+    &CPU::restart_at_0x28_0xef,
     &CPU::load_a_memory_high_ram_immediate8_0xf0,
     &CPU::pop_stack_af_0xf1,
     &CPU::load_a_memory_high_ram_c_0xf2,
@@ -294,7 +285,7 @@ const CPU::Instruction CPU::instruction_table[0x100] = {
     &CPU::unused_opcode, // 0xf4 is an unused opcode
     &CPU::push_stack_af_0xf5,
     &CPU::or_a_immediate8_0xf6,
-    &CPU::restart_0x30_0xf7,
+    &CPU::restart_at_0x30_0xf7,
     &CPU::load_hl_stack_pointer_with_signed_offset_0xf8,
     &CPU::load_stack_pointer_hl_0xf9,
     &CPU::load_a_memory_immediate16_0xfa,
@@ -302,10 +293,10 @@ const CPU::Instruction CPU::instruction_table[0x100] = {
     &CPU::unused_opcode, // 0xfc is an unused opcode
     &CPU::unused_opcode, // 0xfd is an unused opcode
     &CPU::compare_a_immediate8_0xfe,
-    &CPU::restart_0x38_0xff
+    &CPU::restart_at_0x38_0xff
 };
 
-const CPU::Instruction CPU::extended_instruction_table[0x100] = {
+const CPU::InstructionPointer CPU::extended_instruction_table[0x100] = {
     &CPU::rotate_left_circular_b_prefix_0x00,
     &CPU::rotate_left_circular_c_prefix_0x01,
     &CPU::rotate_left_circular_d_prefix_0x02,
@@ -568,6 +559,20 @@ const CPU::Instruction CPU::extended_instruction_table[0x100] = {
 // ===== Instruction Helpers =====
 // ===============================
 
+void CPU::execute_instruction(uint8_t opcode) {
+    if (opcode != INSTRUCTION_PREFIX_BYTE) {
+        (this->*instruction_table[opcode])();
+    } else {
+        const uint8_t prefixed_opcode = memory.read_8(registers.program_counter + 1);
+        (this->*extended_instruction_table[prefixed_opcode])();
+    }
+
+    if (did_enable_interrupts_execute && opcode != ENABLE_INTERRUPTS_OPCODE) {
+        are_interrupts_enabled = true;
+        did_enable_interrupts_execute = false;
+    }
+}
+
 bool CPU::is_flag_set(uint8_t flag_mask) const {
     return (registers.flags & flag_mask) != 0;
 }
@@ -772,7 +777,7 @@ void CPU::pop_stack_register16(uint16_t &register16) {
     cycles_elapsed += 12;
 }
 
-void CPU::restart_address(uint16_t address) {
+void CPU::restart_at_address(uint16_t address) {
     const uint16_t return_address = registers.program_counter + 1;
     registers.stack_pointer -= 2;
     memory.write_16(registers.stack_pointer, return_address);
@@ -1053,7 +1058,7 @@ void CPU::rotate_right_through_carry_a_0x1f() {
     cycles_elapsed += 4;
 }
 
-void CPU::jump_relative_not_zero_signed_immediate8_0x20() {
+void CPU::jump_relative_if_not_zero_signed_immediate8_0x20() {
     jump_relative_conditional_signed_immediate8(!is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1061,7 +1066,7 @@ void CPU::load_hl_immediate16_0x21() {
     load_register16_immediate16(registers.hl);
 }
 
-void CPU::load_memory_hli_a_0x22() {
+void CPU::load_memory_post_increment_hl_a_0x22() {
     load_memory_register16_register8(registers.hl++, registers.a);
 }
 
@@ -1099,7 +1104,7 @@ void CPU::decimal_adjust_a_0x27() {
     cycles_elapsed += 4;
 }
 
-void CPU::jump_relative_zero_signed_immediate8_0x28() {
+void CPU::jump_relative_if_zero_signed_immediate8_0x28() {
     jump_relative_conditional_signed_immediate8(is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1107,7 +1112,7 @@ void CPU::add_hl_hl_0x29() {
     add_hl_register16(registers.hl);
 }
 
-void CPU::load_a_memory_hli_0x2a() {
+void CPU::load_a_memory_post_increment_hl_0x2a() {
     load_register8_memory_register16(registers.a, registers.hl++);
 }
 
@@ -1134,7 +1139,7 @@ void CPU::complement_a_0x2f() {
     cycles_elapsed += 4;
 }
 
-void CPU::jump_relative_not_carry_signed_immediate8_0x30() {
+void CPU::jump_relative_if_not_carry_signed_immediate8_0x30() {
     jump_relative_conditional_signed_immediate8(!is_flag_set(FLAG_CARRY_MASK));
 }
 
@@ -1142,7 +1147,7 @@ void CPU::load_stack_pointer_immediate16_0x31() {
     load_register16_immediate16(registers.stack_pointer);
 }
 
-void CPU::load_memory_hload_a_0x32() {
+void CPU::load_memory_post_decrement_hl_a_0x32() {
     load_memory_register16_register8(registers.hl--, registers.a);
 }
 
@@ -1180,7 +1185,7 @@ void CPU::set_carry_flag_0x37() {
     cycles_elapsed += 4;
 }
 
-void CPU::jump_relative_carry_signed_immediate8_0x38() {
+void CPU::jump_relative_if_carry_signed_immediate8_0x38() {
     jump_relative_conditional_signed_immediate8(is_flag_set(FLAG_CARRY_MASK));
 }
 
@@ -1188,7 +1193,7 @@ void CPU::add_hl_stack_pointer_0x39() {
     add_hl_register16(registers.stack_pointer);
 }
 
-void CPU::load_a_memory_hload_0x3a() {
+void CPU::load_a_memory_post_decrement_hl_0x3a() {
     load_register8_memory_register16(registers.a, registers.hl--);
 }
 
@@ -1768,7 +1773,7 @@ void CPU::compare_a_a_0xbf() {
     compare_a_register8(registers.a);
 }
 
-void CPU::return_not_zero_0xc0() {
+void CPU::return_if_not_zero_0xc0() {
     return_conditional(!is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1776,7 +1781,7 @@ void CPU::pop_stack_bc_0xc1() {
     pop_stack_register16(registers.bc);
 }
 
-void CPU::jump_not_zero_immediate16_0xc2() {
+void CPU::jump_if_not_zero_immediate16_0xc2() {
     jump_conditional_immediate16(!is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1784,7 +1789,7 @@ void CPU::jump_immediate16_0xc3() {
     jump_conditional_immediate16(true);
 }
 
-void CPU::call_not_zero_immediate16_0xc4() {
+void CPU::call_if_not_zero_immediate16_0xc4() {
     call_conditional_immediate16(!is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1802,11 +1807,11 @@ void CPU::add_a_immediate8_0xc6() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x00_0xc7() {
-    restart_address(0x00);
+void CPU::restart_at_0x00_0xc7() {
+    restart_at_address(0x00);
 }
 
-void CPU::return_zero_0xc8() {
+void CPU::return_if_zero_0xc8() {
     return_conditional(is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1816,13 +1821,13 @@ void CPU::return_0xc9() {
     cycles_elapsed += 16;
 }
 
-void CPU::jump_zero_immediate16_0xca() {
+void CPU::jump_if_zero_immediate16_0xca() {
     jump_conditional_immediate16(is_flag_set(FLAG_ZERO_MASK));
 }
 
 // 0xcb is only used to prefix an extended instruction
 
-void CPU::call_zero_immediate16_0xcc() {
+void CPU::call_if_zero_immediate16_0xcc() {
     call_conditional_immediate16(is_flag_set(FLAG_ZERO_MASK));
 }
 
@@ -1841,11 +1846,11 @@ void CPU::add_with_carry_a_immediate8_0xce() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x08_0xcf() {
-    restart_address(0x08);
+void CPU::restart_at_0x08_0xcf() {
+    restart_at_address(0x08);
 }
 
-void CPU::return_not_carry_0xd0() {
+void CPU::return_if_not_carry_0xd0() {
     return_conditional(!is_flag_set(FLAG_CARRY_MASK));
 }
 
@@ -1853,13 +1858,13 @@ void CPU::pop_stack_de_0xd1() {
     pop_stack_register16(registers.de);
 }
 
-void CPU::jump_not_carry_immediate16_0xd2() {
+void CPU::jump_if_not_carry_immediate16_0xd2() {
     jump_conditional_immediate16(!is_flag_set(FLAG_CARRY_MASK));
 }
 
 // 0xd3 is an unused opcode
 
-void CPU::call_not_carry_immediate16_0xd4() {
+void CPU::call_if_not_carry_immediate16_0xd4() {
     call_conditional_immediate16(!is_flag_set(FLAG_CARRY_MASK));
 }
 
@@ -1877,11 +1882,11 @@ void CPU::subtract_a_immediate8_0xd6() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x10_0xd7() {
-    restart_address(0x10);
+void CPU::restart_at_0x10_0xd7() {
+    restart_at_address(0x10);
 }
 
-void CPU::return_carry_0xd8() {
+void CPU::return_if_carry_0xd8() {
     return_conditional(is_flag_set(FLAG_CARRY_MASK));
 }
 
@@ -1892,13 +1897,13 @@ void CPU::return_from_interrupt_0xd9() {
     cycles_elapsed += 16;
 }
 
-void CPU::jump_carry_immediate16_0xda() {
+void CPU::jump_if_carry_immediate16_0xda() {
     jump_conditional_immediate16(is_flag_set(FLAG_CARRY_MASK));
 }
 
 // 0xdb is an unused opcode
 
-void CPU::call_carry_immediate16_0xdc() {
+void CPU::call_if_carry_immediate16_0xdc() {
     call_conditional_immediate16(is_flag_set(FLAG_CARRY_MASK));
 }
 
@@ -1915,8 +1920,8 @@ void CPU::subtract_with_carry_a_immediate8_0xde() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x18_0xdf() {
-    restart_address(0x18);
+void CPU::restart_at_0x18_0xdf() {
+    restart_at_address(0x18);
 }
 
 void CPU::load_memory_high_ram_signed_immediate8_a_0xe0() {
@@ -1947,8 +1952,8 @@ void CPU::and_a_immediate8_0xe6() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x20_0xe7() {
-    restart_address(0x20);
+void CPU::restart_at_0x20_0xe7() {
+    restart_at_address(0x20);
 }
 
 void CPU::add_sp_signed_immediate8_0xe8() {
@@ -1987,8 +1992,8 @@ void CPU::xor_a_immediate8_0xee() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x28_0xef() {
-    restart_address(0x28);
+void CPU::restart_at_0x28_0xef() {
+    restart_at_address(0x28);
 }
 
 void CPU::load_a_memory_high_ram_immediate8_0xf0() {
@@ -2027,8 +2032,8 @@ void CPU::or_a_immediate8_0xf6() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x30_0xf7() {
-    restart_address(0x30);
+void CPU::restart_at_0x30_0xf7() {
+    restart_at_address(0x30);
 }
 
 void CPU::load_hl_stack_pointer_with_signed_offset_0xf8() {
@@ -2075,8 +2080,8 @@ void CPU::compare_a_immediate8_0xfe() {
     cycles_elapsed += 8;
 }
 
-void CPU::restart_0x38_0xff() {
-    restart_address(0x38);
+void CPU::restart_at_0x38_0xff() {
+    restart_at_address(0x38);
 }
 
 // =================================

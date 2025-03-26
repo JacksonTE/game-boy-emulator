@@ -18,7 +18,7 @@ class CPU {
 public:
     CPU(Memory &memory) : memory{memory} {}
     void print_register_values() const;
-    void execute_instruction(uint8_t opcode);
+    void execute_next_instruction();
 
 private:
     Memory &memory;
@@ -29,11 +29,12 @@ private:
     bool are_interrupts_enabled{};
     bool did_enable_interrupts_execute{};
 
-    using Instruction = void (CPU::*)();
-    static const Instruction instruction_table[0x100];
-    static const Instruction extended_instruction_table[0x100];
+    using InstructionPointer = void (CPU::*)();
+    static const InstructionPointer instruction_table[0x100];
+    static const InstructionPointer extended_instruction_table[0x100];
 
     // Instruction Helpers
+    void execute_instruction(uint8_t opcode);
     bool is_flag_set(uint8_t flag_mask) const;
     void update_flags(bool new_zero_state, bool new_subtract_state, bool new_half_carry_state, bool new_carry_state);
     
@@ -61,7 +62,7 @@ private:
     void return_conditional(bool is_condition_met);
     void push_stack_register16(const uint16_t &register16);
     void pop_stack_register16(uint16_t &register16);
-    void restart_address(uint16_t address);
+    void restart_at_address(uint16_t address);
 
     void rotate_left_circular_register8(uint8_t &register8);
     void rotate_right_circular_register8(uint8_t &register8);
@@ -112,33 +113,33 @@ private:
     void decrement_e_0x1d();
     void load_e_immediate8_0x1e();
     void rotate_right_through_carry_a_0x1f();
-    void jump_relative_not_zero_signed_immediate8_0x20();
+    void jump_relative_if_not_zero_signed_immediate8_0x20();
     void load_hl_immediate16_0x21();
-    void load_memory_hli_a_0x22();
+    void load_memory_post_increment_hl_a_0x22();
     void increment_hl_0x23();
     void increment_h_0x24();
     void decrement_h_0x25();
     void load_h_immediate8_0x26();
     void decimal_adjust_a_0x27();
-    void jump_relative_zero_signed_immediate8_0x28();
+    void jump_relative_if_zero_signed_immediate8_0x28();
     void add_hl_hl_0x29();
-    void load_a_memory_hli_0x2a();
+    void load_a_memory_post_increment_hl_0x2a();
     void decrement_hl_0x2b();
     void increment_l_0x2c();
     void decrement_l_0x2d();
     void load_l_immediate8_0x2e();
     void complement_a_0x2f();
-    void jump_relative_not_carry_signed_immediate8_0x30();
+    void jump_relative_if_not_carry_signed_immediate8_0x30();
     void load_stack_pointer_immediate16_0x31();
-    void load_memory_hload_a_0x32();
+    void load_memory_post_decrement_hl_a_0x32();
     void increment_stack_pointer_0x33();
     void increment_memory_hl_0x34();
     void decrement_memory_hl_0x35();
     void load_memory_hl_immediate8_0x36();
     void set_carry_flag_0x37();
-    void jump_relative_carry_signed_immediate8_0x38();
+    void jump_relative_if_carry_signed_immediate8_0x38();
     void add_hl_stack_pointer_0x39();
-    void load_a_memory_hload_0x3a();
+    void load_a_memory_post_decrement_hl_0x3a();
     void decrement_stack_pointer_0x3b();
     void increment_a_0x3c();
     void decrement_a_0x3d();
@@ -272,38 +273,38 @@ private:
     void compare_a_l_0xbd();
     void compare_a_memory_hl_0xbe();
     void compare_a_a_0xbf();
-    void return_not_zero_0xc0();
+    void return_if_not_zero_0xc0();
     void pop_stack_bc_0xc1();
-    void jump_not_zero_immediate16_0xc2();
+    void jump_if_not_zero_immediate16_0xc2();
     void jump_immediate16_0xc3();
-    void call_not_zero_immediate16_0xc4();
+    void call_if_not_zero_immediate16_0xc4();
     void push_stack_bc_0xc5();
     void add_a_immediate8_0xc6();
-    void restart_0x00_0xc7();
-    void return_zero_0xc8();
+    void restart_at_0x00_0xc7();
+    void return_if_zero_0xc8();
     void return_0xc9();
-    void jump_zero_immediate16_0xca();
+    void jump_if_zero_immediate16_0xca();
     // 0xcb is only used to prefix an extended instruction
-    void call_zero_immediate16_0xcc();
+    void call_if_zero_immediate16_0xcc();
     void call_immediate16_0xcd();
     void add_with_carry_a_immediate8_0xce();
-    void restart_0x08_0xcf();
-    void return_not_carry_0xd0();
+    void restart_at_0x08_0xcf();
+    void return_if_not_carry_0xd0();
     void pop_stack_de_0xd1();
-    void jump_not_carry_immediate16_0xd2();
+    void jump_if_not_carry_immediate16_0xd2();
     // 0xd3 is an unused opcode
-    void call_not_carry_immediate16_0xd4();
+    void call_if_not_carry_immediate16_0xd4();
     void push_stack_de_0xd5();
     void subtract_a_immediate8_0xd6();
-    void restart_0x10_0xd7();
-    void return_carry_0xd8();
+    void restart_at_0x10_0xd7();
+    void return_if_carry_0xd8();
     void return_from_interrupt_0xd9();
-    void jump_carry_immediate16_0xda();
+    void jump_if_carry_immediate16_0xda();
     // 0xdb is an unused opcode
-    void call_carry_immediate16_0xdc();
+    void call_if_carry_immediate16_0xdc();
     // 0xdb is an unused opcode
     void subtract_with_carry_a_immediate8_0xde();
-    void restart_0x18_0xdf();
+    void restart_at_0x18_0xdf();
     void load_memory_high_ram_signed_immediate8_a_0xe0();
     void pop_stack_hl_0xe1();
     void load_memory_high_ram_c_a_0xe2();
@@ -311,7 +312,7 @@ private:
     // 0xe4 is an unused opcode
     void push_stack_hl_0xe5();
     void and_a_immediate8_0xe6();
-    void restart_0x20_0xe7();
+    void restart_at_0x20_0xe7();
     void add_sp_signed_immediate8_0xe8();
     void jump_hl_0xe9();
     void load_memory_immediate16_a_0xea();
@@ -319,7 +320,7 @@ private:
     // 0xec is an unused opcode
     // 0xed is an unused opcode
     void xor_a_immediate8_0xee();
-    void restart_0x28_0xef();
+    void restart_at_0x28_0xef();
     void load_a_memory_high_ram_immediate8_0xf0();
     void pop_stack_af_0xf1();
     void load_a_memory_high_ram_c_0xf2();
@@ -327,7 +328,7 @@ private:
     // 0xf4 is an unused opcode
     void push_stack_af_0xf5();
     void or_a_immediate8_0xf6();
-    void restart_0x30_0xf7();
+    void restart_at_0x30_0xf7();
     void load_hl_stack_pointer_with_signed_offset_0xf8();
     void load_stack_pointer_hl_0xf9();
     void load_a_memory_immediate16_0xfa();
@@ -335,9 +336,9 @@ private:
     // 0xfc is an unused opcode
     // 0xfd is an unused opcode
     void compare_a_immediate8_0xfe();
-    void restart_0x38_0xff();
+    void restart_at_0x38_0xff();
 
-    // Extended instructions suffixed with prefiix and their opcode
+    // Extended instructions suffixed with _prefix_ and their opcode
     void rotate_left_circular_b_prefix_0x00();
     void rotate_left_circular_c_prefix_0x01();
     void rotate_left_circular_d_prefix_0x02();
