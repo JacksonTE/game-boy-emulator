@@ -4,3 +4,4 @@
 *.pdb
 
 assets/*.bin
+assets/*.gb

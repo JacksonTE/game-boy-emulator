@@ -4,13 +4,22 @@
 
 namespace GameBoy {
 
+void CPU::execute_next_instruction() {
+    uint8_t next_instruction_opcode = memory.read_8(registers.program_counter);
+    execute_instruction(next_instruction_opcode);
+}
+
 void CPU::print_register_values() const {
     std::cout << "=================== CPU Registers ===================\n";
     std::cout << std::hex << std::setfill('0');
 
     std::cout << "AF: 0x" << std::setw(4) << registers.af << "   "
               << "(A: 0x" << std::setw(2) << static_cast<int>(registers.a) << ","
-              << " F: 0x" << std::setw(2) << static_cast<int>(registers.flags) << ")\n";
+              << " F: 0x" << std::setw(2) << static_cast<int>(registers.flags) << ")   "
+              << "Flags ZNHC: " << ((registers.flags & FLAG_ZERO_MASK) ? "1" : "0")
+                                << ((registers.flags & FLAG_SUBTRACT_MASK) ? "1" : "0")
+                                << ((registers.flags & FLAG_HALF_CARRY_MASK) ? "1" : "0")
+                                << ((registers.flags & FLAG_CARRY_MASK) ? "1" : "0") << "\n";
 
     std::cout << "BC: 0x" << std::setw(4) << registers.bc << "   "
               << "(B: 0x" << std::setw(2) << static_cast<int>(registers.b) << ","
@@ -32,9 +41,8 @@ void CPU::print_register_values() const {
     std::cout << "=====================================================\n";
 }
 
-void CPU::execute_next_instruction() {
-    uint8_t next_instruction_opcode = memory.read_8(registers.program_counter);
-    execute_instruction(next_instruction_opcode);
+uint16_t CPU::get_program_counter() const {
+    return registers.program_counter;
 }
 
 const CPU::InstructionPointer CPU::instruction_table[0x100] = {
@@ -562,7 +570,8 @@ const CPU::InstructionPointer CPU::extended_instruction_table[0x100] = {
 void CPU::execute_instruction(uint8_t opcode) {
     if (opcode != INSTRUCTION_PREFIX_BYTE) {
         (this->*instruction_table[opcode])();
-    } else {
+    }
+    else {
         const uint8_t prefixed_opcode = memory.read_8(registers.program_counter + 1);
         (this->*extended_instruction_table[prefixed_opcode])();
     }
@@ -573,15 +582,15 @@ void CPU::execute_instruction(uint8_t opcode) {
     }
 }
 
-bool CPU::is_flag_set(uint8_t flag_mask) const {
-    return (registers.flags & flag_mask) != 0;
-}
-
 void CPU::update_flags(bool new_zero_state, bool new_subtract_state, bool new_half_carry_state, bool new_carry_state) {
     registers.flags = (new_zero_state ? FLAG_ZERO_MASK : 0) |
-                      (new_subtract_state ? FLAG_SUBTRACT_MASK : 0) |
-                      (new_half_carry_state ? FLAG_HALF_CARRY_MASK : 0) |
-                      (new_carry_state ? FLAG_CARRY_MASK : 0);
+        (new_subtract_state ? FLAG_SUBTRACT_MASK : 0) |
+        (new_half_carry_state ? FLAG_HALF_CARRY_MASK : 0) |
+        (new_carry_state ? FLAG_CARRY_MASK : 0);
+}
+
+bool CPU::is_flag_set(uint8_t flag_mask) const {
+    return (registers.flags & flag_mask) != 0;
 }
 
 void CPU::load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8) {
@@ -723,7 +732,8 @@ void CPU::jump_relative_conditional_signed_immediate8(bool is_condition_met) {
         const int8_t signed_offset = static_cast<int8_t>(memory.read_8(registers.program_counter + 1));
         registers.program_counter += 2 + signed_offset;
         cycles_elapsed += 12;
-    } else {
+    } 
+    else {
         registers.program_counter += 2;
         cycles_elapsed += 8;
     }
@@ -733,7 +743,8 @@ void CPU::jump_conditional_immediate16(bool is_condition_met) {
     if (is_condition_met) {
         registers.program_counter = memory.read_16(registers.program_counter + 1);
         cycles_elapsed += 16;
-    } else {
+    } 
+    else {
         registers.program_counter += 3;
         cycles_elapsed += 12;
     }
@@ -746,7 +757,8 @@ void CPU::call_conditional_immediate16(bool is_condition_met) {
         memory.write_16(registers.stack_pointer, return_address);
         registers.program_counter = memory.read_16(registers.program_counter + 1);
         cycles_elapsed += 24;
-    } else {
+    } 
+    else {
         registers.program_counter += 3;
         cycles_elapsed += 12;
     }
@@ -757,7 +769,8 @@ void CPU::return_conditional(bool is_condition_met) {
         registers.program_counter = memory.read_16(registers.stack_pointer);
         registers.stack_pointer += 2;
         cycles_elapsed += 20;
-    } else {
+    } 
+    else {
         registers.program_counter += 1;
         cycles_elapsed += 8;
     }
