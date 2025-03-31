@@ -9,6 +9,48 @@ void CPU::execute_next_instruction() {
     execute_instruction(next_instruction_opcode);
 }
 
+void CPU::reset() {
+    RegisterFile<std::endian::native> initialized_register_file;
+    update_registers(initialized_register_file);
+    cycles_elapsed = 0;
+    is_stopped = false;
+    is_halted = false;
+    are_interrupts_enabled = false;
+    did_enable_interrupts_execute = false;
+}
+
+void CPU::set_post_boot_state() {
+    uint8_t header_checksum = 0;
+    for (uint16_t address = 0x0134; address <= 0x014C; address++) {
+        header_checksum -= memory.read_8(BOOTROM_SIZE + address) - 1;
+    }
+
+    registers.a = 0x01;
+    update_flags(true, false, header_checksum != 0, header_checksum != 0);
+    registers.b = 0x00;
+    registers.c = 0x13;
+    registers.d = 0x00;
+    registers.e = 0xd8;
+    registers.h = 0x01;
+    registers.l = 0x4d;
+    registers.program_counter = 0x100;
+    registers.stack_pointer = 0xfffe;
+}
+
+RegisterFile<std::endian::native> CPU::get_register_file() const {
+    return registers;
+}
+
+void CPU::update_registers(const RegisterFile<std::endian::native> &new_register_values) {
+    registers.a = new_register_values.a;
+    registers.flags = new_register_values.flags & 0xf0; // Lower nibble of flags must always be zeroed
+    registers.bc = new_register_values.bc;
+    registers.de = new_register_values.de;
+    registers.hl = new_register_values.hl;
+    registers.program_counter = new_register_values.program_counter;
+    registers.stack_pointer = new_register_values.stack_pointer;
+}
+
 void CPU::print_register_values() const {
     std::cout << "=================== CPU Registers ===================\n";
     std::cout << std::hex << std::setfill('0');
@@ -582,11 +624,11 @@ void CPU::execute_instruction(uint8_t opcode) {
     }
 }
 
-void CPU::update_flags(bool new_zero_state, bool new_subtract_state, bool new_half_carry_state, bool new_carry_state) {
-    registers.flags = (new_zero_state ? FLAG_ZERO_MASK : 0) |
-        (new_subtract_state ? FLAG_SUBTRACT_MASK : 0) |
-        (new_half_carry_state ? FLAG_HALF_CARRY_MASK : 0) |
-        (new_carry_state ? FLAG_CARRY_MASK : 0);
+void CPU::update_flags(bool new_zero_value, bool new_subtract_value, bool new_half_carry_value, bool new_carry_value) {
+    registers.flags = (new_zero_value ? FLAG_ZERO_MASK : 0) |
+                      (new_subtract_value ? FLAG_SUBTRACT_MASK : 0) |
+                      (new_half_carry_value ? FLAG_HALF_CARRY_MASK : 0) |
+                      (new_carry_value ? FLAG_CARRY_MASK : 0);
 }
 
 bool CPU::is_flag_set(uint8_t flag_mask) const {
@@ -2018,6 +2060,7 @@ void CPU::load_a_memory_high_ram_immediate8_0xf0() {
 
 void CPU::pop_stack_af_0xf1() {
     pop_stack_register16(registers.af);
+    registers.flags &= 0xf0; // Lower nibble of flags must always be zeroed
 }
 
 void CPU::load_a_memory_high_ram_c_0xf2() {
@@ -2075,6 +2118,7 @@ void CPU::load_a_memory_immediate16_0xfa() {
 
 void CPU::enable_interrupts_0xfb() {
     // Enabling interrupts is delayed until after the next instruction executes
+    // TODO look into this logic, may not be right
     did_enable_interrupts_execute = true;
     registers.program_counter += 1;
     cycles_elapsed += 4;

@@ -17,7 +17,13 @@ constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 class CPU {
 public:
     CPU(Memory &memory) : memory{memory} {}
+    void reset();
+    void set_post_boot_state();
+
     void execute_next_instruction();
+
+    RegisterFile<std::endian::native> get_register_file() const;
+    void update_registers(const RegisterFile<std::endian::native> &new_register_values);
     void print_register_values() const;
     uint16_t get_program_counter() const;
 
@@ -36,9 +42,9 @@ private:
 
     // Instruction Helpers
     void execute_instruction(uint8_t opcode);
-    void update_flags(bool new_zero_state, bool new_subtract_state, bool new_half_carry_state, bool new_carry_state);
+    void update_flags(bool new_zero_value, bool new_subtract_value, bool new_half_carry_value, bool new_carry_value);
     bool is_flag_set(uint8_t flag_mask) const;
-    
+
     void load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8);
     void load_register8_immediate8(uint8_t &destination_register8);
     void load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16);

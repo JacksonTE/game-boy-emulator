@@ -3,5 +3,5 @@
 *.obj
 *.pdb
 
-assets/*.bin
-assets/*.gb
+bootrom/*
+!bootrom/README.md
