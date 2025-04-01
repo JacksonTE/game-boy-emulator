@@ -1,7 +1,8 @@
 #pragma once
 
+#include <bit>
 #include <cstdint>
-#include "memory.h"
+#include "memory_management_unit.h"
 #include "register_file.h"
 
 namespace GameBoy {
@@ -16,7 +17,7 @@ constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 
 class CPU {
 public:
-    CPU(Memory &memory) : memory{memory} {}
+    CPU(MemoryInterface &memory) : memory{memory} {}
     void reset();
     void set_post_boot_state();
 
@@ -28,7 +29,7 @@ public:
     uint16_t get_program_counter() const;
 
 private:
-    Memory &memory;
+    MemoryInterface &memory;
     RegisterFile<std::endian::native> registers;
     uint64_t cycles_elapsed{};
     bool is_stopped{};
@@ -104,7 +105,7 @@ private:
     void decrement_c_0x0d();
     void load_c_immediate8_0x0e();
     void rotate_right_circular_a_0x0f();
-    void stop_immediate8_0x10();
+    void stop_0x10();
     void load_de_immediate16_0x11();
     void load_memory_de_a_0x12();
     void increment_de_0x13();
@@ -312,7 +313,7 @@ private:
     // 0xdb is an unused opcode
     void subtract_with_carry_a_immediate8_0xde();
     void restart_at_0x18_0xdf();
-    void load_memory_high_ram_signed_immediate8_a_0xe0();
+    void load_memory_high_ram_offset_immediate8_a_0xe0();
     void pop_stack_hl_0xe1();
     void load_memory_high_ram_c_a_0xe2();
     // 0xe3 is an unused opcode

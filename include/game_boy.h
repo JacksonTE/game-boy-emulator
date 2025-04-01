@@ -1,15 +1,20 @@
 #pragma once
 
+#include <bit>
 #include <cstdint>
 #include <filesystem>
 #include "cpu.h"
-#include "memory.h"
+#include "memory_management_unit.h"
+#include "register_file.h"
 
 namespace GameBoy {
 
 class GameBoy {
 public:
-	GameBoy() : memory{}, cpu{memory} {}
+	GameBoy() : memory{std::make_unique<MemoryManagementUnit>()}, cpu{*memory} {}
+
+	GameBoy(std::unique_ptr<MemoryInterface> memory_interface) : memory{std::move(memory_interface)}, cpu{*memory} {}
+
 	void reset();
 	void set_post_boot_state();
 	bool try_load_bootrom(std::filesystem::path bootrom_path);
@@ -26,8 +31,8 @@ public:
 	bool try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
 
 private:
+	std::unique_ptr<MemoryInterface> memory;
 	CPU cpu;
-	Memory memory;
 };
 
 } // namespace GameBoy

@@ -8,13 +8,20 @@ project(emulate-game-boy-project
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(emulate-game-boy
-    src/main.cpp
-    src/game_boy.cpp
-    src/cpu.cpp
-    src/memory.cpp
+add_library(emulate-game-boy-lib
+    core/game_boy.cpp
+    core/cpu.cpp
+    core/memory_management_unit.cpp
+)
+target_include_directories(emulate-game-boy-lib PUBLIC
+    include
 )
 
-target_include_directories(emulate-game-boy PRIVATE
-    include/emulate-game-boy
+add_executable(emulate-game-boy 
+    app/main.cpp
 )
+target_link_libraries(emulate-game-boy PUBLIC 
+    emulate-game-boy-lib
+)
+
+add_subdirectory(tests)

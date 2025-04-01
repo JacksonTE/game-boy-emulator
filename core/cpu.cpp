@@ -1,6 +1,8 @@
+#include <bit>
 #include <iomanip>
 #include <iostream>
 #include "cpu.h"
+#include "register_file.h"
 
 namespace GameBoy {
 
@@ -20,6 +22,7 @@ void CPU::reset() {
 }
 
 void CPU::set_post_boot_state() {
+    // Updates flags based on header bytes 0x0134-0x014c in the loaded 'cartridge' ROM
     uint8_t header_checksum = 0;
     for (uint16_t address = 0x0134; address <= 0x014C; address++) {
         header_checksum -= memory.read_8(BOOTROM_SIZE + address) - 1;
@@ -104,7 +107,7 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::decrement_c_0x0d,
     &CPU::load_c_immediate8_0x0e,
     &CPU::rotate_right_circular_a_0x0f,
-    &CPU::stop_immediate8_0x10,
+    &CPU::stop_0x10,
     &CPU::load_de_immediate16_0x11,
     &CPU::load_memory_de_a_0x12,
     &CPU::increment_de_0x13,
@@ -312,7 +315,7 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::unused_opcode, // 0xdd is only used to prefix an extended instruction
     &CPU::subtract_with_carry_a_immediate8_0xde,
     &CPU::restart_at_0x18_0xdf,
-    &CPU::load_memory_high_ram_signed_immediate8_a_0xe0,
+    &CPU::load_memory_high_ram_offset_immediate8_a_0xe0,
     &CPU::pop_stack_hl_0xe1,
     &CPU::load_memory_high_ram_c_a_0xe2,
     &CPU::unused_opcode,
@@ -1037,9 +1040,10 @@ void CPU::rotate_right_circular_a_0x0f() {
     cycles_elapsed += 4;
 }
 
-void CPU::stop_immediate8_0x10() {
+void CPU::stop_0x10() {
+    // TODO handle skipping the next byte in memory elsewhere
     is_stopped = true;
-    registers.program_counter += 2; // Immediate isn't actually read - it's skipped over and usually will be 0x00
+    registers.program_counter += 1;
     cycles_elapsed += 4;
 }
 
@@ -1144,16 +1148,16 @@ void CPU::load_h_immediate8_0x26() {
 void CPU::decimal_adjust_a_0x27() {
     const bool was_addition_most_recent = !is_flag_set(FLAG_SUBTRACT_MASK);
     bool does_carry_occur = false;
-    uint8_t correction = 0;
+    uint8_t adjustment = 0;
     // Previous operation was between two binary coded decimals (BCDs) and this corrects register A back to BCD format
     if (is_flag_set(FLAG_HALF_CARRY_MASK) || (was_addition_most_recent && (registers.a & 0x0f) > 0x09)) {
-        correction |= 0x06;
+        adjustment |= 0x06;
     }
     if (is_flag_set(FLAG_CARRY_MASK) || (was_addition_most_recent && registers.a > 0x99)) {
-        correction |= 0x60;
-        does_carry_occur = was_addition_most_recent;
+        adjustment |= 0x60;
+        does_carry_occur = true;
     }
-    registers.a = was_addition_most_recent ? (registers.a + correction) : (registers.a - correction);
+    registers.a = was_addition_most_recent ? (registers.a + adjustment) : (registers.a - adjustment);
     update_flags(registers.a == 0, is_flag_set(FLAG_SUBTRACT_MASK), false, does_carry_occur);
     registers.program_counter += 1;
     cycles_elapsed += 4;
@@ -1979,9 +1983,9 @@ void CPU::restart_at_0x18_0xdf() {
     restart_at_address(0x18);
 }
 
-void CPU::load_memory_high_ram_signed_immediate8_a_0xe0() {
-    const int8_t signed_offset = static_cast<int8_t>(memory.read_8(registers.program_counter + 1));
-    memory.write_8(HIGH_RAM_START + signed_offset, registers.a);
+void CPU::load_memory_high_ram_offset_immediate8_a_0xe0() {
+    const uint8_t unsigned_offset = memory.read_8(registers.program_counter + 1);
+    memory.write_8(HIGH_RAM_START + unsigned_offset, registers.a);
     registers.program_counter += 2;
     cycles_elapsed += 12;
 }
@@ -2552,7 +2556,7 @@ void CPU::test_bit_3_c_prefix_0x59() {
 }
 
 void CPU::test_bit_3_d_prefix_0x5a() {
-    test_bit_position_register8(3, registers.b);
+    test_bit_position_register8(3, registers.d);
 }
 
 void CPU::test_bit_3_e_prefix_0x5b() {

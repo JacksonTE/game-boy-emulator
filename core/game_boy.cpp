@@ -1,6 +1,9 @@
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include "game_boy.h"
+#include "register_file.h"
 
 namespace GameBoy {
 
@@ -11,7 +14,7 @@ void GameBoy::reset() {
 
 void GameBoy::set_post_boot_state() {
 	cpu.set_post_boot_state();
-	memory.set_post_boot_state();
+	memory->set_post_boot_state();
 }
 
 bool GameBoy::try_load_bootrom(std::filesystem::path bootrom_path) {
@@ -39,19 +42,19 @@ void GameBoy::print_register_file_values() const {
 }
 
 uint8_t GameBoy::read_byte_from_memory(uint16_t address) const {
-	return memory.read_8(address);
+	return memory->read_8(address);
 }
 
 void GameBoy::write_byte_to_memory(uint16_t address, uint8_t value) {
-	memory.write_8(address, value);
+	memory->write_8(address, value);
 }
 
 void GameBoy::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const {
-	memory.print_bytes_in_range(start_address, end_address);
+	memory->print_bytes_in_range(start_address, end_address);
 }
 
 bool GameBoy::try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file) {
-	return memory.try_load_file(address, number_of_bytes_to_load, file_path, is_bootrom_file);
+	return memory->try_load_file(address, number_of_bytes_to_load, file_path, is_bootrom_file);
 }
 
 } // namespace GameBoy
