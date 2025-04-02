@@ -11,7 +11,7 @@ void CPU::execute_next_instruction() {
     execute_instruction(next_instruction_opcode);
 }
 
-void CPU::reset() {
+void CPU::reset_state() {
     RegisterFile<std::endian::native> initialized_register_file;
     update_registers(initialized_register_file);
     cycles_elapsed = 0;
@@ -24,7 +24,7 @@ void CPU::reset() {
 void CPU::set_post_boot_state() {
     // Updates flags based on header bytes 0x0134-0x014c in the loaded 'cartridge' ROM
     uint8_t header_checksum = 0;
-    for (uint16_t address = 0x0134; address <= 0x014C; address++) {
+    for (uint16_t address = 0x0134; address <= 0x014c; address++) {
         header_checksum -= memory.read_8(BOOTROM_SIZE + address) - 1;
     }
 
@@ -302,7 +302,7 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::return_if_not_carry_0xd0,
     &CPU::pop_stack_de_0xd1,
     &CPU::jump_if_not_carry_immediate16_0xd2,
-    &CPU::unused_opcode, // 0xd3 is only used to prefix an extended instruction
+    &CPU::unused_opcode, // 0xd3 is an unused opcode
     &CPU::call_if_not_carry_immediate16_0xd4,
     &CPU::push_stack_de_0xd5,
     &CPU::subtract_a_immediate8_0xd6,
@@ -310,9 +310,9 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::return_if_carry_0xd8,
     &CPU::return_from_interrupt_0xd9,
     &CPU::jump_if_carry_immediate16_0xda,
-    &CPU::unused_opcode, // 0xdb is only used to prefix an extended instruction
+    &CPU::unused_opcode, // 0xdb is an unused opcode
     &CPU::call_if_carry_immediate16_0xdc,
-    &CPU::unused_opcode, // 0xdd is only used to prefix an extended instruction
+    &CPU::unused_opcode, // 0xdd is an unused opcode
     &CPU::subtract_with_carry_a_immediate8_0xde,
     &CPU::restart_at_0x18_0xdf,
     &CPU::load_memory_high_ram_offset_immediate8_a_0xe0,

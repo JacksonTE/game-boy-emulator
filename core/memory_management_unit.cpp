@@ -9,7 +9,7 @@ MemoryManagementUnit::MemoryManagementUnit() {
     std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
 }
 
-void MemoryManagementUnit::reset() {
+void MemoryManagementUnit::reset_state() {
     std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
     bootrom.reset();
 }

@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
 namespace GameBoy {
 
@@ -14,7 +15,7 @@ constexpr uint16_t BOOTROM_STATUS_ADDRESS = 0xff50;
 
 class MemoryInterface {
 public:
-    virtual void reset() = 0;
+    virtual void reset_state() = 0;
     virtual void set_post_boot_state() = 0;
     virtual bool try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file) = 0;
 

@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 #include <vector>
-#include "game_boy.h"
+#include "emulator.h"
 #include "memory_interface.h"
 #include "register_file.h"
 
@@ -14,7 +14,7 @@ struct AddressValuePair {
     uint8_t value;
 };
 
-struct JsonTestCase {
+struct SingleInstructionTestCase {
     std::string test_name;
 
     GameBoy::RegisterFile<std::endian::native> register_values_initial;
@@ -24,7 +24,7 @@ struct JsonTestCase {
     std::vector<AddressValuePair> ram_values_expected_final;
 };
 
-static std::vector<std::filesystem::path> get_json_test_file_paths(const std::filesystem::path& directory) {
+static std::vector<std::filesystem::path> get_ordered_json_test_file_paths(const std::filesystem::path &directory) {
     std::vector<std::filesystem::path> filenames;
 
     for (const auto &entry : std::filesystem::directory_iterator(directory)) {
@@ -44,18 +44,18 @@ static std::vector<std::filesystem::path> get_json_test_file_paths(const std::fi
     return filenames;
 }
 
-static std::vector<JsonTestCase> load_json_test_cases(const std::filesystem::path& json_tests_file_path) {
-    std::ifstream file(json_tests_file_path);
+static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(const std::filesystem::path &json_test_file_path) {
+    std::ifstream file(json_test_file_path);
     if (!file) {
-        throw std::runtime_error("Error: could not open JSON file " + json_tests_file_path.string());
+        throw std::runtime_error("Error: could not open JSON file " + json_test_file_path.string());
     }
 
     nlohmann::json test_file_json;
     file >> test_file_json;
-    std::vector<JsonTestCase> json_test_cases;
+    std::vector<SingleInstructionTestCase> json_test_cases;
 
     for (const auto &test_object : test_file_json) {
-        JsonTestCase test_case;
+        SingleInstructionTestCase test_case;
 
         test_case.test_name = test_object["name"].get<std::string>();
 
@@ -92,14 +92,14 @@ static std::vector<JsonTestCase> load_json_test_cases(const std::filesystem::pat
     return json_test_cases;
 }
 
-class JsonTestMemory : public GameBoy::MemoryInterface {
+// The single instruction tests expect the memory to be a 64KB flat array with no internal read/write restrictions
+class SingleInstructionTestMemory : public GameBoy::MemoryInterface {
 public:
-    JsonTestMemory() {
-        std::cout << "test constructor" << "\n";
+    SingleInstructionTestMemory() {
         memory.fill(0);
     }
 
-    void reset() override {
+    void reset_state() override {
         memory.fill(0);
     }
 
@@ -124,14 +124,14 @@ private:
     std::array<uint8_t, GameBoy::MEMORY_SIZE> memory;
 };
 
-class JsonTest : public testing::TestWithParam<std::filesystem::path> {
+class SingleInstructionTest : public testing::TestWithParam<std::filesystem::path> {
 protected:
-    GameBoy::GameBoy game_boy;
+    GameBoy::Emulator game_boy;
 
-    JsonTest() : game_boy{ std::make_unique<JsonTestMemory>() } {} // TODO fix this not populating correctly
+    SingleInstructionTest() : game_boy{ std::make_unique<SingleInstructionTestMemory>() } {}
 
-    void set_initial_values(const JsonTestCase &test_case) {
-        game_boy.reset();
+    void set_initial_values(const SingleInstructionTestCase &test_case) {
+        game_boy.reset_state();
 
         for (const AddressValuePair &pair : test_case.ram_values_initial) {
             game_boy.write_byte_to_memory(pair.memory_address, pair.value);
@@ -140,11 +140,11 @@ protected:
     }
 };
 
-TEST_P(JsonTest, SingleInstructionTestFile) {
+TEST_P(SingleInstructionTest, JsonTestCasesFile) {
     std::filesystem::path json_test_filename = GetParam();
     SCOPED_TRACE("Test file: " + json_test_filename.string());
 
-    auto test_cases = load_json_test_cases(json_test_filename);
+    auto test_cases = load_test_cases_from_json_file(json_test_filename);
 
     for (const auto &test_case : test_cases) {
         SCOPED_TRACE("Test name: " + test_case.test_name);
@@ -167,12 +167,16 @@ TEST_P(JsonTest, SingleInstructionTestFile) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    JsonTestSuite,
-    JsonTest,
-    testing::ValuesIn(get_json_test_file_paths(std::filesystem::path("..") / ".." / ".." / ".." / "tests" / "data" / "sm83" / "v1"))
+    SingleInstructionTestSuite,
+    SingleInstructionTest,
+    testing::ValuesIn(
+        get_ordered_json_test_file_paths(
+            std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "single-instructions-json" / "sm83" / "v1"
+        )
+    )
 );
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

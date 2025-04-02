@@ -17,8 +17,9 @@ constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 
 class CPU {
 public:
-    CPU(MemoryInterface &memory) : memory{memory} {}
-    void reset();
+    CPU(MemoryInterface &memory)
+        : memory{memory} {}
+    void reset_state();
     void set_post_boot_state();
 
     void execute_next_instruction();

@@ -10,14 +10,16 @@ FetchContent_Declare(
   URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip
 )
 
-FetchContent_MakeAvailable(googletest nlohmann-json)
+FetchContent_MakeAvailable(
+	googletest
+	nlohmann-json
+)
 
 enable_testing()
 
 add_executable(emulate-game-boy-tests
-    test_json_single_instructions.cpp
+    test_single_instructions_json.cpp
  )
-
 target_link_libraries(emulate-game-boy-tests PRIVATE
 	emulate-game-boy-lib
 	GTest::gtest_main

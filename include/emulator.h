@@ -9,13 +9,14 @@
 
 namespace GameBoy {
 
-class GameBoy {
+class Emulator {
 public:
-	GameBoy() : memory{std::make_unique<MemoryManagementUnit>()}, cpu{*memory} {}
+	Emulator()
+		: memory{std::make_unique<MemoryManagementUnit>()}, cpu{*memory} {}
+	Emulator(std::unique_ptr<MemoryInterface> memory_interface)
+		: memory{std::move(memory_interface)}, cpu{*memory} {}
 
-	GameBoy(std::unique_ptr<MemoryInterface> memory_interface) : memory{std::move(memory_interface)}, cpu{*memory} {}
-
-	void reset();
+	void reset_state();
 	void set_post_boot_state();
 	bool try_load_bootrom(std::filesystem::path bootrom_path);
 

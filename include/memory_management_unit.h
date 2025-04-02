@@ -9,7 +9,7 @@ namespace GameBoy {
 class MemoryManagementUnit : public MemoryInterface {
 public:
     MemoryManagementUnit();
-    void reset() override;
+    void reset_state() override;
     void set_post_boot_state() override;
     bool try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file) override;
 
