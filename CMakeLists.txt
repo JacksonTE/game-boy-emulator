@@ -14,20 +14,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_definitions(PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
-add_library(emulate-game-boy-lib
-    core/emulator.cpp
-    core/cpu.cpp
-    core/memory_management_unit.cpp
-)
-target_include_directories(emulate-game-boy-lib PUBLIC
-    include
-)
+enable_testing()
 
-add_executable(emulate-game-boy 
-    app/main.cpp
-)
-target_link_libraries(emulate-game-boy PUBLIC 
-    emulate-game-boy-lib
-)
-
+add_subdirectory(core)
+add_subdirectory(app)
 add_subdirectory(tests)

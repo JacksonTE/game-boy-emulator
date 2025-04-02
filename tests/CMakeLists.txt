@@ -15,11 +15,10 @@ FetchContent_MakeAvailable(
 	nlohmann-json
 )
 
-enable_testing()
-
 add_executable(emulate-game-boy-tests
-    test_single_instructions_json.cpp
- )
+    "test_single_instructions_json.cpp"
+)
+
 target_link_libraries(emulate-game-boy-tests PRIVATE
 	emulate-game-boy-lib
 	GTest::gtest_main

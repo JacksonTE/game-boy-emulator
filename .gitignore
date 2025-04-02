@@ -1,7 +1,4 @@
-*.exe
-*.ilk
-*.obj
-*.pdb
+build/
 
 bootrom/*
 !bootrom/README.md
