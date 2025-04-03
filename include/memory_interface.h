@@ -22,26 +22,6 @@ public:
     virtual uint8_t read_8(uint16_t address) const = 0;
     virtual void write_8(uint16_t address, uint8_t value) = 0;
 
-    virtual uint16_t read_16(uint16_t address) const {
-        // Little-endian read, first byte is least significant
-        if (address == 0xffff) {
-            std::cerr << "Warning: Attempted 16-bit read at 0xffff which would access out-of-bounds memory. Returning only the lower byte.\n";
-            return read_8(address); // TODO add & read_8(address) when switching to per m-cycle ticking?
-        }
-        return (read_8(address + 1) << 8) | read_8(address);
-    }
-
-    virtual void write_16(uint16_t address, uint16_t value) {
-        // Little-endian write, first byte is least significant
-        write_8(address, value & 0xff); // TODO double write when switching to per m-cycle ticking?
-        if (address != 0xffff) {
-            write_8(address + 1, value >> 8);
-        }
-        else {
-            std::cerr << "Warning: Attempted 16-bit write at 0xffff which would access out-of-bounds memory. Wrote only the lower byte.\n";
-        }
-    }
-
     virtual void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const {
         std::cout << std::hex << std::setfill('0');
         std::cout << "=========== Memory Range 0x" << std::setw(4) << start_address << " - 0x" << std::setw(4) << end_address << " ============\n";

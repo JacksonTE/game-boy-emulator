@@ -1,3 +1,5 @@
-Place boot ROM files directly into this `bootrom` directory.
+Optionally, you can place boot ROM files into this `bootrom` directory. Otherwise the `Emulator` will skip this step and automatically be put into to its post-boot state.
 
-For emulating the original DMG-01 Game Boy, place its boot ROM here with the name `bootrom_dmg.bin`.
+To use the provided boot ROM file, run the `emulate-game-boy.exe` executable with arguments `--bootrom` `{filename.extension}`.
+
+Currently, only the original DMG-01 Game Boy and its boot ROM are supported.

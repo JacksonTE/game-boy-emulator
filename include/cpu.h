@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <functional>
 #include "memory_management_unit.h"
 #include "register_file.h"
 
@@ -17,21 +18,27 @@ constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 
 class CPU {
 public:
-    CPU(MemoryInterface &memory)
-        : memory{memory} {}
+    RegisterFile<std::endian::native> register_file; // TODO make private later
+
+    CPU(MemoryInterface& memory_interface, std::function<void()> tick_callback);
+
     void reset_state();
     void set_post_boot_state();
 
-    void execute_next_instruction();
+    void tick_machine_cycle();
+    uint8_t read_8_and_tick(uint16_t address);
+    void write_8_and_tick(uint16_t address, uint8_t value);
+    uint16_t read_16_and_tick(uint16_t address);
+    uint8_t fetch_next_8_and_tick();
+    uint16_t fetch_next_16_and_tick();
 
-    RegisterFile<std::endian::native> get_register_file() const;
+    void execute_next_instruction();
     void update_registers(const RegisterFile<std::endian::native> &new_register_values);
     void print_register_values() const;
-    uint16_t get_program_counter() const;
 
 private:
     MemoryInterface &memory;
-    RegisterFile<std::endian::native> registers;
+    std::function<void()> emulator_tick_callback;
     uint64_t cycles_elapsed{};
     bool is_stopped{};
     bool is_halted{};
@@ -42,11 +49,11 @@ private:
     static const InstructionPointer instruction_table[0x100];
     static const InstructionPointer extended_instruction_table[0x100];
 
-    // Instruction Helpers
     void execute_instruction(uint8_t opcode);
-    void update_flags(bool new_zero_value, bool new_subtract_value, bool new_half_carry_value, bool new_carry_value);
+    void update_flag(uint8_t flag_mask, bool new_flag_state);
     bool is_flag_set(uint8_t flag_mask) const;
 
+    // Instruction Helpers
     void load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8);
     void load_register8_immediate8(uint8_t &destination_register8);
     void load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16);
@@ -67,12 +74,13 @@ private:
     void compare_a_register8(const uint8_t &register8);
     void jump_relative_conditional_signed_immediate8(bool is_condition_met);
     void jump_conditional_immediate16(bool is_condition_met);
+    void push_stack_uint16(const uint16_t &value);
+    uint16_t pop_stack();
     void call_conditional_immediate16(bool is_condition_met);
     void return_conditional(bool is_condition_met);
-    void push_stack_register16(const uint16_t &register16);
-    void pop_stack_register16(uint16_t &register16);
     void restart_at_address(uint16_t address);
 
+    // Extended instruction helpers
     void rotate_left_circular_register8(uint8_t &register8);
     void rotate_right_circular_register8(uint8_t &register8);
     void rotate_left_through_carry_register8(uint8_t &register8);

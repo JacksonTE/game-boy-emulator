@@ -3,6 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include "cpu.h"
 #include "memory_management_unit.h"
 #include "register_file.h"
@@ -11,10 +12,8 @@ namespace GameBoy {
 
 class Emulator {
 public:
-	Emulator()
-		: memory{std::make_unique<MemoryManagementUnit>()}, cpu{*memory} {}
-	Emulator(std::unique_ptr<MemoryInterface> memory_interface)
-		: memory{std::move(memory_interface)}, cpu{*memory} {}
+	Emulator();
+	Emulator(std::unique_ptr<MemoryInterface> memory_interface);
 
 	void reset_state();
 	void set_post_boot_state();
@@ -30,6 +29,8 @@ public:
 	void write_byte_to_memory(uint16_t address, uint8_t value);
 	void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
 	bool try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
+
+	void tick_all_components();
 
 private:
 	std::unique_ptr<MemoryInterface> memory;
