@@ -20,7 +20,7 @@ add_executable(emulate-game-boy-tests
 )
 
 target_link_libraries(emulate-game-boy-tests PRIVATE
-	emulate-game-boy-lib
+	emulate-game-boy-core-library
 	GTest::gtest_main
 	nlohmann_json::nlohmann_json
 )

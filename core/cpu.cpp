@@ -6,13 +6,14 @@
 
 namespace GameBoy {
 
-CPU::CPU(MemoryInterface& memory_interface, std::function<void()> tick_callback)
-    : memory{ memory_interface },
-      emulator_tick_callback{ tick_callback } {}
+CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> tick_callback)
+    : emulator_tick_callback{tick_callback},
+      memory_interface{memory_management_unit} {
+}
 
 void CPU::reset_state() {
     RegisterFile<std::endian::native> initialized_register_file;
-    update_registers(initialized_register_file);
+    update_register_file(initialized_register_file);
     cycles_elapsed = 0;
     is_stopped = false;
     is_halted = false;
@@ -24,7 +25,7 @@ void CPU::set_post_boot_state() {
     // Updates flags based on header bytes 0x0134-0x014c in the loaded 'cartridge' ROM
     uint8_t header_checksum = 0;
     for (uint16_t address = 0x0134; address <= 0x014c; address++) {
-        header_checksum -= memory.read_8(BOOTROM_SIZE + address) - 1;
+        header_checksum -= memory_interface.read_8(BOOTROM_SIZE + address) - 1;
     }
 
     register_file.a = 0x01;
@@ -47,30 +48,30 @@ void CPU::tick_machine_cycle() {
 }
 
 uint8_t CPU::read_8_and_tick(uint16_t address) {
-    emulator_tick_callback();
-    return memory.read_8(address);
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::Read, address});
+    return memory_interface.read_8(address);
 }
 
 void CPU::write_8_and_tick(uint16_t address, uint8_t value) {
-    emulator_tick_callback();
-    memory.write_8(address, value);
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::Write, address, value});
+    memory_interface.write_8(address, value);
 }
 
-uint8_t CPU::fetch_next_8_and_tick() {
+uint8_t CPU::fetch_immediate8_and_tick() {
     return read_8_and_tick(register_file.program_counter++);
 }
 
-uint16_t CPU::fetch_next_16_and_tick() {
-    const uint8_t low_byte = fetch_next_8_and_tick();
-    return low_byte | static_cast<uint16_t>(fetch_next_8_and_tick() << 8);
+uint16_t CPU::fetch_immediate16_and_tick() {
+    const uint8_t low_byte = fetch_immediate8_and_tick();
+    return low_byte | static_cast<uint16_t>(fetch_immediate8_and_tick() << 8);
 }
 
 void CPU::execute_next_instruction() {
-    uint8_t next_instruction_opcode = fetch_next_8_and_tick();
+    uint8_t next_instruction_opcode = fetch_immediate8_and_tick();
     execute_instruction(next_instruction_opcode);
 }
 
-void CPU::update_registers(const RegisterFile<std::endian::native> &new_register_values) {
+void CPU::update_register_file(const RegisterFile<std::endian::native> &new_register_values) {
     register_file.a = new_register_values.a;
     register_file.flags = new_register_values.flags & 0xf0; // Lower nibble of flags must always be zeroed
     register_file.bc = new_register_values.bc;
@@ -110,6 +111,14 @@ void CPU::print_register_values() const {
     std::cout << std::dec;
     std::cout << "Cycles Elapsed: " << cycles_elapsed << "\n";
     std::cout << "=====================================================\n";
+}
+
+uint16_t CPU::get_program_counter() const {
+    return register_file.program_counter;
+}
+
+RegisterFile<std::endian::native> CPU::get_register_file() const {
+    return register_file;
 }
 
 const CPU::InstructionPointer CPU::instruction_table[0x100] = {
@@ -339,7 +348,7 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::restart_at_0x18_0xdf,
     &CPU::load_memory_high_ram_offset_immediate8_a_0xe0,
     &CPU::pop_stack_hl_0xe1,
-    &CPU::load_memory_high_ram_c_a_0xe2,
+    &CPU::load_memory_high_ram_offset_c_a_0xe2,
     &CPU::unused_opcode,
     &CPU::unused_opcode,
     &CPU::push_stack_hl_0xe5,
@@ -353,9 +362,9 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
     &CPU::unused_opcode, // 0xed is an unused opcode
     &CPU::xor_a_immediate8_0xee,
     &CPU::restart_at_0x28_0xef,
-    &CPU::load_a_memory_high_ram_immediate8_0xf0,
+    &CPU::load_a_memory_high_ram_offset_immediate8_0xf0,
     &CPU::pop_stack_af_0xf1,
-    &CPU::load_a_memory_high_ram_c_0xf2,
+    &CPU::load_a_memory_high_ram_offset_c_0xf2,
     &CPU::disable_interrupts_0xf3,
     &CPU::unused_opcode, // 0xf4 is an unused opcode
     &CPU::push_stack_af_0xf5,
@@ -635,7 +644,7 @@ void CPU::execute_instruction(uint8_t opcode) {
         (this->*instruction_table[opcode])();
     }
     else {
-        const uint8_t prefixed_opcode = fetch_next_8_and_tick(); // TODO maybe need to rework this with interrupts
+        const uint8_t prefixed_opcode = fetch_immediate8_and_tick(); // TODO maybe need to rework this with interrupts
         (this->*extended_instruction_table[prefixed_opcode])();
     }
 
@@ -646,7 +655,9 @@ void CPU::execute_instruction(uint8_t opcode) {
 }
 
 void CPU::update_flag(uint8_t flag_mask, bool new_flag_state) {
-    register_file.flags = new_flag_state ? (register_file.flags | flag_mask) : (register_file.flags & ~flag_mask);
+    register_file.flags = new_flag_state
+        ? (register_file.flags | flag_mask)
+        : (register_file.flags & ~flag_mask);
 }
 
 bool CPU::is_flag_set(uint8_t flag_mask) const {
@@ -656,26 +667,6 @@ bool CPU::is_flag_set(uint8_t flag_mask) const {
 // ===============================
 // ===== Instruction Helpers =====
 // ===============================
-
-void CPU::load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8) {
-    destination_register8 = source_register8;
-}
-
-void CPU::load_register8_immediate8(uint8_t &destination_register8) {
-    destination_register8 = fetch_next_8_and_tick();
-}
-
-void CPU::load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16) {
-    destination_register8 = read_8_and_tick(source_address_register16);
-}
-
-void CPU::load_memory_register16_register8(const uint16_t &destination_address_register16, const uint8_t &source_register8) {
-    write_8_and_tick(destination_address_register16, source_register8);
-}
-
-void CPU::load_register16_immediate16(uint16_t &destination_register16) {
-    destination_register16 = fetch_next_16_and_tick();
-}
 
 void CPU::increment_register8(uint8_t &register8) {
     const bool does_half_carry_occur = (register8 & 0x0f) == 0x0f;
@@ -695,12 +686,12 @@ void CPU::decrement_register8(uint8_t &register8) {
 
 void CPU::increment_register16(uint16_t &register16) {
     register16++;
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::decrement_register16(uint16_t &register16) {
     register16--;
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::add_hl_register16(const uint16_t &register16) {
@@ -710,7 +701,7 @@ void CPU::add_hl_register16(const uint16_t &register16) {
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::add_a_register8(const uint8_t &register8) {
@@ -789,23 +780,23 @@ void CPU::compare_a_register8(const uint8_t &register8) {
 }
 
 void CPU::jump_relative_conditional_signed_immediate8(bool is_condition_met) {
-    const int8_t signed_offset = static_cast<int8_t>(fetch_next_8_and_tick());
+    const int8_t signed_offset = static_cast<int8_t>(fetch_immediate8_and_tick());
     if (is_condition_met) {
         register_file.program_counter += signed_offset;
-        emulator_tick_callback();
+        emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
     }
 }
 
 void CPU::jump_conditional_immediate16(bool is_condition_met) {
-    const uint16_t jump_address = fetch_next_16_and_tick();
+    const uint16_t jump_address = fetch_immediate16_and_tick();
     if (is_condition_met) {
         register_file.program_counter = jump_address;
-        emulator_tick_callback();
+        emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
     }
 }
 
 void CPU::push_stack_uint16(const uint16_t& value) {
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
     write_8_and_tick(--register_file.stack_pointer, value >> 8);
     write_8_and_tick(--register_file.stack_pointer, value & 0xff);
 }
@@ -816,15 +807,15 @@ uint16_t CPU::pop_stack() {
 }
 
 void CPU::call_conditional_immediate16(bool is_condition_met) {
-    const uint16_t suboutine_address = fetch_next_16_and_tick();
+    const uint16_t subroutine_address = fetch_immediate16_and_tick();
     if (is_condition_met) {
         push_stack_uint16(register_file.program_counter);
-        register_file.program_counter = suboutine_address;
+        register_file.program_counter = subroutine_address;
     }
 }
 
 void CPU::return_conditional(bool is_condition_met) {
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
     if (is_condition_met) {
         return_0xc9();
     }
@@ -952,7 +943,7 @@ void CPU::set_bit_position_memory_hl(uint8_t bit_position_to_set) {
 void CPU::unused_opcode() {
     std::cerr << std::hex << std::setfill('0');
     std::cerr << "Warning: Unused opcode 0x" << std::setw(2) 
-              << static_cast<int>(memory.read_8(register_file.program_counter - 1)) << " "
+              << static_cast<int>(memory_interface.read_8(register_file.program_counter - 1)) << " "
               << "encountered at memory address 0x" << std::setw(2) 
               << static_cast<int>(register_file.program_counter - 1) << "\n";
 }
@@ -961,11 +952,11 @@ void CPU::no_operation_0x00() {
 }
 
 void CPU::load_bc_immediate16_0x01() {
-    load_register16_immediate16(register_file.bc);
+    register_file.bc = fetch_immediate16_and_tick();
 }
 
 void CPU::load_memory_bc_a_0x02() {
-    load_memory_register16_register8(register_file.bc, register_file.a);
+    write_8_and_tick(register_file.bc, register_file.a);
 }
 
 void CPU::increment_bc_0x03() {
@@ -981,20 +972,16 @@ void CPU::decrement_b_0x05() {
 }
 
 void CPU::load_b_immediate8_0x06() {
-    load_register8_immediate8(register_file.b);
+    register_file.b = fetch_immediate8_and_tick();
 }
 
 void CPU::rotate_left_circular_a_0x07() {
-    const bool does_carry_occur = (register_file.a & 0b10000000) != 0;
-    register_file.a = (register_file.a << 1) | (register_file.a >> 7);
+    rotate_left_circular_register8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::load_memory_immediate16_stack_pointer_0x08() {
-    uint16_t immediate16 = fetch_next_16_and_tick();
+    uint16_t immediate16 = fetch_immediate16_and_tick();
     const uint8_t stack_pointer_low_byte = static_cast<uint8_t>(register_file.stack_pointer & 0xff);
     const uint8_t stack_pointer_high_byte = static_cast<uint8_t>(register_file.stack_pointer >> 8);
     write_8_and_tick(immediate16, stack_pointer_low_byte);
@@ -1006,7 +993,7 @@ void CPU::add_hl_bc_0x09() {
 }
 
 void CPU::load_a_memory_bc_0x0a() {
-    load_register8_memory_register16(register_file.a, register_file.bc);
+    register_file.a = read_8_and_tick(register_file.bc);
 }
 
 void CPU::decrement_bc_0x0b() {
@@ -1022,29 +1009,25 @@ void CPU::decrement_c_0x0d() {
 }
 
 void CPU::load_c_immediate8_0x0e() {
-    load_register8_immediate8(register_file.c);
+    register_file.c = fetch_immediate8_and_tick();
 }
 
 void CPU::rotate_right_circular_a_0x0f() {
-    const bool does_carry_occur = (register_file.a & 0b00000001) != 0;
-    register_file.a = (register_file.a << 7) | (register_file.a >> 1);
+    rotate_right_circular_register8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::stop_0x10() {
-    // TODO handle skipping the next byte in memory elsewhere
+    // TODO implement this properly eventually
     is_stopped = true;
 }
 
 void CPU::load_de_immediate16_0x11() {
-    load_register16_immediate16(register_file.de);
+    register_file.de = fetch_immediate16_and_tick();
 }
 
 void CPU::load_memory_de_a_0x12() {
-    load_memory_register16_register8(register_file.de, register_file.a);
+    write_8_and_tick(register_file.de, register_file.a);
 }
 
 void CPU::increment_de_0x13() {
@@ -1060,17 +1043,12 @@ void CPU::decrement_d_0x15() {
 }
 
 void CPU::load_d_immediate8_0x16() {
-    load_register8_immediate8(register_file.d);
+    register_file.d = fetch_immediate8_and_tick();
 }
 
 void CPU::rotate_left_through_carry_a_0x17() {
-    const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
-    const bool does_carry_occur = (register_file.a & 0b10000000) != 0;
-    register_file.a = (register_file.a << 1) | carry_in;
+    rotate_left_through_carry_register8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::jump_relative_signed_immediate8_0x18() {
@@ -1082,7 +1060,7 @@ void CPU::add_hl_de_0x19() {
 }
 
 void CPU::load_a_memory_de_0x1a() {
-    load_register8_memory_register16(register_file.a, register_file.de);
+    register_file.a = read_8_and_tick(register_file.de);
 }
 
 void CPU::decrement_de_0x1b() {
@@ -1098,30 +1076,24 @@ void CPU::decrement_e_0x1d() {
 }
 
 void CPU::load_e_immediate8_0x1e() {
-    load_register8_immediate8(register_file.e);
+    register_file.e = fetch_immediate8_and_tick();
 }
 
 void CPU::rotate_right_through_carry_a_0x1f() {
-    const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
-    const bool does_carry_occur = (register_file.a & 0b00000001) != 0;
-    register_file.a = (carry_in << 7) | (register_file.a >> 1);
+    rotate_right_through_carry_register8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::jump_relative_if_not_zero_signed_immediate8_0x20() {
-    const bool is_condition_met = !is_flag_set(FLAG_ZERO_MASK);
-    jump_relative_conditional_signed_immediate8(is_condition_met);
+    jump_relative_conditional_signed_immediate8(!is_flag_set(FLAG_ZERO_MASK));
 }
 
 void CPU::load_hl_immediate16_0x21() {
-    load_register16_immediate16(register_file.hl);
+    register_file.hl = fetch_immediate16_and_tick();
 }
 
 void CPU::load_memory_post_increment_hl_a_0x22() {
-    load_memory_register16_register8(register_file.hl++, register_file.a);
+    write_8_and_tick(register_file.hl++, register_file.a);
 }
 
 void CPU::increment_hl_0x23() {
@@ -1137,7 +1109,7 @@ void CPU::decrement_h_0x25() {
 }
 
 void CPU::load_h_immediate8_0x26() {
-    load_register8_immediate8(register_file.h);
+    register_file.h = fetch_immediate8_and_tick();
 }
 
 void CPU::decimal_adjust_a_0x27() {
@@ -1152,15 +1124,16 @@ void CPU::decimal_adjust_a_0x27() {
         adjustment |= 0x60;
         does_carry_occur = true;
     }
-    register_file.a = was_addition_most_recent ? (register_file.a + adjustment) : (register_file.a - adjustment);
+    register_file.a = was_addition_most_recent
+        ? (register_file.a + adjustment)
+        : (register_file.a - adjustment);
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::jump_relative_if_zero_signed_immediate8_0x28() {
-    const bool is_condition_met = is_flag_set(FLAG_ZERO_MASK);
-    jump_relative_conditional_signed_immediate8(is_condition_met);
+    jump_relative_conditional_signed_immediate8(is_flag_set(FLAG_ZERO_MASK));
 }
 
 void CPU::add_hl_hl_0x29() {
@@ -1168,7 +1141,7 @@ void CPU::add_hl_hl_0x29() {
 }
 
 void CPU::load_a_memory_post_increment_hl_0x2a() {
-    load_register8_memory_register16(register_file.a, register_file.hl++);
+    register_file.a = read_8_and_tick(register_file.hl++);
 }
 
 void CPU::decrement_hl_0x2b() {
@@ -1184,7 +1157,7 @@ void CPU::decrement_l_0x2d() {
 }
 
 void CPU::load_l_immediate8_0x2e() {
-    load_register8_immediate8(register_file.l);
+    register_file.l = fetch_immediate8_and_tick();
 }
 
 void CPU::complement_a_0x2f() {
@@ -1194,16 +1167,15 @@ void CPU::complement_a_0x2f() {
 }
 
 void CPU::jump_relative_if_not_carry_signed_immediate8_0x30() {
-    const bool is_condition_met = !is_flag_set(FLAG_CARRY_MASK);
-    jump_relative_conditional_signed_immediate8(is_condition_met);
+    jump_relative_conditional_signed_immediate8(!is_flag_set(FLAG_CARRY_MASK));
 }
 
 void CPU::load_stack_pointer_immediate16_0x31() {
-    load_register16_immediate16(register_file.stack_pointer);
+    register_file.stack_pointer = fetch_immediate16_and_tick();
 }
 
 void CPU::load_memory_post_decrement_hl_a_0x32() {
-    load_memory_register16_register8(register_file.hl--, register_file.a);
+    write_8_and_tick(register_file.hl--, register_file.a);
 }
 
 void CPU::increment_stack_pointer_0x33() {
@@ -1212,25 +1184,18 @@ void CPU::increment_stack_pointer_0x33() {
 
 void CPU::increment_memory_hl_0x34() {
     uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    const bool does_half_carry_occur = (memory_hl & 0x0f) == 0x0f;
-    write_8_and_tick(register_file.hl, ++memory_hl);
-    update_flag(FLAG_ZERO_MASK, memory_hl == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    increment_register8(memory_hl);
+    write_8_and_tick(register_file.hl, memory_hl);
 }
 
 void CPU::decrement_memory_hl_0x35() {
     uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    const bool does_half_carry_occur = (memory_hl & 0x0f) == 0x00;
-    write_8_and_tick(register_file.hl, --memory_hl);
-    update_flag(FLAG_ZERO_MASK, memory_hl == 0);
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    decrement_register8(memory_hl);
+    write_8_and_tick(register_file.hl, memory_hl);
 }
 
 void CPU::load_memory_hl_immediate8_0x36() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    write_8_and_tick(register_file.hl, immediate8);
+    write_8_and_tick(register_file.hl, fetch_immediate8_and_tick());
 }
 
 void CPU::set_carry_flag_0x37() {
@@ -1240,8 +1205,7 @@ void CPU::set_carry_flag_0x37() {
 }
 
 void CPU::jump_relative_if_carry_signed_immediate8_0x38() {
-    const bool is_condition_met = is_flag_set(FLAG_CARRY_MASK);
-    jump_relative_conditional_signed_immediate8(is_condition_met);
+    jump_relative_conditional_signed_immediate8(is_flag_set(FLAG_CARRY_MASK));
 }
 
 void CPU::add_hl_stack_pointer_0x39() {
@@ -1249,7 +1213,7 @@ void CPU::add_hl_stack_pointer_0x39() {
 }
 
 void CPU::load_a_memory_post_decrement_hl_0x3a() {
-    load_register8_memory_register16(register_file.a, register_file.hl--);
+    register_file.a = read_8_and_tick(register_file.hl--);
 }
 
 void CPU::decrement_stack_pointer_0x3b() {
@@ -1265,7 +1229,7 @@ void CPU::decrement_a_0x3d() {
 }
 
 void CPU::load_a_immediate8_0x3e() {
-    load_register8_immediate8(register_file.a);
+    register_file.a = fetch_immediate8_and_tick();
 }
 
 void CPU::complement_carry_flag_0x3f() {
@@ -1275,259 +1239,260 @@ void CPU::complement_carry_flag_0x3f() {
 }
 
 void CPU::load_b_b_0x40() {
-    load_register8_register8(register_file.b, register_file.b); // Essentially no operation
+    register_file.b = register_file.b; // Essentially no operation
 }
 
 void CPU::load_b_c_0x41() {
-    load_register8_register8(register_file.b, register_file.c);
+    register_file.b = register_file.c;
 }
 
 void CPU::load_b_d_0x42() {
-    load_register8_register8(register_file.b, register_file.d);
+    register_file.b = register_file.d;
 }
 
 void CPU::load_b_e_0x43() {
-    load_register8_register8(register_file.b, register_file.e);
+    register_file.b = register_file.e;
 }
 
 void CPU::load_b_h_0x44() {
-    load_register8_register8(register_file.b, register_file.h);
+    register_file.b = register_file.h;
 }
 
 void CPU::load_b_l_0x45() {
-    load_register8_register8(register_file.b, register_file.l);
+    register_file.b = register_file.l;
 }
 
 void CPU::load_b_memory_hl_0x46() {
-    load_register8_memory_register16(register_file.b, register_file.hl);
+    register_file.b = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_b_a_0x47() {
-    load_register8_register8(register_file.b, register_file.a);
+    register_file.b = register_file.a;
 }
 
 void CPU::load_c_b_0x48() {
-    load_register8_register8(register_file.c, register_file.b);
+    register_file.c = register_file.b;
 }
 
 void CPU::load_c_c_0x49() {
-    load_register8_register8(register_file.c, register_file.c); // Essentially no operation
+    register_file.c = register_file.c; // Essentially no operation
 }
 
 void CPU::load_c_d_0x4a() {
-    load_register8_register8(register_file.c, register_file.d);
+    register_file.c = register_file.d;
 }
 
 void CPU::load_c_e_0x4b() {
-    load_register8_register8(register_file.c, register_file.e);
+    register_file.c = register_file.e;
 }
 
 void CPU::load_c_h_0x4c() {
-    load_register8_register8(register_file.c, register_file.h);
+    register_file.c = register_file.h;
 }
 
 void CPU::load_c_l_0x4d() {
-    load_register8_register8(register_file.c, register_file.l);
+    register_file.c = register_file.l;
 }
 
 void CPU::load_c_memory_hl_0x4e() {
-    load_register8_memory_register16(register_file.c, register_file.hl);
+    register_file.c = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_c_a_0x4f() {
-    load_register8_register8(register_file.c, register_file.a);
+    register_file.c = register_file.a;
 }
 
 void CPU::load_d_b_0x50() {
-    load_register8_register8(register_file.d, register_file.b);
+    register_file.d = register_file.b;
 }
 
 void CPU::load_d_c_0x51() {
-    load_register8_register8(register_file.d, register_file.c);
+    register_file.d = register_file.c;
 }
 
 void CPU::load_d_d_0x52() {
-    load_register8_register8(register_file.d, register_file.d); // Essentially no operation
+    register_file.d = register_file.d; // Essentially no operation
 }
 
 void CPU::load_d_e_0x53() {
-    load_register8_register8(register_file.d, register_file.e);
+    register_file.d = register_file.e;
 }
 
 void CPU::load_d_h_0x54() {
-    load_register8_register8(register_file.d, register_file.h);
+    register_file.d = register_file.h;
 }
 
 void CPU::load_d_l_0x55() {
-    load_register8_register8(register_file.d, register_file.l);
+    register_file.d = register_file.l;
 }
 
 void CPU::load_d_memory_hl_0x56() {
-    load_register8_memory_register16(register_file.d, register_file.hl);
+    register_file.d = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_d_a_0x57() {
-    load_register8_register8(register_file.d, register_file.a);
+    register_file.d = register_file.a;
 }
 
 void CPU::load_e_b_0x58() {
-    load_register8_register8(register_file.e, register_file.b);
+    register_file.e = register_file.b;
 }
 
 void CPU::load_e_c_0x59() {
-    load_register8_register8(register_file.e, register_file.c);
+    register_file.e = register_file.c;
 }
 
 void CPU::load_e_d_0x5a() {
-    load_register8_register8(register_file.e, register_file.d);
+    register_file.e = register_file.d;
 }
 
 void CPU::load_e_e_0x5b() {
-    load_register8_register8(register_file.e, register_file.e); // Essentially no operation
+    register_file.e = register_file.e; // Essentially no operation
 }
 
 void CPU::load_e_h_0x5c() {
-    load_register8_register8(register_file.e, register_file.h);
+    register_file.e = register_file.h;
 }
 
 void CPU::load_e_l_0x5d() {
-    load_register8_register8(register_file.e, register_file.l);
+    register_file.e = register_file.l;
 }
 
 void CPU::load_e_memory_hl_0x5e() {
-    load_register8_memory_register16(register_file.e, register_file.hl);
+    register_file.e = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_e_a_0x5f() {
-    load_register8_register8(register_file.e, register_file.a);
+    register_file.e = register_file.a;
 }
 
 void CPU::load_h_b_0x60() {
-    load_register8_register8(register_file.h, register_file.b);
+    register_file.h = register_file.b;
 }
 
 void CPU::load_h_c_0x61() {
-    load_register8_register8(register_file.h, register_file.c);
+    register_file.h = register_file.c;
 }
 
 void CPU::load_h_d_0x62() {
-    load_register8_register8(register_file.h, register_file.d);
+    register_file.h = register_file.d;
 }
 
 void CPU::load_h_e_0x63() {
-    load_register8_register8(register_file.h, register_file.e);
+    register_file.h = register_file.e;
 }
 
 void CPU::load_h_h_0x64() {
-    load_register8_register8(register_file.h, register_file.h); // Essentially no operation
+    register_file.h = register_file.h; // Essentially no operation
 }
 
 void CPU::load_h_l_0x65() {
-    load_register8_register8(register_file.h, register_file.l);
+    register_file.h = register_file.l;
 }
 
 void CPU::load_h_memory_hl_0x66() {
-    load_register8_memory_register16(register_file.h, register_file.hl);
+    register_file.h = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_h_a_0x67() {
-    load_register8_register8(register_file.h, register_file.a);
+    register_file.h = register_file.a;
 }
 
 void CPU::load_l_b_0x68() {
-    load_register8_register8(register_file.l, register_file.b);
+    register_file.l = register_file.b;
 }
 
 void CPU::load_l_c_0x69() {
-    load_register8_register8(register_file.l, register_file.c);
+    register_file.l = register_file.c;
 }
 
 void CPU::load_l_d_0x6a() {
-    load_register8_register8(register_file.l, register_file.d);
+    register_file.l = register_file.d;
 }
 
 void CPU::load_l_e_0x6b() {
-    load_register8_register8(register_file.l, register_file.e);
+    register_file.l = register_file.e;
 }
 
 void CPU::load_l_h_0x6c() {
-    load_register8_register8(register_file.l, register_file.h);
+    register_file.l = register_file.h;
 }
 
 void CPU::load_l_l_0x6d() {
-    load_register8_register8(register_file.l, register_file.l); // Essentially no operation
+    register_file.l = register_file.l; // Essentially no operation
 }
 
 void CPU::load_l_memory_hl_0x6e() {
-    load_register8_memory_register16(register_file.l, register_file.hl);
+    register_file.l = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_l_a_0x6f() {
-    load_register8_register8(register_file.l, register_file.a);
+    register_file.l = register_file.a;
 }
 
 void CPU::load_memory_hl_b_0x70() {
-    load_memory_register16_register8(register_file.hl, register_file.b);
+    write_8_and_tick(register_file.hl, register_file.b);
 }
 
 void CPU::load_memory_hl_c_0x71() {
-    load_memory_register16_register8(register_file.hl, register_file.c);
+    write_8_and_tick(register_file.hl, register_file.c);
 }
 
 void CPU::load_memory_hl_d_0x72() {
-    load_memory_register16_register8(register_file.hl, register_file.d);
+    write_8_and_tick(register_file.hl, register_file.d);
 }
 
 void CPU::load_memory_hl_e_0x73() {
-    load_memory_register16_register8(register_file.hl, register_file.e);
+    write_8_and_tick(register_file.hl, register_file.e);
 }
 
 void CPU::load_memory_hl_h_0x74() { 
-    load_memory_register16_register8(register_file.hl, register_file.h);
+    write_8_and_tick(register_file.hl, register_file.h);
 }
 
 void CPU::load_memory_hl_l_0x75() {
-    load_memory_register16_register8(register_file.hl, register_file.l);
+    write_8_and_tick(register_file.hl, register_file.l);
 }
 
 void CPU::halt_0x76() {
+    // TODO implement properly eventually
     is_halted = true;
 }
 
 void CPU::load_memory_hl_a_0x77() {
-    load_memory_register16_register8(register_file.hl, register_file.a);
+    write_8_and_tick(register_file.hl, register_file.a);
 }
 
 void CPU::load_a_b_0x78() {
-    load_register8_register8(register_file.a, register_file.b);
+    register_file.a = register_file.b;
 }
 
 void CPU::load_a_c_0x79() {
-    load_register8_register8(register_file.a, register_file.c);
+    register_file.a = register_file.c;
 }
 
 void CPU::load_a_d_0x7a() {
-    load_register8_register8(register_file.a, register_file.d);
+    register_file.a = register_file.d;
 }
 
 void CPU::load_a_e_0x7b() {
-    load_register8_register8(register_file.a, register_file.e);
+    register_file.a = register_file.e;
 }
 
 void CPU::load_a_h_0x7c() {
-    load_register8_register8(register_file.a, register_file.h);
+    register_file.a = register_file.h;
 }
 
 void CPU::load_a_l_0x7d() {
-    load_register8_register8(register_file.a, register_file.l);
+    register_file.a = register_file.l;
 }
 
 void CPU::load_a_memory_hl_0x7e() {
-    load_register8_memory_register16(register_file.a, register_file.hl);
+    register_file.a = read_8_and_tick(register_file.hl);
 }
 
 void CPU::load_a_a_0x7f() {
-    load_register8_register8(register_file.a, register_file.a); // Essentially no operation
+    register_file.a = register_file.a; // Essentially no operation
 }
 
 void CPU::add_a_b_0x80() {
@@ -1555,8 +1520,7 @@ void CPU::add_a_l_0x85() {
 }
 
 void CPU::add_a_memory_hl_0x86() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    add_a_register8(memory_hl);
+    add_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::add_a_a_0x87() {
@@ -1588,8 +1552,7 @@ void CPU::add_with_carry_a_l_0x8d() {
 }
 
 void CPU::add_with_carry_a_memory_hl_0x8e() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    add_with_carry_a_register8(memory_hl);
+    add_with_carry_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::add_with_carry_a_a_0x8f() {
@@ -1621,8 +1584,7 @@ void CPU::subtract_a_l_0x95() {
 }
 
 void CPU::subtract_a_memory_hl_0x96() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    subtract_a_register8(memory_hl);
+    subtract_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::subtract_a_a_0x97() {
@@ -1654,8 +1616,7 @@ void CPU::subtract_with_carry_a_l_0x9d() {
 }
 
 void CPU::subtract_with_carry_a_memory_hl_0x9e() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    subtract_with_carry_a_register8(memory_hl);
+    subtract_with_carry_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::subtract_with_carry_a_a_0x9f() {
@@ -1687,8 +1648,7 @@ void CPU::and_a_l_0xa5() {
 }
 
 void CPU::and_a_memory_hl_0xa6() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    and_a_register8(memory_hl);
+    and_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::and_a_a_0xa7() {
@@ -1720,8 +1680,7 @@ void CPU::xor_a_l_0xad() {
 }
 
 void CPU::xor_a_memory_hl_0xae() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    xor_a_register8(memory_hl);
+    xor_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::xor_a_a_0xaf() {
@@ -1753,8 +1712,7 @@ void CPU::or_a_l_0xb5() {
 }
 
 void CPU::or_a_memory_hl_0xb6() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    or_a_register8(memory_hl);
+    or_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::or_a_a_0xb7() {
@@ -1786,8 +1744,7 @@ void CPU::compare_a_l_0xbd() {
 }
 
 void CPU::compare_a_memory_hl_0xbe() {
-    const uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    compare_a_register8(memory_hl);
+    compare_a_register8(read_8_and_tick(register_file.hl));
 }
 
 void CPU::compare_a_a_0xbf() {
@@ -1803,8 +1760,7 @@ void CPU::pop_stack_bc_0xc1() {
 }
 
 void CPU::jump_if_not_zero_immediate16_0xc2() {
-    const bool is_condition_met = !is_flag_set(FLAG_ZERO_MASK);
-    jump_conditional_immediate16(is_condition_met);
+    jump_conditional_immediate16(!is_flag_set(FLAG_ZERO_MASK));
 }
 
 void CPU::jump_immediate16_0xc3() {
@@ -1812,8 +1768,7 @@ void CPU::jump_immediate16_0xc3() {
 }
 
 void CPU::call_if_not_zero_immediate16_0xc4() {
-    const bool is_condition_met = !is_flag_set(FLAG_ZERO_MASK);
-    call_conditional_immediate16(is_condition_met);
+    call_conditional_immediate16(!is_flag_set(FLAG_ZERO_MASK));
 }
 
 void CPU::push_stack_bc_0xc5() {
@@ -1821,8 +1776,7 @@ void CPU::push_stack_bc_0xc5() {
 }
 
 void CPU::add_a_immediate8_0xc6() {
-    uint8_t immediate8 = fetch_next_8_and_tick();
-    add_a_register8(immediate8);
+    add_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x00_0xc7() {
@@ -1835,7 +1789,7 @@ void CPU::return_if_zero_0xc8() {
 
 void CPU::return_0xc9() {
     register_file.program_counter = pop_stack();
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::jump_if_zero_immediate16_0xca() {
@@ -1853,8 +1807,7 @@ void CPU::call_immediate16_0xcd() {
 }
 
 void CPU::add_with_carry_a_immediate8_0xce() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    add_with_carry_a_register8(immediate8);
+    add_with_carry_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x08_0xcf() {
@@ -1884,8 +1837,7 @@ void CPU::push_stack_de_0xd5() {
 }
 
 void CPU::subtract_a_immediate8_0xd6() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    subtract_a_register8(immediate8);
+    subtract_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x10_0xd7() {
@@ -1914,8 +1866,7 @@ void CPU::call_if_carry_immediate16_0xdc() {
 // 0xdd is an unused opcode
 
 void CPU::subtract_with_carry_a_immediate8_0xde() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    subtract_with_carry_a_register8(immediate8);
+    subtract_with_carry_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x18_0xdf() {
@@ -1923,15 +1874,14 @@ void CPU::restart_at_0x18_0xdf() {
 }
 
 void CPU::load_memory_high_ram_offset_immediate8_a_0xe0() {
-    const uint8_t unsigned_offset = fetch_next_8_and_tick();
-    write_8_and_tick(HIGH_RAM_START + unsigned_offset, register_file.a);
+    write_8_and_tick(HIGH_RAM_START + fetch_immediate8_and_tick(), register_file.a);
 }
 
 void CPU::pop_stack_hl_0xe1() {
     register_file.hl = pop_stack();
 }
 
-void CPU::load_memory_high_ram_c_a_0xe2() {
+void CPU::load_memory_high_ram_offset_c_a_0xe2() {
     write_8_and_tick(HIGH_RAM_START + register_file.c, register_file.a);
 }
 
@@ -1940,8 +1890,7 @@ void CPU::push_stack_hl_0xe5() {
 }
 
 void CPU::and_a_immediate8_0xe6() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    and_a_register8(immediate8);
+    and_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x20_0xe7() {
@@ -1950,7 +1899,7 @@ void CPU::restart_at_0x20_0xe7() {
 
 void CPU::add_sp_signed_immediate8_0xe8() {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
-    const uint8_t unsigned_offset = fetch_next_8_and_tick();
+    const uint8_t unsigned_offset = fetch_immediate8_and_tick();
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
     const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
     register_file.stack_pointer += static_cast<int8_t>(unsigned_offset);
@@ -1958,8 +1907,8 @@ void CPU::add_sp_signed_immediate8_0xe8() {
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
-    emulator_tick_callback();
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::jump_hl_0xe9() {
@@ -1967,8 +1916,7 @@ void CPU::jump_hl_0xe9() {
 }
 
 void CPU::load_memory_immediate16_a_0xea() {
-    const uint16_t destination_address = fetch_next_16_and_tick();
-    write_8_and_tick(destination_address, register_file.a);
+    write_8_and_tick(fetch_immediate16_and_tick(), register_file.a);
 }
 
 // 0xeb is an unused opcode
@@ -1978,17 +1926,15 @@ void CPU::load_memory_immediate16_a_0xea() {
 // 0xed is an unused opcode
 
 void CPU::xor_a_immediate8_0xee() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    xor_a_register8(immediate8);
+    xor_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x28_0xef() {
     restart_at_address(0x28);
 }
 
-void CPU::load_a_memory_high_ram_immediate8_0xf0() {
-    const uint8_t unsigned_offset = fetch_next_8_and_tick();
-    register_file.a = read_8_and_tick(HIGH_RAM_START + unsigned_offset);
+void CPU::load_a_memory_high_ram_offset_immediate8_0xf0() {
+    register_file.a = read_8_and_tick(HIGH_RAM_START + fetch_immediate8_and_tick());
 }
 
 void CPU::pop_stack_af_0xf1() {
@@ -1996,7 +1942,7 @@ void CPU::pop_stack_af_0xf1() {
     register_file.flags &= 0xf0; // Lower nibble of flags must always be zeroed
 }
 
-void CPU::load_a_memory_high_ram_c_0xf2() {
+void CPU::load_a_memory_high_ram_offset_c_0xf2() {
     register_file.a = read_8_and_tick(HIGH_RAM_START + register_file.c);
 }
 
@@ -2011,8 +1957,7 @@ void CPU::push_stack_af_0xf5() {
 }
 
 void CPU::or_a_immediate8_0xf6() {
-    uint8_t immediate8 = fetch_next_8_and_tick();
-    or_a_register8(immediate8);
+    or_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x30_0xf7() {
@@ -2021,7 +1966,7 @@ void CPU::restart_at_0x30_0xf7() {
 
 void CPU::load_hl_stack_pointer_with_signed_offset_0xf8() {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
-    const uint8_t unsigned_offset = fetch_next_8_and_tick();
+    const uint8_t unsigned_offset = fetch_immediate8_and_tick();
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
     const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
     register_file.hl = register_file.stack_pointer + static_cast<int8_t>(unsigned_offset);
@@ -2029,17 +1974,16 @@ void CPU::load_hl_stack_pointer_with_signed_offset_0xf8() {
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::load_stack_pointer_hl_0xf9() {
     register_file.stack_pointer = register_file.hl;
-    emulator_tick_callback();
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
 void CPU::load_a_memory_immediate16_0xfa() {
-    const uint16_t immediate16 = fetch_next_16_and_tick();
-    register_file.a = read_8_and_tick(immediate16);
+    register_file.a = read_8_and_tick(fetch_immediate16_and_tick());
 }
 
 void CPU::enable_interrupts_0xfb() {
@@ -2053,8 +1997,7 @@ void CPU::enable_interrupts_0xfb() {
 // 0xfd is an unused opcode
 
 void CPU::compare_a_immediate8_0xfe() {
-    const uint8_t immediate8 = fetch_next_8_and_tick();
-    compare_a_register8(immediate8);
+    compare_a_register8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x38_0xff() {

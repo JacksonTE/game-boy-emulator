@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <functional>
 #include "cpu.h"
-#include "memory_management_unit.h"
 #include "register_file.h"
 
 namespace GameBoy {
@@ -13,7 +12,6 @@ namespace GameBoy {
 class Emulator {
 public:
 	Emulator();
-	Emulator(std::unique_ptr<MemoryInterface> memory_interface);
 
 	void reset_state();
 	void set_post_boot_state();
@@ -33,7 +31,7 @@ public:
 	void tick_all_components();
 
 private:
-	std::unique_ptr<MemoryInterface> memory;
+	std::unique_ptr<MemoryManagementUnit> memory_interface;
 	CPU cpu;
 };
 

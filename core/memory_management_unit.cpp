@@ -1,3 +1,5 @@
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include "memory_management_unit.h"
@@ -117,6 +119,35 @@ uint8_t MemoryManagementUnit::read_8(uint16_t address) const {
 
 void MemoryManagementUnit::write_8(uint16_t address, uint8_t value) {
     placeholder_memory[address] = value;
+}
+
+void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t end_address) const {
+    std::cout << std::hex << std::setfill('0');
+    std::cout << "=========== Memory Range 0x" << std::setw(4) << start_address << " - 0x" << std::setw(4) << end_address << " ============\n";
+
+    for (uint16_t address = start_address; address <= end_address; address++) {
+        uint16_t remainder = address % 0x10;
+
+        if (address == start_address || remainder == 0) {
+            uint16_t line_offset = address - remainder;
+            std::cout << std::setw(4) << line_offset << ": ";
+
+            for (uint16_t i = 0; i < remainder; i++) {
+                std::cout << "   ";
+            }
+        }
+
+        std::cout << std::setw(2) << static_cast<int>(read_8(address)) << " ";
+
+        if ((address + 1) % 0x10 == 0) {
+            std::cout << "\n";
+        }
+    }
+
+    if ((end_address + 1) % 0x10 != 0) {
+        std::cout << "\n";
+    }
+    std::cout << "=====================================================\n";
 }
 
 } //namespace GameBoy

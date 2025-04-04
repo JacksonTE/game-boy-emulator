@@ -3,6 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <functional>
+#include "machine_cycle_interaction.h"
 #include "memory_management_unit.h"
 #include "register_file.h"
 
@@ -18,9 +19,7 @@ constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 
 class CPU {
 public:
-    RegisterFile<std::endian::native> register_file; // TODO make private later
-
-    CPU(MemoryInterface& memory_interface, std::function<void()> tick_callback);
+    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> tick_callback);
 
     void reset_state();
     void set_post_boot_state();
@@ -29,16 +28,20 @@ public:
     uint8_t read_8_and_tick(uint16_t address);
     void write_8_and_tick(uint16_t address, uint8_t value);
     uint16_t read_16_and_tick(uint16_t address);
-    uint8_t fetch_next_8_and_tick();
-    uint16_t fetch_next_16_and_tick();
+    uint8_t fetch_immediate8_and_tick();
+    uint16_t fetch_immediate16_and_tick();
 
     void execute_next_instruction();
-    void update_registers(const RegisterFile<std::endian::native> &new_register_values);
+    void update_register_file(const RegisterFile<std::endian::native> &new_register_values);
     void print_register_values() const;
 
+    uint16_t get_program_counter() const;
+    RegisterFile<std::endian::native> get_register_file() const;
+
 private:
-    MemoryInterface &memory;
-    std::function<void()> emulator_tick_callback;
+    std::function<void(MachineCycleInteraction)> emulator_tick_callback;
+    MemoryManagementUnit &memory_interface;
+    RegisterFile<std::endian::native> register_file;
     uint64_t cycles_elapsed{};
     bool is_stopped{};
     bool is_halted{};
@@ -54,11 +57,6 @@ private:
     bool is_flag_set(uint8_t flag_mask) const;
 
     // Instruction Helpers
-    void load_register8_register8(uint8_t &destination_register8, const uint8_t &source_register8);
-    void load_register8_immediate8(uint8_t &destination_register8);
-    void load_register8_memory_register16(uint8_t &destination_register8, const uint16_t &source_address_register16);
-    void load_memory_register16_register8(const uint16_t &destination_address_register16, const uint8_t &source_register8);
-    void load_register16_immediate16(uint16_t &destination_register16);
     void increment_register8(uint8_t &register8);
     void decrement_register8(uint8_t &register8);
     void increment_register16(uint16_t &register16);
@@ -324,7 +322,7 @@ private:
     void restart_at_0x18_0xdf();
     void load_memory_high_ram_offset_immediate8_a_0xe0();
     void pop_stack_hl_0xe1();
-    void load_memory_high_ram_c_a_0xe2();
+    void load_memory_high_ram_offset_c_a_0xe2();
     // 0xe3 is an unused opcode
     // 0xe4 is an unused opcode
     void push_stack_hl_0xe5();
@@ -338,9 +336,9 @@ private:
     // 0xed is an unused opcode
     void xor_a_immediate8_0xee();
     void restart_at_0x28_0xef();
-    void load_a_memory_high_ram_immediate8_0xf0();
+    void load_a_memory_high_ram_offset_immediate8_0xf0();
     void pop_stack_af_0xf1();
-    void load_a_memory_high_ram_c_0xf2();
+    void load_a_memory_high_ram_offset_c_0xf2();
     void disable_interrupts_0xf3();
     // 0xf4 is an unused opcode
     void push_stack_af_0xf5();
