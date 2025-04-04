@@ -17,48 +17,48 @@ void MemoryManagementUnit::reset_state() {
 }
 
 void MemoryManagementUnit::set_post_boot_state() {
-    write_8(0xff00, 0xcf);
-    write_8(0xff01, 0x00);
-    write_8(0xff02, 0x7e);
-    write_8(0xff04, 0xab);
-    write_8(0xff05, 0x00);
-    write_8(0xff06, 0x00);
-    write_8(0xff07, 0xf8);
-    write_8(0xff0f, 0xe1);
-    write_8(0xff10, 0x80);
-    write_8(0xff11, 0xbf);
-    write_8(0xff12, 0xf3);
-    write_8(0xff13, 0xff);
-    write_8(0xff14, 0xbf);
-    write_8(0xff16, 0x3f);
-    write_8(0xff17, 0x00);
-    write_8(0xff18, 0xff);
-    write_8(0xff19, 0xbf);
-    write_8(0xff1a, 0x7f);
-    write_8(0xff1b, 0xff);
-    write_8(0xff1c, 0x9f);
-    write_8(0xff1d, 0xff);
-    write_8(0xff1e, 0xbf);
-    write_8(0xff20, 0xff);
-    write_8(0xff21, 0x00);
-    write_8(0xff22, 0x00);
-    write_8(0xff23, 0xbf);
-    write_8(0xff24, 0x77);
-    write_8(0xff25, 0xf3);
-    write_8(0xff26, 0xf1);
-    write_8(0xff40, 0x90);
-    write_8(0xff41, 0x85);
-    write_8(0xff42, 0x00);
-    write_8(0xff43, 0x00);
-    write_8(0xff44, 0x00);
-    write_8(0xff45, 0x00);
-    write_8(0xff46, 0xff);
-    write_8(0xff47, 0xfc);
-    write_8(0xff48, 0x00);
-    write_8(0xff49, 0x00);
-    write_8(0xff4a, 0x00);
-    write_8(0xff4b, 0x00);
-    write_8(0xffff, 0x00);
+    write_byte(0xff00, 0xcf);
+    write_byte(0xff01, 0x00);
+    write_byte(0xff02, 0x7e);
+    write_byte(0xff04, 0xab);
+    write_byte(0xff05, 0x00);
+    write_byte(0xff06, 0x00);
+    write_byte(0xff07, 0xf8);
+    write_byte(0xff0f, 0xe1);
+    write_byte(0xff10, 0x80);
+    write_byte(0xff11, 0xbf);
+    write_byte(0xff12, 0xf3);
+    write_byte(0xff13, 0xff);
+    write_byte(0xff14, 0xbf);
+    write_byte(0xff16, 0x3f);
+    write_byte(0xff17, 0x00);
+    write_byte(0xff18, 0xff);
+    write_byte(0xff19, 0xbf);
+    write_byte(0xff1a, 0x7f);
+    write_byte(0xff1b, 0xff);
+    write_byte(0xff1c, 0x9f);
+    write_byte(0xff1d, 0xff);
+    write_byte(0xff1e, 0xbf);
+    write_byte(0xff20, 0xff);
+    write_byte(0xff21, 0x00);
+    write_byte(0xff22, 0x00);
+    write_byte(0xff23, 0xbf);
+    write_byte(0xff24, 0x77);
+    write_byte(0xff25, 0xf3);
+    write_byte(0xff26, 0xf1);
+    write_byte(0xff40, 0x90);
+    write_byte(0xff41, 0x85);
+    write_byte(0xff42, 0x00);
+    write_byte(0xff43, 0x00);
+    write_byte(0xff44, 0x00);
+    write_byte(0xff45, 0x00);
+    write_byte(0xff46, 0xff);
+    write_byte(0xff47, 0xfc);
+    write_byte(0xff48, 0x00);
+    write_byte(0xff49, 0x00);
+    write_byte(0xff4a, 0x00);
+    write_byte(0xff4b, 0x00);
+    write_byte(0xffff, 0x00);
 }
 
 bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file) {
@@ -102,7 +102,7 @@ bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_by
     return true;
 }
 
-uint8_t MemoryManagementUnit::read_8(uint16_t address) const {
+uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
     bool is_bootrom_mapped = placeholder_memory[BOOTROM_STATUS_ADDRESS] == 0;
 
     if (is_bootrom_mapped && address < BOOTROM_SIZE) {
@@ -117,7 +117,9 @@ uint8_t MemoryManagementUnit::read_8(uint16_t address) const {
     return address == 0xff44 ? 0x90 : placeholder_memory[address];
 }
 
-void MemoryManagementUnit::write_8(uint16_t address, uint8_t value) {
+void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
+    if (address == 0xff01)
+        std::cout << value;
     placeholder_memory[address] = value;
 }
 
@@ -137,7 +139,7 @@ void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t
             }
         }
 
-        std::cout << std::setw(2) << static_cast<int>(read_8(address)) << " ";
+        std::cout << std::setw(2) << static_cast<int>(read_byte(address)) << " ";
 
         if ((address + 1) % 0x10 == 0) {
             std::cout << "\n";

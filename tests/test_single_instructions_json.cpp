@@ -136,11 +136,11 @@ public:
         std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
     }
 
-    uint8_t read_8(uint16_t address) const override {
+    uint8_t read_byte(uint16_t address) const override {
         return flat_memory[address];
     }
 
-    void write_8(uint16_t address, uint8_t value) override {
+    void write_byte(uint16_t address, uint8_t value) override {
         flat_memory[address] = value;
     }
 
@@ -168,9 +168,9 @@ protected:
         game_boy_cpu.reset_state();
 
         for (const AddressValuePair &pair : test_case.initial_ram_values) {
-            memory_interface->write_8(pair.memory_address, pair.value);
+            memory_interface->write_byte(pair.memory_address, pair.value);
         }
-        game_boy_cpu.update_register_file(test_case.initial_register_values);
+        game_boy_cpu.set_register_file_state(test_case.initial_register_values);
     }
 };
 
@@ -182,24 +182,26 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile) {
 
     auto test_cases = load_test_cases_from_json_file(json_test_filename);
 
-    for (const auto &test_case : test_cases) {
+    for (int i = 0; i < test_cases.size(); i++) {
+        const auto &test_case = test_cases.at(i);
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
+        game_boy_cpu.execute_next_instruction(); // Execute initial NOP (no operation) and fetch first instruction
         game_boy_cpu.execute_next_instruction();
 
         EXPECT_EQ(game_boy_cpu.get_register_file().af, test_case.expected_register_values.af);
         EXPECT_EQ(game_boy_cpu.get_register_file().bc, test_case.expected_register_values.bc);
         EXPECT_EQ(game_boy_cpu.get_register_file().de, test_case.expected_register_values.de);
         EXPECT_EQ(game_boy_cpu.get_register_file().hl, test_case.expected_register_values.hl);
-        EXPECT_EQ(game_boy_cpu.get_register_file().program_counter, test_case.expected_register_values.program_counter);
+        EXPECT_EQ(static_cast<uint16_t>(game_boy_cpu.get_register_file().program_counter - 1), test_case.expected_register_values.program_counter); // Compare expected pc against pc-1 since I fetch instruction at the end of the current one
         EXPECT_EQ(game_boy_cpu.get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
 
         for (const AddressValuePair &expected_pair : test_case.expected_ram_values) {
-            EXPECT_EQ(memory_interface->read_8(expected_pair.memory_address), expected_pair.value);
+            EXPECT_EQ(memory_interface->read_byte(expected_pair.memory_address), expected_pair.value);
         }
 
-        EXPECT_EQ(memory_interactions.size(), test_case.expected_memory_interactions.size());
+        EXPECT_EQ(memory_interactions.size() - 1, test_case.expected_memory_interactions.size());
         for (int i = 0; i < test_case.expected_memory_interactions.size(); i++) {
             EXPECT_EQ(memory_interactions.at(i), test_case.expected_memory_interactions.at(i));
         }

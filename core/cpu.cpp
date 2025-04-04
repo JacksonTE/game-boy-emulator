@@ -12,20 +12,19 @@ CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(Machin
 }
 
 void CPU::reset_state() {
-    RegisterFile<std::endian::native> initialized_register_file;
-    update_register_file(initialized_register_file);
+    instruction_register = 0x00;
+    set_register_file_state(RegisterFile<std::endian::native>{});
     cycles_elapsed = 0;
+    interrupt_master_enable = false;
     is_stopped = false;
     is_halted = false;
-    are_interrupts_enabled = false;
-    did_enable_interrupts_execute = false;
 }
 
 void CPU::set_post_boot_state() {
     // Updates flags based on header bytes 0x0134-0x014c in the loaded 'cartridge' ROM
     uint8_t header_checksum = 0;
     for (uint16_t address = 0x0134; address <= 0x014c; address++) {
-        header_checksum -= memory_interface.read_8(BOOTROM_SIZE + address) - 1;
+        header_checksum -= memory_interface.read_byte(BOOTROM_SIZE + address) - 1;
     }
 
     register_file.a = 0x01;
@@ -47,31 +46,17 @@ void CPU::tick_machine_cycle() {
     cycles_elapsed += 4; // Operations typically take multiples of 4 CPU cycles to complete, called machine cycles (or M-cycles)
 }
 
-uint8_t CPU::read_8_and_tick(uint16_t address) {
-    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::Read, address});
-    return memory_interface.read_8(address);
-}
-
-void CPU::write_8_and_tick(uint16_t address, uint8_t value) {
-    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::Write, address, value});
-    memory_interface.write_8(address, value);
-}
-
-uint8_t CPU::fetch_immediate8_and_tick() {
-    return read_8_and_tick(register_file.program_counter++);
-}
-
-uint16_t CPU::fetch_immediate16_and_tick() {
-    const uint8_t low_byte = fetch_immediate8_and_tick();
-    return low_byte | static_cast<uint16_t>(fetch_immediate8_and_tick() << 8);
-}
-
 void CPU::execute_next_instruction() {
-    uint8_t next_instruction_opcode = fetch_immediate8_and_tick();
-    execute_instruction(next_instruction_opcode);
+    execute_instruction(instruction_register);
+    instruction_register = fetch_immediate8_and_tick();
+    //handle_interrupt
 }
 
-void CPU::update_register_file(const RegisterFile<std::endian::native> &new_register_values) {
+RegisterFile<std::endian::native> CPU::get_register_file() const {
+    return register_file;
+}
+
+void CPU::set_register_file_state(const RegisterFile<std::endian::native> &new_register_values) {
     register_file.a = new_register_values.a;
     register_file.flags = new_register_values.flags & 0xf0; // Lower nibble of flags must always be zeroed
     register_file.bc = new_register_values.bc;
@@ -81,7 +66,7 @@ void CPU::update_register_file(const RegisterFile<std::endian::native> &new_regi
     register_file.stack_pointer = new_register_values.stack_pointer;
 }
 
-void CPU::print_register_values() const {
+void CPU::print_register_file_state() const {
     std::cout << "=================== CPU Registers ===================\n";
     std::cout << std::hex << std::setfill('0');
 
@@ -113,12 +98,42 @@ void CPU::print_register_values() const {
     std::cout << "=====================================================\n";
 }
 
-uint16_t CPU::get_program_counter() const {
-    return register_file.program_counter;
+uint8_t CPU::read_byte_and_tick(uint16_t address) {
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::Read, address});
+    return memory_interface.read_byte(address);
 }
 
-RegisterFile<std::endian::native> CPU::get_register_file() const {
-    return register_file;
+void CPU::write_byte_and_tick(uint16_t address, uint8_t value) {
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::Write, address, value});
+    memory_interface.write_byte(address, value);
+}
+
+uint8_t CPU::fetch_immediate8_and_tick() {
+    return read_byte_and_tick(register_file.program_counter++);
+}
+
+uint16_t CPU::fetch_immediate16_and_tick() {
+    const uint8_t low_byte = fetch_immediate8_and_tick();
+    return low_byte | static_cast<uint16_t>(fetch_immediate8_and_tick() << 8);
+}
+
+void CPU::handle_interrupt() {
+    if (!interrupt_master_enable) {
+        return;
+    }
+
+    decrement_register16(register_file.program_counter);
+    //call
+}
+
+void CPU::execute_instruction(uint8_t opcode) {
+    if (opcode != INSTRUCTION_0xcb_BYTE) {
+        (this->*instruction_table[opcode])();
+    }
+    else {
+        const uint8_t prefixed_opcode = fetch_immediate8_and_tick();
+        (this->*extended_instruction_table[prefixed_opcode])();
+    }
 }
 
 const CPU::InstructionPointer CPU::instruction_table[0x100] = {
@@ -381,278 +396,267 @@ const CPU::InstructionPointer CPU::instruction_table[0x100] = {
 };
 
 const CPU::InstructionPointer CPU::extended_instruction_table[0x100] = {
-    &CPU::rotate_left_circular_b_prefix_0x00,
-    &CPU::rotate_left_circular_c_prefix_0x01,
-    &CPU::rotate_left_circular_d_prefix_0x02,
-    &CPU::rotate_left_circular_e_prefix_0x03,
-    &CPU::rotate_left_circular_h_prefix_0x04,
-    &CPU::rotate_left_circular_l_prefix_0x05,
-    &CPU::rotate_left_circular_memory_hl_prefix_0x06,
-    &CPU::rotate_left_circular_a_prefix_0x07,
-    &CPU::rotate_right_circular_b_prefix_0x08,
-    &CPU::rotate_right_circular_c_prefix_0x09,
-    &CPU::rotate_right_circular_d_prefix_0x0a,
-    &CPU::rotate_right_circular_e_prefix_0x0b,
-    &CPU::rotate_right_circular_h_prefix_0x0c,
-    &CPU::rotate_right_circular_l_prefix_0x0d,
-    &CPU::rotate_right_circular_memory_hl_prefix_0x0e,
-    &CPU::rotate_right_circular_a_prefix_0x0f,
-    &CPU::rotate_left_through_carry_b_prefix_0x10,
-    &CPU::rotate_left_through_carry_c_prefix_0x11,
-    &CPU::rotate_left_through_carry_d_prefix_0x12,
-    &CPU::rotate_left_through_carry_e_prefix_0x13,
-    &CPU::rotate_left_through_carry_h_prefix_0x14,
-    &CPU::rotate_left_through_carry_l_prefix_0x15,
-    &CPU::rotate_left_through_carry_memory_hl_prefix_0x16,
-    &CPU::rotate_left_through_carry_a_prefix_0x17,
-    &CPU::rotate_right_through_carry_b_prefix_0x18,
-    &CPU::rotate_right_through_carry_c_prefix_0x19,
-    &CPU::rotate_right_through_carry_d_prefix_0x1a,
-    &CPU::rotate_right_through_carry_e_prefix_0x1b,
-    &CPU::rotate_right_through_carry_h_prefix_0x1c,
-    &CPU::rotate_right_through_carry_l_prefix_0x1d,
-    &CPU::rotate_right_through_carry_memory_hl_prefix_0x1e,
-    &CPU::rotate_right_through_carry_a_prefix_0x1f,
-    &CPU::shift_left_arithmetic_b_prefix_0x20,
-    &CPU::shift_left_arithmetic_c_prefix_0x21,
-    &CPU::shift_left_arithmetic_d_prefix_0x22,
-    &CPU::shift_left_arithmetic_e_prefix_0x23,
-    &CPU::shift_left_arithmetic_h_prefix_0x24,
-    &CPU::shift_left_arithmetic_l_prefix_0x25,
-    &CPU::shift_left_arithmetic_memory_hl_prefix_0x26,
-    &CPU::shift_left_arithmetic_a_prefix_0x27,
-    &CPU::shift_right_arithmetic_b_prefix_0x28,
-    &CPU::shift_right_arithmetic_c_prefix_0x29,
-    &CPU::shift_right_arithmetic_d_prefix_0x2a,
-    &CPU::shift_right_arithmetic_e_prefix_0x2b,
-    &CPU::shift_right_arithmetic_h_prefix_0x2c,
-    &CPU::shift_right_arithmetic_l_prefix_0x2d,
-    &CPU::shift_right_arithmetic_memory_hl_prefix_0x2e,
-    &CPU::shift_right_arithmetic_a_prefix_0x2f,
-    &CPU::swap_nibbles_b_prefix_0x30,
-    &CPU::swap_nibbles_c_prefix_0x31,
-    &CPU::swap_nibbles_d_prefix_0x32,
-    &CPU::swap_nibbles_e_prefix_0x33,
-    &CPU::swap_nibbles_h_prefix_0x34,
-    &CPU::swap_nibbles_l_prefix_0x35,
-    &CPU::swap_nibbles_memory_hl_prefix_0x36,
-    &CPU::swap_nibbles_a_prefix_0x37,
-    &CPU::shift_right_logical_b_prefix_0x38,
-    &CPU::shift_right_logical_c_prefix_0x39,
-    &CPU::shift_right_logical_d_prefix_0x3a,
-    &CPU::shift_right_logical_e_prefix_0x3b,
-    &CPU::shift_right_logical_h_prefix_0x3c,
-    &CPU::shift_right_logical_l_prefix_0x3d,
-    &CPU::shift_right_logical_memory_hl_prefix_0x3e,
-    &CPU::shift_right_logical_a_prefix_0x3f,
-    &CPU::test_bit_0_b_prefix_0x40,
-    &CPU::test_bit_0_c_prefix_0x41,
-    &CPU::test_bit_0_d_prefix_0x42,
-    &CPU::test_bit_0_e_prefix_0x43,
-    &CPU::test_bit_0_h_prefix_0x44,
-    &CPU::test_bit_0_l_prefix_0x45,
-    &CPU::test_bit_0_memory_hl_prefix_0x46,
-    &CPU::test_bit_0_a_prefix_0x47,
-    &CPU::test_bit_1_b_prefix_0x48,
-    &CPU::test_bit_1_c_prefix_0x49,
-    &CPU::test_bit_1_d_prefix_0x4a,
-    &CPU::test_bit_1_e_prefix_0x4b,
-    &CPU::test_bit_1_h_prefix_0x4c,
-    &CPU::test_bit_1_l_prefix_0x4d,
-    &CPU::test_bit_1_memory_hl_prefix_0x4e,
-    &CPU::test_bit_1_a_prefix_0x4f,
-    &CPU::test_bit_2_b_prefix_0x50,
-    &CPU::test_bit_2_c_prefix_0x51,
-    &CPU::test_bit_2_d_prefix_0x52,
-    &CPU::test_bit_2_e_prefix_0x53,
-    &CPU::test_bit_2_h_prefix_0x54,
-    &CPU::test_bit_2_l_prefix_0x55,
-    &CPU::test_bit_2_memory_hl_prefix_0x56,
-    &CPU::test_bit_2_a_prefix_0x57,
-    &CPU::test_bit_3_b_prefix_0x58,
-    &CPU::test_bit_3_c_prefix_0x59,
-    &CPU::test_bit_3_d_prefix_0x5a,
-    &CPU::test_bit_3_e_prefix_0x5b,
-    &CPU::test_bit_3_h_prefix_0x5c,
-    &CPU::test_bit_3_l_prefix_0x5d,
-    &CPU::test_bit_3_memory_hl_prefix_0x5e,
-    &CPU::test_bit_3_a_prefix_0x5f,
-    &CPU::test_bit_4_b_prefix_0x60,
-    &CPU::test_bit_4_c_prefix_0x61,
-    &CPU::test_bit_4_d_prefix_0x62,
-    &CPU::test_bit_4_e_prefix_0x63,
-    &CPU::test_bit_4_h_prefix_0x64,
-    &CPU::test_bit_4_l_prefix_0x65,
-    &CPU::test_bit_4_memory_hl_prefix_0x66,
-    &CPU::test_bit_4_a_prefix_0x67,
-    &CPU::test_bit_5_b_prefix_0x68,
-    &CPU::test_bit_5_c_prefix_0x69,
-    &CPU::test_bit_5_d_prefix_0x6a,
-    &CPU::test_bit_5_e_prefix_0x6b,
-    &CPU::test_bit_5_h_prefix_0x6c,
-    &CPU::test_bit_5_l_prefix_0x6d,
-    &CPU::test_bit_5_memory_hl_prefix_0x6e,
-    &CPU::test_bit_5_a_prefix_0x6f,
-    &CPU::test_bit_6_b_prefix_0x70,
-    &CPU::test_bit_6_c_prefix_0x71,
-    &CPU::test_bit_6_d_prefix_0x72,
-    &CPU::test_bit_6_e_prefix_0x73,
-    &CPU::test_bit_6_h_prefix_0x74,
-    &CPU::test_bit_6_l_prefix_0x75,
-    &CPU::test_bit_6_memory_hl_prefix_0x76,
-    &CPU::test_bit_6_a_prefix_0x77,
-    &CPU::test_bit_7_b_prefix_0x78,
-    &CPU::test_bit_7_c_prefix_0x79,
-    &CPU::test_bit_7_d_prefix_0x7a,
-    &CPU::test_bit_7_e_prefix_0x7b,
-    &CPU::test_bit_7_h_prefix_0x7c,
-    &CPU::test_bit_7_l_prefix_0x7d,
-    &CPU::test_bit_7_memory_hl_prefix_0x7e,
-    &CPU::test_bit_7_a_prefix_0x7f,
-    &CPU::reset_bit_0_b_prefix_0x80,
-    &CPU::reset_bit_0_c_prefix_0x81,
-    &CPU::reset_bit_0_d_prefix_0x82,
-    &CPU::reset_bit_0_e_prefix_0x83,
-    &CPU::reset_bit_0_h_prefix_0x84,
-    &CPU::reset_bit_0_l_prefix_0x85,
-    &CPU::reset_bit_0_memory_hl_prefix_0x86,
-    &CPU::reset_bit_0_a_prefix_0x87,
-    &CPU::reset_bit_1_b_prefix_0x88,
-    &CPU::reset_bit_1_c_prefix_0x89,
-    &CPU::reset_bit_1_d_prefix_0x8a,
-    &CPU::reset_bit_1_e_prefix_0x8b,
-    &CPU::reset_bit_1_h_prefix_0x8c,
-    &CPU::reset_bit_1_l_prefix_0x8d,
-    &CPU::reset_bit_1_memory_hl_prefix_0x8e,
-    &CPU::reset_bit_1_a_prefix_0x8f,
-    &CPU::reset_bit_2_b_prefix_0x90,
-    &CPU::reset_bit_2_c_prefix_0x91,
-    &CPU::reset_bit_2_d_prefix_0x92,
-    &CPU::reset_bit_2_e_prefix_0x93,
-    &CPU::reset_bit_2_h_prefix_0x94,
-    &CPU::reset_bit_2_l_prefix_0x95,
-    &CPU::reset_bit_2_memory_hl_prefix_0x96,
-    &CPU::reset_bit_2_a_prefix_0x97,
-    &CPU::reset_bit_3_b_prefix_0x98,
-    &CPU::reset_bit_3_c_prefix_0x99,
-    &CPU::reset_bit_3_d_prefix_0x9a,
-    &CPU::reset_bit_3_e_prefix_0x9b,
-    &CPU::reset_bit_3_h_prefix_0x9c,
-    &CPU::reset_bit_3_l_prefix_0x9d,
-    &CPU::reset_bit_3_memory_hl_prefix_0x9e,
-    &CPU::reset_bit_3_a_prefix_0x9f,
-    &CPU::reset_bit_4_b_prefix_0xa0,
-    &CPU::reset_bit_4_c_prefix_0xa1,
-    &CPU::reset_bit_4_d_prefix_0xa2,
-    &CPU::reset_bit_4_e_prefix_0xa3,
-    &CPU::reset_bit_4_h_prefix_0xa4,
-    &CPU::reset_bit_4_l_prefix_0xa5,
-    &CPU::reset_bit_4_memory_hl_prefix_0xa6,
-    &CPU::reset_bit_4_a_prefix_0xa7,
-    &CPU::reset_bit_5_b_prefix_0xa8,
-    &CPU::reset_bit_5_c_prefix_0xa9,
-    &CPU::reset_bit_5_d_prefix_0xaa,
-    &CPU::reset_bit_5_e_prefix_0xab,
-    &CPU::reset_bit_5_h_prefix_0xac,
-    &CPU::reset_bit_5_l_prefix_0xad,
-    &CPU::reset_bit_5_memory_hl_prefix_0xae,
-    &CPU::reset_bit_5_a_prefix_0xaf,
-    &CPU::reset_bit_6_b_prefix_0xb0,
-    &CPU::reset_bit_6_c_prefix_0xb1,
-    &CPU::reset_bit_6_d_prefix_0xb2,
-    &CPU::reset_bit_6_e_prefix_0xb3,
-    &CPU::reset_bit_6_h_prefix_0xb4,
-    &CPU::reset_bit_6_l_prefix_0xb5,
-    &CPU::reset_bit_6_memory_hl_prefix_0xb6,
-    &CPU::reset_bit_6_a_prefix_0xb7,
-    &CPU::reset_bit_7_b_prefix_0xb8,
-    &CPU::reset_bit_7_c_prefix_0xb9,
-    &CPU::reset_bit_7_d_prefix_0xba,
-    &CPU::reset_bit_7_e_prefix_0xbb,
-    &CPU::reset_bit_7_h_prefix_0xbc,
-    &CPU::reset_bit_7_l_prefix_0xbd,
-    &CPU::reset_bit_7_memory_hl_prefix_0xbe,
-    &CPU::reset_bit_7_a_prefix_0xbf,
-    &CPU::set_bit_0_b_prefix_0xc0,
-    &CPU::set_bit_0_c_prefix_0xc1,
-    &CPU::set_bit_0_d_prefix_0xc2,
-    &CPU::set_bit_0_e_prefix_0xc3,
-    &CPU::set_bit_0_h_prefix_0xc4,
-    &CPU::set_bit_0_l_prefix_0xc5,
-    &CPU::set_bit_0_memory_hl_prefix_0xc6,
-    &CPU::set_bit_0_a_prefix_0xc7,
-    &CPU::set_bit_1_b_prefix_0xc8,
-    &CPU::set_bit_1_c_prefix_0xc9,
-    &CPU::set_bit_1_d_prefix_0xca,
-    &CPU::set_bit_1_e_prefix_0xcb,
-    &CPU::set_bit_1_h_prefix_0xcc,
-    &CPU::set_bit_1_l_prefix_0xcd,
-    &CPU::set_bit_1_memory_hl_prefix_0xce,
-    &CPU::set_bit_1_a_prefix_0xcf,
-    &CPU::set_bit_2_b_prefix_0xd0,
-    &CPU::set_bit_2_c_prefix_0xd1,
-    &CPU::set_bit_2_d_prefix_0xd2,
-    &CPU::set_bit_2_e_prefix_0xd3,
-    &CPU::set_bit_2_h_prefix_0xd4,
-    &CPU::set_bit_2_l_prefix_0xd5,
-    &CPU::set_bit_2_memory_hl_prefix_0xd6,
-    &CPU::set_bit_2_a_prefix_0xd7,
-    &CPU::set_bit_3_b_prefix_0xd8,
-    &CPU::set_bit_3_c_prefix_0xd9,
-    &CPU::set_bit_3_d_prefix_0xda,
-    &CPU::set_bit_3_e_prefix_0xdb,
-    &CPU::set_bit_3_h_prefix_0xdc,
-    &CPU::set_bit_3_l_prefix_0xdd,
-    &CPU::set_bit_3_memory_hl_prefix_0xde,
-    &CPU::set_bit_3_a_prefix_0xdf,
-    &CPU::set_bit_4_b_prefix_0xe0,
-    &CPU::set_bit_4_c_prefix_0xe1,
-    &CPU::set_bit_4_d_prefix_0xe2,
-    &CPU::set_bit_4_e_prefix_0xe3,
-    &CPU::set_bit_4_h_prefix_0xe4,
-    &CPU::set_bit_4_l_prefix_0xe5,
-    &CPU::set_bit_4_memory_hl_prefix_0xe6,
-    &CPU::set_bit_4_a_prefix_0xe7,
-    &CPU::set_bit_5_b_prefix_0xe8,
-    &CPU::set_bit_5_c_prefix_0xe9,
-    &CPU::set_bit_5_d_prefix_0xea,
-    &CPU::set_bit_5_e_prefix_0xeb,
-    &CPU::set_bit_5_h_prefix_0xec,
-    &CPU::set_bit_5_l_prefix_0xed,
-    &CPU::set_bit_5_memory_hl_prefix_0xee,
-    &CPU::set_bit_5_a_prefix_0xef,
-    &CPU::set_bit_6_b_prefix_0xf0,
-    &CPU::set_bit_6_c_prefix_0xf1,
-    &CPU::set_bit_6_d_prefix_0xf2,
-    &CPU::set_bit_6_e_prefix_0xf3,
-    &CPU::set_bit_6_h_prefix_0xf4,
-    &CPU::set_bit_6_l_prefix_0xf5,
-    &CPU::set_bit_6_memory_hl_prefix_0xf6,
-    &CPU::set_bit_6_a_prefix_0xf7,
-    &CPU::set_bit_7_b_prefix_0xf8,
-    &CPU::set_bit_7_c_prefix_0xf9,
-    &CPU::set_bit_7_d_prefix_0xfa,
-    &CPU::set_bit_7_e_prefix_0xfb,
-    &CPU::set_bit_7_h_prefix_0xfc,
-    &CPU::set_bit_7_l_prefix_0xfd,
-    &CPU::set_bit_7_memory_hl_prefix_0xfe,
-    &CPU::set_bit_7_a_prefix_0xff
+    &CPU::rotate_left_circular_b_0xcb_0x00,
+    &CPU::rotate_left_circular_c_0xcb_0x01,
+    &CPU::rotate_left_circular_d_0xcb_0x02,
+    &CPU::rotate_left_circular_e_0xcb_0x03,
+    &CPU::rotate_left_circular_h_0xcb_0x04,
+    &CPU::rotate_left_circular_l_0xcb_0x05,
+    &CPU::rotate_left_circular_memory_hl_0xcb_0x06,
+    &CPU::rotate_left_circular_a_0xcb_0x07,
+    &CPU::rotate_right_circular_b_0xcb_0x08,
+    &CPU::rotate_right_circular_c_0xcb_0x09,
+    &CPU::rotate_right_circular_d_0xcb_0x0a,
+    &CPU::rotate_right_circular_e_0xcb_0x0b,
+    &CPU::rotate_right_circular_h_0xcb_0x0c,
+    &CPU::rotate_right_circular_l_0xcb_0x0d,
+    &CPU::rotate_right_circular_memory_hl_0xcb_0x0e,
+    &CPU::rotate_right_circular_a_0xcb_0x0f,
+    &CPU::rotate_left_through_carry_b_0xcb_0x10,
+    &CPU::rotate_left_through_carry_c_0xcb_0x11,
+    &CPU::rotate_left_through_carry_d_0xcb_0x12,
+    &CPU::rotate_left_through_carry_e_0xcb_0x13,
+    &CPU::rotate_left_through_carry_h_0xcb_0x14,
+    &CPU::rotate_left_through_carry_l_0xcb_0x15,
+    &CPU::rotate_left_through_carry_memory_hl_0xcb_0x16,
+    &CPU::rotate_left_through_carry_a_0xcb_0x17,
+    &CPU::rotate_right_through_carry_b_0xcb_0x18,
+    &CPU::rotate_right_through_carry_c_0xcb_0x19,
+    &CPU::rotate_right_through_carry_d_0xcb_0x1a,
+    &CPU::rotate_right_through_carry_e_0xcb_0x1b,
+    &CPU::rotate_right_through_carry_h_0xcb_0x1c,
+    &CPU::rotate_right_through_carry_l_0xcb_0x1d,
+    &CPU::rotate_right_through_carry_memory_hl_0xcb_0x1e,
+    &CPU::rotate_right_through_carry_a_0xcb_0x1f,
+    &CPU::shift_left_arithmetic_b_0xcb_0x20,
+    &CPU::shift_left_arithmetic_c_0xcb_0x21,
+    &CPU::shift_left_arithmetic_d_0xcb_0x22,
+    &CPU::shift_left_arithmetic_e_0xcb_0x23,
+    &CPU::shift_left_arithmetic_h_0xcb_0x24,
+    &CPU::shift_left_arithmetic_l_0xcb_0x25,
+    &CPU::shift_left_arithmetic_memory_hl_0xcb_0x26,
+    &CPU::shift_left_arithmetic_a_0xcb_0x27,
+    &CPU::shift_right_arithmetic_b_0xcb_0x28,
+    &CPU::shift_right_arithmetic_c_0xcb_0x29,
+    &CPU::shift_right_arithmetic_d_0xcb_0x2a,
+    &CPU::shift_right_arithmetic_e_0xcb_0x2b,
+    &CPU::shift_right_arithmetic_h_0xcb_0x2c,
+    &CPU::shift_right_arithmetic_l_0xcb_0x2d,
+    &CPU::shift_right_arithmetic_memory_hl_0xcb_0x2e,
+    &CPU::shift_right_arithmetic_a_0xcb_0x2f,
+    &CPU::swap_nibbles_b_0xcb_0x30,
+    &CPU::swap_nibbles_c_0xcb_0x31,
+    &CPU::swap_nibbles_d_0xcb_0x32,
+    &CPU::swap_nibbles_e_0xcb_0x33,
+    &CPU::swap_nibbles_h_0xcb_0x34,
+    &CPU::swap_nibbles_l_0xcb_0x35,
+    &CPU::swap_nibbles_memory_hl_0xcb_0x36,
+    &CPU::swap_nibbles_a_0xcb_0x37,
+    &CPU::shift_right_logical_b_0xcb_0x38,
+    &CPU::shift_right_logical_c_0xcb_0x39,
+    &CPU::shift_right_logical_d_0xcb_0x3a,
+    &CPU::shift_right_logical_e_0xcb_0x3b,
+    &CPU::shift_right_logical_h_0xcb_0x3c,
+    &CPU::shift_right_logical_l_0xcb_0x3d,
+    &CPU::shift_right_logical_memory_hl_0xcb_0x3e,
+    &CPU::shift_right_logical_a_0xcb_0x3f,
+    &CPU::test_bit_0_b_0xcb_0x40,
+    &CPU::test_bit_0_c_0xcb_0x41,
+    &CPU::test_bit_0_d_0xcb_0x42,
+    &CPU::test_bit_0_e_0xcb_0x43,
+    &CPU::test_bit_0_h_0xcb_0x44,
+    &CPU::test_bit_0_l_0xcb_0x45,
+    &CPU::test_bit_0_memory_hl_0xcb_0x46,
+    &CPU::test_bit_0_a_0xcb_0x47,
+    &CPU::test_bit_1_b_0xcb_0x48,
+    &CPU::test_bit_1_c_0xcb_0x49,
+    &CPU::test_bit_1_d_0xcb_0x4a,
+    &CPU::test_bit_1_e_0xcb_0x4b,
+    &CPU::test_bit_1_h_0xcb_0x4c,
+    &CPU::test_bit_1_l_0xcb_0x4d,
+    &CPU::test_bit_1_memory_hl_0xcb_0x4e,
+    &CPU::test_bit_1_a_0xcb_0x4f,
+    &CPU::test_bit_2_b_0xcb_0x50,
+    &CPU::test_bit_2_c_0xcb_0x51,
+    &CPU::test_bit_2_d_0xcb_0x52,
+    &CPU::test_bit_2_e_0xcb_0x53,
+    &CPU::test_bit_2_h_0xcb_0x54,
+    &CPU::test_bit_2_l_0xcb_0x55,
+    &CPU::test_bit_2_memory_hl_0xcb_0x56,
+    &CPU::test_bit_2_a_0xcb_0x57,
+    &CPU::test_bit_3_b_0xcb_0x58,
+    &CPU::test_bit_3_c_0xcb_0x59,
+    &CPU::test_bit_3_d_0xcb_0x5a,
+    &CPU::test_bit_3_e_0xcb_0x5b,
+    &CPU::test_bit_3_h_0xcb_0x5c,
+    &CPU::test_bit_3_l_0xcb_0x5d,
+    &CPU::test_bit_3_memory_hl_0xcb_0x5e,
+    &CPU::test_bit_3_a_0xcb_0x5f,
+    &CPU::test_bit_4_b_0xcb_0x60,
+    &CPU::test_bit_4_c_0xcb_0x61,
+    &CPU::test_bit_4_d_0xcb_0x62,
+    &CPU::test_bit_4_e_0xcb_0x63,
+    &CPU::test_bit_4_h_0xcb_0x64,
+    &CPU::test_bit_4_l_0xcb_0x65,
+    &CPU::test_bit_4_memory_hl_0xcb_0x66,
+    &CPU::test_bit_4_a_0xcb_0x67,
+    &CPU::test_bit_5_b_0xcb_0x68,
+    &CPU::test_bit_5_c_0xcb_0x69,
+    &CPU::test_bit_5_d_0xcb_0x6a,
+    &CPU::test_bit_5_e_0xcb_0x6b,
+    &CPU::test_bit_5_h_0xcb_0x6c,
+    &CPU::test_bit_5_l_0xcb_0x6d,
+    &CPU::test_bit_5_memory_hl_0xcb_0x6e,
+    &CPU::test_bit_5_a_0xcb_0x6f,
+    &CPU::test_bit_6_b_0xcb_0x70,
+    &CPU::test_bit_6_c_0xcb_0x71,
+    &CPU::test_bit_6_d_0xcb_0x72,
+    &CPU::test_bit_6_e_0xcb_0x73,
+    &CPU::test_bit_6_h_0xcb_0x74,
+    &CPU::test_bit_6_l_0xcb_0x75,
+    &CPU::test_bit_6_memory_hl_0xcb_0x76,
+    &CPU::test_bit_6_a_0xcb_0x77,
+    &CPU::test_bit_7_b_0xcb_0x78,
+    &CPU::test_bit_7_c_0xcb_0x79,
+    &CPU::test_bit_7_d_0xcb_0x7a,
+    &CPU::test_bit_7_e_0xcb_0x7b,
+    &CPU::test_bit_7_h_0xcb_0x7c,
+    &CPU::test_bit_7_l_0xcb_0x7d,
+    &CPU::test_bit_7_memory_hl_0xcb_0x7e,
+    &CPU::test_bit_7_a_0xcb_0x7f,
+    &CPU::reset_bit_0_b_0xcb_0x80,
+    &CPU::reset_bit_0_c_0xcb_0x81,
+    &CPU::reset_bit_0_d_0xcb_0x82,
+    &CPU::reset_bit_0_e_0xcb_0x83,
+    &CPU::reset_bit_0_h_0xcb_0x84,
+    &CPU::reset_bit_0_l_0xcb_0x85,
+    &CPU::reset_bit_0_memory_hl_0xcb_0x86,
+    &CPU::reset_bit_0_a_0xcb_0x87,
+    &CPU::reset_bit_1_b_0xcb_0x88,
+    &CPU::reset_bit_1_c_0xcb_0x89,
+    &CPU::reset_bit_1_d_0xcb_0x8a,
+    &CPU::reset_bit_1_e_0xcb_0x8b,
+    &CPU::reset_bit_1_h_0xcb_0x8c,
+    &CPU::reset_bit_1_l_0xcb_0x8d,
+    &CPU::reset_bit_1_memory_hl_0xcb_0x8e,
+    &CPU::reset_bit_1_a_0xcb_0x8f,
+    &CPU::reset_bit_2_b_0xcb_0x90,
+    &CPU::reset_bit_2_c_0xcb_0x91,
+    &CPU::reset_bit_2_d_0xcb_0x92,
+    &CPU::reset_bit_2_e_0xcb_0x93,
+    &CPU::reset_bit_2_h_0xcb_0x94,
+    &CPU::reset_bit_2_l_0xcb_0x95,
+    &CPU::reset_bit_2_memory_hl_0xcb_0x96,
+    &CPU::reset_bit_2_a_0xcb_0x97,
+    &CPU::reset_bit_3_b_0xcb_0x98,
+    &CPU::reset_bit_3_c_0xcb_0x99,
+    &CPU::reset_bit_3_d_0xcb_0x9a,
+    &CPU::reset_bit_3_e_0xcb_0x9b,
+    &CPU::reset_bit_3_h_0xcb_0x9c,
+    &CPU::reset_bit_3_l_0xcb_0x9d,
+    &CPU::reset_bit_3_memory_hl_0xcb_0x9e,
+    &CPU::reset_bit_3_a_0xcb_0x9f,
+    &CPU::reset_bit_4_b_0xcb_0xa0,
+    &CPU::reset_bit_4_c_0xcb_0xa1,
+    &CPU::reset_bit_4_d_0xcb_0xa2,
+    &CPU::reset_bit_4_e_0xcb_0xa3,
+    &CPU::reset_bit_4_h_0xcb_0xa4,
+    &CPU::reset_bit_4_l_0xcb_0xa5,
+    &CPU::reset_bit_4_memory_hl_0xcb_0xa6,
+    &CPU::reset_bit_4_a_0xcb_0xa7,
+    &CPU::reset_bit_5_b_0xcb_0xa8,
+    &CPU::reset_bit_5_c_0xcb_0xa9,
+    &CPU::reset_bit_5_d_0xcb_0xaa,
+    &CPU::reset_bit_5_e_0xcb_0xab,
+    &CPU::reset_bit_5_h_0xcb_0xac,
+    &CPU::reset_bit_5_l_0xcb_0xad,
+    &CPU::reset_bit_5_memory_hl_0xcb_0xae,
+    &CPU::reset_bit_5_a_0xcb_0xaf,
+    &CPU::reset_bit_6_b_0xcb_0xb0,
+    &CPU::reset_bit_6_c_0xcb_0xb1,
+    &CPU::reset_bit_6_d_0xcb_0xb2,
+    &CPU::reset_bit_6_e_0xcb_0xb3,
+    &CPU::reset_bit_6_h_0xcb_0xb4,
+    &CPU::reset_bit_6_l_0xcb_0xb5,
+    &CPU::reset_bit_6_memory_hl_0xcb_0xb6,
+    &CPU::reset_bit_6_a_0xcb_0xb7,
+    &CPU::reset_bit_7_b_0xcb_0xb8,
+    &CPU::reset_bit_7_c_0xcb_0xb9,
+    &CPU::reset_bit_7_d_0xcb_0xba,
+    &CPU::reset_bit_7_e_0xcb_0xbb,
+    &CPU::reset_bit_7_h_0xcb_0xbc,
+    &CPU::reset_bit_7_l_0xcb_0xbd,
+    &CPU::reset_bit_7_memory_hl_0xcb_0xbe,
+    &CPU::reset_bit_7_a_0xcb_0xbf,
+    &CPU::set_bit_0_b_0xcb_0xc0,
+    &CPU::set_bit_0_c_0xcb_0xc1,
+    &CPU::set_bit_0_d_0xcb_0xc2,
+    &CPU::set_bit_0_e_0xcb_0xc3,
+    &CPU::set_bit_0_h_0xcb_0xc4,
+    &CPU::set_bit_0_l_0xcb_0xc5,
+    &CPU::set_bit_0_memory_hl_0xcb_0xc6,
+    &CPU::set_bit_0_a_0xcb_0xc7,
+    &CPU::set_bit_1_b_0xcb_0xc8,
+    &CPU::set_bit_1_c_0xcb_0xc9,
+    &CPU::set_bit_1_d_0xcb_0xca,
+    &CPU::set_bit_1_e_0xcb_0xcb,
+    &CPU::set_bit_1_h_0xcb_0xcc,
+    &CPU::set_bit_1_l_0xcb_0xcd,
+    &CPU::set_bit_1_memory_hl_0xcb_0xce,
+    &CPU::set_bit_1_a_0xcb_0xcf,
+    &CPU::set_bit_2_b_0xcb_0xd0,
+    &CPU::set_bit_2_c_0xcb_0xd1,
+    &CPU::set_bit_2_d_0xcb_0xd2,
+    &CPU::set_bit_2_e_0xcb_0xd3,
+    &CPU::set_bit_2_h_0xcb_0xd4,
+    &CPU::set_bit_2_l_0xcb_0xd5,
+    &CPU::set_bit_2_memory_hl_0xcb_0xd6,
+    &CPU::set_bit_2_a_0xcb_0xd7,
+    &CPU::set_bit_3_b_0xcb_0xd8,
+    &CPU::set_bit_3_c_0xcb_0xd9,
+    &CPU::set_bit_3_d_0xcb_0xda,
+    &CPU::set_bit_3_e_0xcb_0xdb,
+    &CPU::set_bit_3_h_0xcb_0xdc,
+    &CPU::set_bit_3_l_0xcb_0xdd,
+    &CPU::set_bit_3_memory_hl_0xcb_0xde,
+    &CPU::set_bit_3_a_0xcb_0xdf,
+    &CPU::set_bit_4_b_0xcb_0xe0,
+    &CPU::set_bit_4_c_0xcb_0xe1,
+    &CPU::set_bit_4_d_0xcb_0xe2,
+    &CPU::set_bit_4_e_0xcb_0xe3,
+    &CPU::set_bit_4_h_0xcb_0xe4,
+    &CPU::set_bit_4_l_0xcb_0xe5,
+    &CPU::set_bit_4_memory_hl_0xcb_0xe6,
+    &CPU::set_bit_4_a_0xcb_0xe7,
+    &CPU::set_bit_5_b_0xcb_0xe8,
+    &CPU::set_bit_5_c_0xcb_0xe9,
+    &CPU::set_bit_5_d_0xcb_0xea,
+    &CPU::set_bit_5_e_0xcb_0xeb,
+    &CPU::set_bit_5_h_0xcb_0xec,
+    &CPU::set_bit_5_l_0xcb_0xed,
+    &CPU::set_bit_5_memory_hl_0xcb_0xee,
+    &CPU::set_bit_5_a_0xcb_0xef,
+    &CPU::set_bit_6_b_0xcb_0xf0,
+    &CPU::set_bit_6_c_0xcb_0xf1,
+    &CPU::set_bit_6_d_0xcb_0xf2,
+    &CPU::set_bit_6_e_0xcb_0xf3,
+    &CPU::set_bit_6_h_0xcb_0xf4,
+    &CPU::set_bit_6_l_0xcb_0xf5,
+    &CPU::set_bit_6_memory_hl_0xcb_0xf6,
+    &CPU::set_bit_6_a_0xcb_0xf7,
+    &CPU::set_bit_7_b_0xcb_0xf8,
+    &CPU::set_bit_7_c_0xcb_0xf9,
+    &CPU::set_bit_7_d_0xcb_0xfa,
+    &CPU::set_bit_7_e_0xcb_0xfb,
+    &CPU::set_bit_7_h_0xcb_0xfc,
+    &CPU::set_bit_7_l_0xcb_0xfd,
+    &CPU::set_bit_7_memory_hl_0xcb_0xfe,
+    &CPU::set_bit_7_a_0xcb_0xff
 };
 
-void CPU::execute_instruction(uint8_t opcode) {
-    if (opcode != INSTRUCTION_PREFIX_BYTE) {
-        (this->*instruction_table[opcode])();
-    }
-    else {
-        const uint8_t prefixed_opcode = fetch_immediate8_and_tick(); // TODO maybe need to rework this with interrupts
-        (this->*extended_instruction_table[prefixed_opcode])();
-    }
-
-    if (did_enable_interrupts_execute && opcode != ENABLE_INTERRUPTS_OPCODE) {
-        are_interrupts_enabled = true;
-        did_enable_interrupts_execute = false;
-    }
-}
+// ===============================
+// ===== Instruction Helpers =====
+// ===============================
 
 void CPU::update_flag(uint8_t flag_mask, bool new_flag_state) {
     register_file.flags = new_flag_state
@@ -662,26 +666,6 @@ void CPU::update_flag(uint8_t flag_mask, bool new_flag_state) {
 
 bool CPU::is_flag_set(uint8_t flag_mask) const {
     return (register_file.flags & flag_mask) != 0;
-}
-
-// ===============================
-// ===== Instruction Helpers =====
-// ===============================
-
-void CPU::increment_register8(uint8_t &register8) {
-    const bool does_half_carry_occur = (register8 & 0x0f) == 0x0f;
-    register8++;
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-}
-
-void CPU::decrement_register8(uint8_t &register8) {
-    const bool does_half_carry_occur = (register8 & 0x0f) == 0x00;
-    register8--;
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
 }
 
 void CPU::increment_register16(uint16_t &register16) {
@@ -704,76 +688,92 @@ void CPU::add_hl_register16(const uint16_t &register16) {
     emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
 }
 
-void CPU::add_a_register8(const uint8_t &register8) {
-    const bool does_half_carry_occur = (register_file.a & 0x0f) + (register8 & 0x0f) > 0x0f;
-    const bool does_carry_occur = static_cast<uint16_t>(register_file.a) + register8 > 0xff;
-    register_file.a += register8;
+void CPU::increment_uint8(uint8_t &uint8) {
+    const bool does_half_carry_occur = (uint8 & 0x0f) == 0x0f;
+    uint8++;
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(FLAG_SUBTRACT_MASK, false);
+    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+}
+
+void CPU::decrement_uint8(uint8_t &uint8) {
+    const bool does_half_carry_occur = (uint8 & 0x0f) == 0x00;
+    uint8--;
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(FLAG_SUBTRACT_MASK, true);
+    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+}
+
+void CPU::add_a_uint8(const uint8_t &uint8) {
+    const bool does_half_carry_occur = (register_file.a & 0x0f) + (uint8 & 0x0f) > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(register_file.a) + uint8 > 0xff;
+    register_file.a += uint8;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::add_with_carry_a_register8(const uint8_t &register8) {
+void CPU::add_with_carry_a_uint8(const uint8_t &uint8) {
     const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
-    const bool does_half_carry_occur = (register_file.a & 0x0f) + (register8 & 0x0f) + carry_in > 0x0f;
-    const bool does_carry_occur = static_cast<uint16_t>(register_file.a) + register8 + carry_in > 0xff;
-    register_file.a += register8 + carry_in;
+    const bool does_half_carry_occur = (register_file.a & 0x0f) + (uint8 & 0x0f) + carry_in > 0x0f;
+    const bool does_carry_occur = static_cast<uint16_t>(register_file.a) + uint8 + carry_in > 0xff;
+    register_file.a += uint8 + carry_in;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::subtract_a_register8(const uint8_t &register8) {
-    const bool does_half_carry_occur = (register_file.a & 0x0f) < (register8 & 0x0f);
-    const bool does_carry_occur = register_file.a < register8;
-    register_file.a -= register8;
+void CPU::subtract_a_uint8(const uint8_t &uint8) {
+    const bool does_half_carry_occur = (register_file.a & 0x0f) < (uint8 & 0x0f);
+    const bool does_carry_occur = register_file.a < uint8;
+    register_file.a -= uint8;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, true);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::subtract_with_carry_a_register8(const uint8_t &register8) {
+void CPU::subtract_with_carry_a_uint8(const uint8_t &uint8) {
     const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
-    const bool does_half_carry_occur = (register_file.a & 0x0f) < (register8 & 0x0f) + carry_in;
-    const bool does_carry_occur = register_file.a < register8 + carry_in;
-    register_file.a -= register8 + carry_in;
+    const bool does_half_carry_occur = (register_file.a & 0x0f) < (uint8 & 0x0f) + carry_in;
+    const bool does_carry_occur = register_file.a < uint8 + carry_in;
+    register_file.a -= uint8 + carry_in;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, true);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::and_a_register8(const uint8_t &register8) {
-    register_file.a &= register8;
+void CPU::and_a_uint8(const uint8_t &uint8) {
+    register_file.a &= uint8;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, true);
     update_flag(FLAG_CARRY_MASK, false);
 }
 
-void CPU::xor_a_register8(const uint8_t &register8) {
-    register_file.a ^= register8;
+void CPU::xor_a_uint8(const uint8_t &uint8) {
+    register_file.a ^= uint8;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, false);
 }
 
-void CPU::or_a_register8(const uint8_t &register8) {
-    register_file.a |= register8;
+void CPU::or_a_uint8(const uint8_t &uint8) {
+    register_file.a |= uint8;
     update_flag(FLAG_ZERO_MASK, register_file.a == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, false);
 }
 
-void CPU::compare_a_register8(const uint8_t &register8) {
-    const bool does_half_carry_occur = (register_file.a & 0x0f) < (register8 & 0x0f);
-    const bool does_carry_occur = register_file.a < register8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == register8);
+void CPU::compare_a_uint8(const uint8_t &uint8) {
+    const bool does_half_carry_occur = (register_file.a & 0x0f) < (uint8 & 0x0f);
+    const bool does_carry_occur = register_file.a < uint8;
+    update_flag(FLAG_ZERO_MASK, register_file.a == uint8);
     update_flag(FLAG_SUBTRACT_MASK, true);
     update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
@@ -795,15 +795,15 @@ void CPU::jump_conditional_immediate16(bool is_condition_met) {
     }
 }
 
-void CPU::push_stack_uint16(const uint16_t& value) {
-    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
-    write_8_and_tick(--register_file.stack_pointer, value >> 8);
-    write_8_and_tick(--register_file.stack_pointer, value & 0xff);
+uint16_t CPU::pop_stack() {
+    uint8_t low_byte = read_byte_and_tick(register_file.stack_pointer++);
+    return low_byte | static_cast<uint16_t>(read_byte_and_tick(register_file.stack_pointer++) << 8);
 }
 
-uint16_t CPU::pop_stack() {
-    uint8_t low_byte = read_8_and_tick(register_file.stack_pointer++);
-    return low_byte | static_cast<uint16_t>(read_8_and_tick(register_file.stack_pointer++) << 8);
+void CPU::push_stack_uint16(const uint16_t &value) {
+    emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
+    write_byte_and_tick(--register_file.stack_pointer, value >> 8);
+    write_byte_and_tick(--register_file.stack_pointer, value & 0xff);
 }
 
 void CPU::call_conditional_immediate16(bool is_condition_met) {
@@ -826,114 +826,110 @@ void CPU::restart_at_address(uint16_t address) {
     register_file.program_counter = address;
 }
 
-// ========================================
-// ===== Extended Instruction Helpers =====
-// ========================================
-
-void CPU::rotate_left_circular_register8(uint8_t &register8) {
-    const bool does_carry_occur = (register8 & 0b10000000) != 0;
-    register8 = (register8 << 1) | (register8 >> 7);
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+void CPU::rotate_left_circular_uint8(uint8_t &uint8) {
+    const bool does_carry_occur = (uint8 & 0b10000000) != 0;
+    uint8 = (uint8 << 1) | (uint8 >> 7);
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::rotate_right_circular_register8(uint8_t &register8) {
-    const bool does_carry_occur = (register8 & 0b00000001) != 0;
-    register8 = (register8 << 7) | (register8 >> 1);
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+void CPU::rotate_right_circular_uint8(uint8_t &uint8) {
+    const bool does_carry_occur = (uint8 & 0b00000001) != 0;
+    uint8 = (uint8 << 7) | (uint8 >> 1);
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::rotate_left_through_carry_register8(uint8_t &register8) {
+void CPU::rotate_left_through_carry_uint8(uint8_t &uint8) {
     const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
-    const bool does_carry_occur = (register8 & 0b10000000) != 0;
-    register8 = (register8 << 1) | carry_in;
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+    const bool does_carry_occur = (uint8 & 0b10000000) != 0;
+    uint8 = (uint8 << 1) | carry_in;
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::rotate_right_through_carry_register8(uint8_t &register8) {
+void CPU::rotate_right_through_carry_uint8(uint8_t &uint8) {
     const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
-    const bool does_carry_occur = (register8 & 0b00000001) != 0;
-    register8 = (carry_in << 7) | (register8 >> 1);
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+    const bool does_carry_occur = (uint8 & 0b00000001) != 0;
+    uint8 = (carry_in << 7) | (uint8 >> 1);
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::shift_left_arithmetic_register8(uint8_t &register8) {
-    const bool does_carry_occur = (register8 & 0b10000000) != 0;
-    register8 <<= 1;
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+void CPU::shift_left_arithmetic_uint8(uint8_t &uint8) {
+    const bool does_carry_occur = (uint8 & 0b10000000) != 0;
+    uint8 <<= 1;
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::shift_right_arithmetic_register8(uint8_t &register8) {
-    const bool does_carry_occur = (register8 & 0b00000001) != 0;
-    const uint8_t preserved_sign_bit = register8 & 0b10000000;
-    register8 = preserved_sign_bit | (register8 >> 1);
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+void CPU::shift_right_arithmetic_uint8(uint8_t &uint8) {
+    const bool does_carry_occur = (uint8 & 0b00000001) != 0;
+    const uint8_t preserved_sign_bit = uint8 & 0b10000000;
+    uint8 = preserved_sign_bit | (uint8 >> 1);
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::swap_nibbles_register8(uint8_t &register8) {
-    register8 = ((register8 & 0x0f) << 4) | ((register8 & 0xf0) >> 4);
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+void CPU::swap_nibbles_uint8(uint8_t &uint8) {
+    uint8 = ((uint8 & 0x0f) << 4) | ((uint8 & 0xf0) >> 4);
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, false);
 }
 
-void CPU::shift_right_logical_register8(uint8_t &register8) {
-    const bool does_carry_occur = (register8 & 0b00000001) != 0;
-    register8 >>= 1;
-    update_flag(FLAG_ZERO_MASK, register8 == 0);
+void CPU::shift_right_logical_uint8(uint8_t &uint8) {
+    const bool does_carry_occur = (uint8 & 0b00000001) != 0;
+    uint8 >>= 1;
+    update_flag(FLAG_ZERO_MASK, uint8 == 0);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, false);
     update_flag(FLAG_CARRY_MASK, does_carry_occur);
 }
 
-void CPU::test_bit_position_register8(uint8_t bit_position_to_test, const uint8_t &register8) {
-    const bool is_bit_set = (register8 & (1 << bit_position_to_test)) != 0;
+void CPU::test_bit_position_uint8(uint8_t bit_position_to_test, const uint8_t &uint8) {
+    const bool is_bit_set = (uint8 & (1 << bit_position_to_test)) != 0;
     update_flag(FLAG_ZERO_MASK, !is_bit_set);
     update_flag(FLAG_SUBTRACT_MASK, false);
     update_flag(FLAG_HALF_CARRY_MASK, true);
 }
 
 void CPU::test_bit_position_memory_hl(uint8_t bit_position_to_test) {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    test_bit_position_register8(bit_position_to_test, memory_hl);
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    test_bit_position_uint8(bit_position_to_test, memory_hl);
 }
 
-void CPU::reset_bit_position_register8(uint8_t bit_position_to_reset, uint8_t &register8) {
-    register8 &= ~(1 << bit_position_to_reset);
+void CPU::reset_bit_position_uint8(uint8_t bit_position_to_reset, uint8_t &uint8) {
+    uint8 &= ~(1 << bit_position_to_reset);
 }
 
 void CPU::reset_bit_position_memory_hl(uint8_t bit_position_to_reset) {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    reset_bit_position_register8(bit_position_to_reset, memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    reset_bit_position_uint8(bit_position_to_reset, memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::set_bit_position_register8(uint8_t bit_position_to_set, uint8_t &register8) {
-    register8 |= (1 << bit_position_to_set);
+void CPU::set_bit_position_uint8(uint8_t bit_position_to_set, uint8_t &uint8) {
+    uint8 |= (1 << bit_position_to_set);
 }
 
 void CPU::set_bit_position_memory_hl(uint8_t bit_position_to_set) {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    set_bit_position_register8(bit_position_to_set, memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    set_bit_position_uint8(bit_position_to_set, memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
 // ========================
@@ -943,7 +939,7 @@ void CPU::set_bit_position_memory_hl(uint8_t bit_position_to_set) {
 void CPU::unused_opcode() {
     std::cerr << std::hex << std::setfill('0');
     std::cerr << "Warning: Unused opcode 0x" << std::setw(2) 
-              << static_cast<int>(memory_interface.read_8(register_file.program_counter - 1)) << " "
+              << static_cast<int>(memory_interface.read_byte(register_file.program_counter - 1)) << " "
               << "encountered at memory address 0x" << std::setw(2) 
               << static_cast<int>(register_file.program_counter - 1) << "\n";
 }
@@ -956,7 +952,7 @@ void CPU::load_bc_immediate16_0x01() {
 }
 
 void CPU::load_memory_bc_a_0x02() {
-    write_8_and_tick(register_file.bc, register_file.a);
+    write_byte_and_tick(register_file.bc, register_file.a);
 }
 
 void CPU::increment_bc_0x03() {
@@ -964,11 +960,11 @@ void CPU::increment_bc_0x03() {
 }
 
 void CPU::increment_b_0x04() {
-    increment_register8(register_file.b);
+    increment_uint8(register_file.b);
 }
 
 void CPU::decrement_b_0x05() {
-    decrement_register8(register_file.b);
+    decrement_uint8(register_file.b);
 }
 
 void CPU::load_b_immediate8_0x06() {
@@ -976,7 +972,7 @@ void CPU::load_b_immediate8_0x06() {
 }
 
 void CPU::rotate_left_circular_a_0x07() {
-    rotate_left_circular_register8(register_file.a);
+    rotate_left_circular_uint8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
 }
 
@@ -984,8 +980,8 @@ void CPU::load_memory_immediate16_stack_pointer_0x08() {
     uint16_t immediate16 = fetch_immediate16_and_tick();
     const uint8_t stack_pointer_low_byte = static_cast<uint8_t>(register_file.stack_pointer & 0xff);
     const uint8_t stack_pointer_high_byte = static_cast<uint8_t>(register_file.stack_pointer >> 8);
-    write_8_and_tick(immediate16, stack_pointer_low_byte);
-    write_8_and_tick(immediate16 + 1, stack_pointer_high_byte);
+    write_byte_and_tick(immediate16, stack_pointer_low_byte);
+    write_byte_and_tick(immediate16 + 1, stack_pointer_high_byte);
 }
 
 void CPU::add_hl_bc_0x09() {
@@ -993,7 +989,7 @@ void CPU::add_hl_bc_0x09() {
 }
 
 void CPU::load_a_memory_bc_0x0a() {
-    register_file.a = read_8_and_tick(register_file.bc);
+    register_file.a = read_byte_and_tick(register_file.bc);
 }
 
 void CPU::decrement_bc_0x0b() {
@@ -1001,11 +997,11 @@ void CPU::decrement_bc_0x0b() {
 }
 
 void CPU::increment_c_0x0c() {
-    increment_register8(register_file.c);
+    increment_uint8(register_file.c);
 }
 
 void CPU::decrement_c_0x0d() {
-    decrement_register8(register_file.c);
+    decrement_uint8(register_file.c);
 }
 
 void CPU::load_c_immediate8_0x0e() {
@@ -1013,7 +1009,7 @@ void CPU::load_c_immediate8_0x0e() {
 }
 
 void CPU::rotate_right_circular_a_0x0f() {
-    rotate_right_circular_register8(register_file.a);
+    rotate_right_circular_uint8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
 }
 
@@ -1027,7 +1023,7 @@ void CPU::load_de_immediate16_0x11() {
 }
 
 void CPU::load_memory_de_a_0x12() {
-    write_8_and_tick(register_file.de, register_file.a);
+    write_byte_and_tick(register_file.de, register_file.a);
 }
 
 void CPU::increment_de_0x13() {
@@ -1035,11 +1031,11 @@ void CPU::increment_de_0x13() {
 }
 
 void CPU::increment_d_0x14() {
-    increment_register8(register_file.d);
+    increment_uint8(register_file.d);
 }
 
 void CPU::decrement_d_0x15() {
-    decrement_register8(register_file.d);
+    decrement_uint8(register_file.d);
 }
 
 void CPU::load_d_immediate8_0x16() {
@@ -1047,7 +1043,7 @@ void CPU::load_d_immediate8_0x16() {
 }
 
 void CPU::rotate_left_through_carry_a_0x17() {
-    rotate_left_through_carry_register8(register_file.a);
+    rotate_left_through_carry_uint8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
 }
 
@@ -1060,7 +1056,7 @@ void CPU::add_hl_de_0x19() {
 }
 
 void CPU::load_a_memory_de_0x1a() {
-    register_file.a = read_8_and_tick(register_file.de);
+    register_file.a = read_byte_and_tick(register_file.de);
 }
 
 void CPU::decrement_de_0x1b() {
@@ -1068,11 +1064,11 @@ void CPU::decrement_de_0x1b() {
 }
 
 void CPU::increment_e_0x1c() {
-    increment_register8(register_file.e);
+    increment_uint8(register_file.e);
 }
 
 void CPU::decrement_e_0x1d() {
-    decrement_register8(register_file.e);
+    decrement_uint8(register_file.e);
 }
 
 void CPU::load_e_immediate8_0x1e() {
@@ -1080,7 +1076,7 @@ void CPU::load_e_immediate8_0x1e() {
 }
 
 void CPU::rotate_right_through_carry_a_0x1f() {
-    rotate_right_through_carry_register8(register_file.a);
+    rotate_right_through_carry_uint8(register_file.a);
     update_flag(FLAG_ZERO_MASK, false);
 }
 
@@ -1093,7 +1089,7 @@ void CPU::load_hl_immediate16_0x21() {
 }
 
 void CPU::load_memory_post_increment_hl_a_0x22() {
-    write_8_and_tick(register_file.hl++, register_file.a);
+    write_byte_and_tick(register_file.hl++, register_file.a);
 }
 
 void CPU::increment_hl_0x23() {
@@ -1101,11 +1097,11 @@ void CPU::increment_hl_0x23() {
 }
 
 void CPU::increment_h_0x24() {
-    increment_register8(register_file.h);
+    increment_uint8(register_file.h);
 }
 
 void CPU::decrement_h_0x25() {
-    decrement_register8(register_file.h);
+    decrement_uint8(register_file.h);
 }
 
 void CPU::load_h_immediate8_0x26() {
@@ -1141,7 +1137,7 @@ void CPU::add_hl_hl_0x29() {
 }
 
 void CPU::load_a_memory_post_increment_hl_0x2a() {
-    register_file.a = read_8_and_tick(register_file.hl++);
+    register_file.a = read_byte_and_tick(register_file.hl++);
 }
 
 void CPU::decrement_hl_0x2b() {
@@ -1149,11 +1145,11 @@ void CPU::decrement_hl_0x2b() {
 }
 
 void CPU::increment_l_0x2c() {
-    increment_register8(register_file.l);
+    increment_uint8(register_file.l);
 }
 
 void CPU::decrement_l_0x2d() {
-    decrement_register8(register_file.l);
+    decrement_uint8(register_file.l);
 }
 
 void CPU::load_l_immediate8_0x2e() {
@@ -1175,7 +1171,7 @@ void CPU::load_stack_pointer_immediate16_0x31() {
 }
 
 void CPU::load_memory_post_decrement_hl_a_0x32() {
-    write_8_and_tick(register_file.hl--, register_file.a);
+    write_byte_and_tick(register_file.hl--, register_file.a);
 }
 
 void CPU::increment_stack_pointer_0x33() {
@@ -1183,19 +1179,19 @@ void CPU::increment_stack_pointer_0x33() {
 }
 
 void CPU::increment_memory_hl_0x34() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    increment_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    increment_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
 void CPU::decrement_memory_hl_0x35() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    decrement_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    decrement_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
 void CPU::load_memory_hl_immediate8_0x36() {
-    write_8_and_tick(register_file.hl, fetch_immediate8_and_tick());
+    write_byte_and_tick(register_file.hl, fetch_immediate8_and_tick());
 }
 
 void CPU::set_carry_flag_0x37() {
@@ -1213,7 +1209,7 @@ void CPU::add_hl_stack_pointer_0x39() {
 }
 
 void CPU::load_a_memory_post_decrement_hl_0x3a() {
-    register_file.a = read_8_and_tick(register_file.hl--);
+    register_file.a = read_byte_and_tick(register_file.hl--);
 }
 
 void CPU::decrement_stack_pointer_0x3b() {
@@ -1221,11 +1217,11 @@ void CPU::decrement_stack_pointer_0x3b() {
 }
 
 void CPU::increment_a_0x3c() {
-    increment_register8(register_file.a);
+    increment_uint8(register_file.a);
 }
 
 void CPU::decrement_a_0x3d() {
-    decrement_register8(register_file.a);
+    decrement_uint8(register_file.a);
 }
 
 void CPU::load_a_immediate8_0x3e() {
@@ -1263,7 +1259,7 @@ void CPU::load_b_l_0x45() {
 }
 
 void CPU::load_b_memory_hl_0x46() {
-    register_file.b = read_8_and_tick(register_file.hl);
+    register_file.b = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_b_a_0x47() {
@@ -1295,7 +1291,7 @@ void CPU::load_c_l_0x4d() {
 }
 
 void CPU::load_c_memory_hl_0x4e() {
-    register_file.c = read_8_and_tick(register_file.hl);
+    register_file.c = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_c_a_0x4f() {
@@ -1327,7 +1323,7 @@ void CPU::load_d_l_0x55() {
 }
 
 void CPU::load_d_memory_hl_0x56() {
-    register_file.d = read_8_and_tick(register_file.hl);
+    register_file.d = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_d_a_0x57() {
@@ -1359,7 +1355,7 @@ void CPU::load_e_l_0x5d() {
 }
 
 void CPU::load_e_memory_hl_0x5e() {
-    register_file.e = read_8_and_tick(register_file.hl);
+    register_file.e = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_e_a_0x5f() {
@@ -1391,7 +1387,7 @@ void CPU::load_h_l_0x65() {
 }
 
 void CPU::load_h_memory_hl_0x66() {
-    register_file.h = read_8_and_tick(register_file.hl);
+    register_file.h = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_h_a_0x67() {
@@ -1423,7 +1419,7 @@ void CPU::load_l_l_0x6d() {
 }
 
 void CPU::load_l_memory_hl_0x6e() {
-    register_file.l = read_8_and_tick(register_file.hl);
+    register_file.l = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_l_a_0x6f() {
@@ -1431,27 +1427,27 @@ void CPU::load_l_a_0x6f() {
 }
 
 void CPU::load_memory_hl_b_0x70() {
-    write_8_and_tick(register_file.hl, register_file.b);
+    write_byte_and_tick(register_file.hl, register_file.b);
 }
 
 void CPU::load_memory_hl_c_0x71() {
-    write_8_and_tick(register_file.hl, register_file.c);
+    write_byte_and_tick(register_file.hl, register_file.c);
 }
 
 void CPU::load_memory_hl_d_0x72() {
-    write_8_and_tick(register_file.hl, register_file.d);
+    write_byte_and_tick(register_file.hl, register_file.d);
 }
 
 void CPU::load_memory_hl_e_0x73() {
-    write_8_and_tick(register_file.hl, register_file.e);
+    write_byte_and_tick(register_file.hl, register_file.e);
 }
 
 void CPU::load_memory_hl_h_0x74() { 
-    write_8_and_tick(register_file.hl, register_file.h);
+    write_byte_and_tick(register_file.hl, register_file.h);
 }
 
 void CPU::load_memory_hl_l_0x75() {
-    write_8_and_tick(register_file.hl, register_file.l);
+    write_byte_and_tick(register_file.hl, register_file.l);
 }
 
 void CPU::halt_0x76() {
@@ -1460,7 +1456,7 @@ void CPU::halt_0x76() {
 }
 
 void CPU::load_memory_hl_a_0x77() {
-    write_8_and_tick(register_file.hl, register_file.a);
+    write_byte_and_tick(register_file.hl, register_file.a);
 }
 
 void CPU::load_a_b_0x78() {
@@ -1488,7 +1484,7 @@ void CPU::load_a_l_0x7d() {
 }
 
 void CPU::load_a_memory_hl_0x7e() {
-    register_file.a = read_8_and_tick(register_file.hl);
+    register_file.a = read_byte_and_tick(register_file.hl);
 }
 
 void CPU::load_a_a_0x7f() {
@@ -1496,259 +1492,259 @@ void CPU::load_a_a_0x7f() {
 }
 
 void CPU::add_a_b_0x80() {
-    add_a_register8(register_file.b);
+    add_a_uint8(register_file.b);
 }
 
 void CPU::add_a_c_0x81() {
-    add_a_register8(register_file.c);
+    add_a_uint8(register_file.c);
 }
 
 void CPU::add_a_d_0x82() {
-    add_a_register8(register_file.d);
+    add_a_uint8(register_file.d);
 }
 
 void CPU::add_a_e_0x83() {
-    add_a_register8(register_file.e);
+    add_a_uint8(register_file.e);
 }
 
 void CPU::add_a_h_0x84() {
-    add_a_register8(register_file.h);
+    add_a_uint8(register_file.h);
 }
 
 void CPU::add_a_l_0x85() {
-    add_a_register8(register_file.l);
+    add_a_uint8(register_file.l);
 }
 
 void CPU::add_a_memory_hl_0x86() {
-    add_a_register8(read_8_and_tick(register_file.hl));
+    add_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::add_a_a_0x87() {
-    add_a_register8(register_file.a);
+    add_a_uint8(register_file.a);
 }
 
 void CPU::add_with_carry_a_b_0x88() {
-    add_with_carry_a_register8(register_file.b);
+    add_with_carry_a_uint8(register_file.b);
 }
 
 void CPU::add_with_carry_a_c_0x89() {
-    add_with_carry_a_register8(register_file.c);
+    add_with_carry_a_uint8(register_file.c);
 }
 
 void CPU::add_with_carry_a_d_0x8a() {
-    add_with_carry_a_register8(register_file.d);
+    add_with_carry_a_uint8(register_file.d);
 }
 
 void CPU::add_with_carry_a_e_0x8b() {
-    add_with_carry_a_register8(register_file.e);
+    add_with_carry_a_uint8(register_file.e);
 }
 
 void CPU::add_with_carry_a_h_0x8c() {
-    add_with_carry_a_register8(register_file.h);
+    add_with_carry_a_uint8(register_file.h);
 }
 
 void CPU::add_with_carry_a_l_0x8d() {
-    add_with_carry_a_register8(register_file.l);
+    add_with_carry_a_uint8(register_file.l);
 }
 
 void CPU::add_with_carry_a_memory_hl_0x8e() {
-    add_with_carry_a_register8(read_8_and_tick(register_file.hl));
+    add_with_carry_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::add_with_carry_a_a_0x8f() {
-    add_with_carry_a_register8(register_file.a);
+    add_with_carry_a_uint8(register_file.a);
 }
 
 void CPU::subtract_a_b_0x90() {
-    subtract_a_register8(register_file.b);
+    subtract_a_uint8(register_file.b);
 }
 
 void CPU::subtract_a_c_0x91() {
-    subtract_a_register8(register_file.c);
+    subtract_a_uint8(register_file.c);
 }
 
 void CPU::subtract_a_d_0x92() {
-    subtract_a_register8(register_file.d);
+    subtract_a_uint8(register_file.d);
 }
 
 void CPU::subtract_a_e_0x93() {
-    subtract_a_register8(register_file.e);
+    subtract_a_uint8(register_file.e);
 }
 
 void CPU::subtract_a_h_0x94() {
-    subtract_a_register8(register_file.h);
+    subtract_a_uint8(register_file.h);
 }
 
 void CPU::subtract_a_l_0x95() {
-    subtract_a_register8(register_file.l);
+    subtract_a_uint8(register_file.l);
 }
 
 void CPU::subtract_a_memory_hl_0x96() {
-    subtract_a_register8(read_8_and_tick(register_file.hl));
+    subtract_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::subtract_a_a_0x97() {
-    subtract_a_register8(register_file.a);
+    subtract_a_uint8(register_file.a);
 }
 
 void CPU::subtract_with_carry_a_b_0x98() {
-    subtract_with_carry_a_register8(register_file.b);
+    subtract_with_carry_a_uint8(register_file.b);
 }
 
 void CPU::subtract_with_carry_a_c_0x99() {
-    subtract_with_carry_a_register8(register_file.c);
+    subtract_with_carry_a_uint8(register_file.c);
 }
 
 void CPU::subtract_with_carry_a_d_0x9a() {
-    subtract_with_carry_a_register8(register_file.d);
+    subtract_with_carry_a_uint8(register_file.d);
 }
 
 void CPU::subtract_with_carry_a_e_0x9b() {
-    subtract_with_carry_a_register8(register_file.e);
+    subtract_with_carry_a_uint8(register_file.e);
 }
 
 void CPU::subtract_with_carry_a_h_0x9c() {
-    subtract_with_carry_a_register8(register_file.h);
+    subtract_with_carry_a_uint8(register_file.h);
 }
 
 void CPU::subtract_with_carry_a_l_0x9d() {
-    subtract_with_carry_a_register8(register_file.l);
+    subtract_with_carry_a_uint8(register_file.l);
 }
 
 void CPU::subtract_with_carry_a_memory_hl_0x9e() {
-    subtract_with_carry_a_register8(read_8_and_tick(register_file.hl));
+    subtract_with_carry_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::subtract_with_carry_a_a_0x9f() {
-    subtract_with_carry_a_register8(register_file.a);
+    subtract_with_carry_a_uint8(register_file.a);
 }
 
 void CPU::and_a_b_0xa0() {
-    and_a_register8(register_file.b);
+    and_a_uint8(register_file.b);
 }
 
 void CPU::and_a_c_0xa1() {
-    and_a_register8(register_file.c);
+    and_a_uint8(register_file.c);
 }
 
 void CPU::and_a_d_0xa2() {
-    and_a_register8(register_file.d);
+    and_a_uint8(register_file.d);
  }
 
 void CPU::and_a_e_0xa3() {
-    and_a_register8(register_file.e);
+    and_a_uint8(register_file.e);
 }
 
 void CPU::and_a_h_0xa4() {
-    and_a_register8(register_file.h);
+    and_a_uint8(register_file.h);
 }
 
 void CPU::and_a_l_0xa5() {
-    and_a_register8(register_file.l);
+    and_a_uint8(register_file.l);
 }
 
 void CPU::and_a_memory_hl_0xa6() {
-    and_a_register8(read_8_and_tick(register_file.hl));
+    and_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::and_a_a_0xa7() {
-    and_a_register8(register_file.a);
+    and_a_uint8(register_file.a);
 }
 
 void CPU::xor_a_b_0xa8() {
-    xor_a_register8(register_file.b);
+    xor_a_uint8(register_file.b);
 }
 
 void CPU::xor_a_c_0xa9() {
-    xor_a_register8(register_file.c);
+    xor_a_uint8(register_file.c);
 }
 
 void CPU::xor_a_d_0xaa() {
-    xor_a_register8(register_file.d);
+    xor_a_uint8(register_file.d);
 }
 
 void CPU::xor_a_e_0xab() {
-    xor_a_register8(register_file.e);
+    xor_a_uint8(register_file.e);
 }
 
 void CPU::xor_a_h_0xac() {
-    xor_a_register8(register_file.h);
+    xor_a_uint8(register_file.h);
 }
 
 void CPU::xor_a_l_0xad() {
-    xor_a_register8(register_file.l);
+    xor_a_uint8(register_file.l);
 }
 
 void CPU::xor_a_memory_hl_0xae() {
-    xor_a_register8(read_8_and_tick(register_file.hl));
+    xor_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::xor_a_a_0xaf() {
-    xor_a_register8(register_file.a);
+    xor_a_uint8(register_file.a);
 }
 
 void CPU::or_a_b_0xb0() {
-    or_a_register8(register_file.b);
+    or_a_uint8(register_file.b);
 }
 
 void CPU::or_a_c_0xb1() {
-    or_a_register8(register_file.c);
+    or_a_uint8(register_file.c);
 }
 
 void CPU::or_a_d_0xb2() {
-    or_a_register8(register_file.d);
+    or_a_uint8(register_file.d);
 }
 
 void CPU::or_a_e_0xb3() {
-    or_a_register8(register_file.e);
+    or_a_uint8(register_file.e);
 }
 
 void CPU::or_a_h_0xb4() {
-    or_a_register8(register_file.h);
+    or_a_uint8(register_file.h);
 }
 
 void CPU::or_a_l_0xb5() {
-    or_a_register8(register_file.l);
+    or_a_uint8(register_file.l);
 }
 
 void CPU::or_a_memory_hl_0xb6() {
-    or_a_register8(read_8_and_tick(register_file.hl));
+    or_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::or_a_a_0xb7() {
-    or_a_register8(register_file.a);
+    or_a_uint8(register_file.a);
 }
 
 void CPU::compare_a_b_0xb8() {
-    compare_a_register8(register_file.b);
+    compare_a_uint8(register_file.b);
 }
 
 void CPU::compare_a_c_0xb9() {
-    compare_a_register8(register_file.c);
+    compare_a_uint8(register_file.c);
 }
 
 void CPU::compare_a_d_0xba() {
-    compare_a_register8(register_file.d);
+    compare_a_uint8(register_file.d);
 }
 
 void CPU::compare_a_e_0xbb() {
-    compare_a_register8(register_file.e);
+    compare_a_uint8(register_file.e);
 }
 
 void CPU::compare_a_h_0xbc() {
-    compare_a_register8(register_file.h);
+    compare_a_uint8(register_file.h);
 }
 
 void CPU::compare_a_l_0xbd() {
-    compare_a_register8(register_file.l);
+    compare_a_uint8(register_file.l);
 }
 
 void CPU::compare_a_memory_hl_0xbe() {
-    compare_a_register8(read_8_and_tick(register_file.hl));
+    compare_a_uint8(read_byte_and_tick(register_file.hl));
 }
 
 void CPU::compare_a_a_0xbf() {
-    compare_a_register8(register_file.a);
+    compare_a_uint8(register_file.a);
 }
 
 void CPU::return_if_not_zero_0xc0() {
@@ -1776,7 +1772,7 @@ void CPU::push_stack_bc_0xc5() {
 }
 
 void CPU::add_a_immediate8_0xc6() {
-    add_a_register8(fetch_immediate8_and_tick());
+    add_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x00_0xc7() {
@@ -1807,7 +1803,7 @@ void CPU::call_immediate16_0xcd() {
 }
 
 void CPU::add_with_carry_a_immediate8_0xce() {
-    add_with_carry_a_register8(fetch_immediate8_and_tick());
+    add_with_carry_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x08_0xcf() {
@@ -1837,7 +1833,7 @@ void CPU::push_stack_de_0xd5() {
 }
 
 void CPU::subtract_a_immediate8_0xd6() {
-    subtract_a_register8(fetch_immediate8_and_tick());
+    subtract_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x10_0xd7() {
@@ -1850,7 +1846,7 @@ void CPU::return_if_carry_0xd8() {
 
 void CPU::return_from_interrupt_0xd9() {
     return_0xc9();
-    are_interrupts_enabled = true;
+    interrupt_master_enable = true;
 }
 
 void CPU::jump_if_carry_immediate16_0xda() {
@@ -1866,7 +1862,7 @@ void CPU::call_if_carry_immediate16_0xdc() {
 // 0xdd is an unused opcode
 
 void CPU::subtract_with_carry_a_immediate8_0xde() {
-    subtract_with_carry_a_register8(fetch_immediate8_and_tick());
+    subtract_with_carry_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x18_0xdf() {
@@ -1874,7 +1870,7 @@ void CPU::restart_at_0x18_0xdf() {
 }
 
 void CPU::load_memory_high_ram_offset_immediate8_a_0xe0() {
-    write_8_and_tick(HIGH_RAM_START + fetch_immediate8_and_tick(), register_file.a);
+    write_byte_and_tick(HIGH_RAM_START + fetch_immediate8_and_tick(), register_file.a);
 }
 
 void CPU::pop_stack_hl_0xe1() {
@@ -1882,7 +1878,7 @@ void CPU::pop_stack_hl_0xe1() {
 }
 
 void CPU::load_memory_high_ram_offset_c_a_0xe2() {
-    write_8_and_tick(HIGH_RAM_START + register_file.c, register_file.a);
+    write_byte_and_tick(HIGH_RAM_START + register_file.c, register_file.a);
 }
 
 void CPU::push_stack_hl_0xe5() {
@@ -1890,7 +1886,7 @@ void CPU::push_stack_hl_0xe5() {
 }
 
 void CPU::and_a_immediate8_0xe6() {
-    and_a_register8(fetch_immediate8_and_tick());
+    and_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x20_0xe7() {
@@ -1916,7 +1912,7 @@ void CPU::jump_hl_0xe9() {
 }
 
 void CPU::load_memory_immediate16_a_0xea() {
-    write_8_and_tick(fetch_immediate16_and_tick(), register_file.a);
+    write_byte_and_tick(fetch_immediate16_and_tick(), register_file.a);
 }
 
 // 0xeb is an unused opcode
@@ -1926,7 +1922,7 @@ void CPU::load_memory_immediate16_a_0xea() {
 // 0xed is an unused opcode
 
 void CPU::xor_a_immediate8_0xee() {
-    xor_a_register8(fetch_immediate8_and_tick());
+    xor_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x28_0xef() {
@@ -1934,7 +1930,7 @@ void CPU::restart_at_0x28_0xef() {
 }
 
 void CPU::load_a_memory_high_ram_offset_immediate8_0xf0() {
-    register_file.a = read_8_and_tick(HIGH_RAM_START + fetch_immediate8_and_tick());
+    register_file.a = read_byte_and_tick(HIGH_RAM_START + fetch_immediate8_and_tick());
 }
 
 void CPU::pop_stack_af_0xf1() {
@@ -1943,11 +1939,11 @@ void CPU::pop_stack_af_0xf1() {
 }
 
 void CPU::load_a_memory_high_ram_offset_c_0xf2() {
-    register_file.a = read_8_and_tick(HIGH_RAM_START + register_file.c);
+    register_file.a = read_byte_and_tick(HIGH_RAM_START + register_file.c);
 }
 
 void CPU::disable_interrupts_0xf3() {
-    are_interrupts_enabled = false;
+    interrupt_master_enable = false;
 }
 
 // 0xf4 is an unused opcode
@@ -1957,7 +1953,7 @@ void CPU::push_stack_af_0xf5() {
 }
 
 void CPU::or_a_immediate8_0xf6() {
-    or_a_register8(fetch_immediate8_and_tick());
+    or_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x30_0xf7() {
@@ -1983,13 +1979,11 @@ void CPU::load_stack_pointer_hl_0xf9() {
 }
 
 void CPU::load_a_memory_immediate16_0xfa() {
-    register_file.a = read_8_and_tick(fetch_immediate16_and_tick());
+    register_file.a = read_byte_and_tick(fetch_immediate16_and_tick());
 }
 
 void CPU::enable_interrupts_0xfb() {
-    // Enabling interrupts is delayed until after the next instruction executes
-    // TODO look into this logic, may not be right
-    did_enable_interrupts_execute = true;
+    interrupt_master_enable = true;
 }
 
 // 0xfc is an unused opcode
@@ -1997,1056 +1991,1052 @@ void CPU::enable_interrupts_0xfb() {
 // 0xfd is an unused opcode
 
 void CPU::compare_a_immediate8_0xfe() {
-    compare_a_register8(fetch_immediate8_and_tick());
+    compare_a_uint8(fetch_immediate8_and_tick());
 }
 
 void CPU::restart_at_0x38_0xff() {
     restart_at_address(0x38);
 }
 
-// =================================
-// ===== Extended Instructions =====
-// =================================
-
-void CPU::rotate_left_circular_b_prefix_0x00() {
-    rotate_left_circular_register8(register_file.b);
+void CPU::rotate_left_circular_b_0xcb_0x00() {
+    rotate_left_circular_uint8(register_file.b);
 }
 
-void CPU::rotate_left_circular_c_prefix_0x01() {
-    rotate_left_circular_register8(register_file.c);
+void CPU::rotate_left_circular_c_0xcb_0x01() {
+    rotate_left_circular_uint8(register_file.c);
 }
 
-void CPU::rotate_left_circular_d_prefix_0x02() {
-    rotate_left_circular_register8(register_file.d);
+void CPU::rotate_left_circular_d_0xcb_0x02() {
+    rotate_left_circular_uint8(register_file.d);
 }
 
-void CPU::rotate_left_circular_e_prefix_0x03() {
-    rotate_left_circular_register8(register_file.e);
+void CPU::rotate_left_circular_e_0xcb_0x03() {
+    rotate_left_circular_uint8(register_file.e);
 }
 
-void CPU::rotate_left_circular_h_prefix_0x04() {
-    rotate_left_circular_register8(register_file.h);
+void CPU::rotate_left_circular_h_0xcb_0x04() {
+    rotate_left_circular_uint8(register_file.h);
 }
 
-void CPU::rotate_left_circular_l_prefix_0x05() {
-    rotate_left_circular_register8(register_file.l);
+void CPU::rotate_left_circular_l_0xcb_0x05() {
+    rotate_left_circular_uint8(register_file.l);
 }
 
-void CPU::rotate_left_circular_memory_hl_prefix_0x06() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    rotate_left_circular_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::rotate_left_circular_memory_hl_0xcb_0x06() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    rotate_left_circular_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::rotate_left_circular_a_prefix_0x07() {
-    rotate_left_circular_register8(register_file.a);
+void CPU::rotate_left_circular_a_0xcb_0x07() {
+    rotate_left_circular_uint8(register_file.a);
 }
 
-void CPU::rotate_right_circular_b_prefix_0x08() {
-    rotate_right_circular_register8(register_file.b);
+void CPU::rotate_right_circular_b_0xcb_0x08() {
+    rotate_right_circular_uint8(register_file.b);
 }
 
-void CPU::rotate_right_circular_c_prefix_0x09() {
-    rotate_right_circular_register8(register_file.c);
+void CPU::rotate_right_circular_c_0xcb_0x09() {
+    rotate_right_circular_uint8(register_file.c);
 }
 
-void CPU::rotate_right_circular_d_prefix_0x0a() {
-    rotate_right_circular_register8(register_file.d);
+void CPU::rotate_right_circular_d_0xcb_0x0a() {
+    rotate_right_circular_uint8(register_file.d);
 }
 
-void CPU::rotate_right_circular_e_prefix_0x0b() {
-    rotate_right_circular_register8(register_file.e);
+void CPU::rotate_right_circular_e_0xcb_0x0b() {
+    rotate_right_circular_uint8(register_file.e);
 }
 
-void CPU::rotate_right_circular_h_prefix_0x0c() {
-    rotate_right_circular_register8(register_file.h);
+void CPU::rotate_right_circular_h_0xcb_0x0c() {
+    rotate_right_circular_uint8(register_file.h);
 }
 
-void CPU::rotate_right_circular_l_prefix_0x0d() {
-    rotate_right_circular_register8(register_file.l);
+void CPU::rotate_right_circular_l_0xcb_0x0d() {
+    rotate_right_circular_uint8(register_file.l);
 }
 
-void CPU::rotate_right_circular_memory_hl_prefix_0x0e() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    rotate_right_circular_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::rotate_right_circular_memory_hl_0xcb_0x0e() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    rotate_right_circular_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::rotate_right_circular_a_prefix_0x0f() {
-    rotate_right_circular_register8(register_file.a);
+void CPU::rotate_right_circular_a_0xcb_0x0f() {
+    rotate_right_circular_uint8(register_file.a);
 }
 
 
-void CPU::rotate_left_through_carry_b_prefix_0x10() {
-    rotate_left_through_carry_register8(register_file.b);
+void CPU::rotate_left_through_carry_b_0xcb_0x10() {
+    rotate_left_through_carry_uint8(register_file.b);
 }
 
-void CPU::rotate_left_through_carry_c_prefix_0x11() {
-    rotate_left_through_carry_register8(register_file.c);
+void CPU::rotate_left_through_carry_c_0xcb_0x11() {
+    rotate_left_through_carry_uint8(register_file.c);
 }
 
-void CPU::rotate_left_through_carry_d_prefix_0x12() {
-    rotate_left_through_carry_register8(register_file.d);
+void CPU::rotate_left_through_carry_d_0xcb_0x12() {
+    rotate_left_through_carry_uint8(register_file.d);
 }
 
-void CPU::rotate_left_through_carry_e_prefix_0x13() {
-    rotate_left_through_carry_register8(register_file.e);
+void CPU::rotate_left_through_carry_e_0xcb_0x13() {
+    rotate_left_through_carry_uint8(register_file.e);
 }
 
-void CPU::rotate_left_through_carry_h_prefix_0x14() {
-    rotate_left_through_carry_register8(register_file.h);
+void CPU::rotate_left_through_carry_h_0xcb_0x14() {
+    rotate_left_through_carry_uint8(register_file.h);
 }
 
-void CPU::rotate_left_through_carry_l_prefix_0x15() {
-    rotate_left_through_carry_register8(register_file.l);
+void CPU::rotate_left_through_carry_l_0xcb_0x15() {
+    rotate_left_through_carry_uint8(register_file.l);
 }
 
-void CPU::rotate_left_through_carry_memory_hl_prefix_0x16() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    rotate_left_through_carry_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::rotate_left_through_carry_memory_hl_0xcb_0x16() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    rotate_left_through_carry_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::rotate_left_through_carry_a_prefix_0x17() {
-    rotate_left_through_carry_register8(register_file.a);
+void CPU::rotate_left_through_carry_a_0xcb_0x17() {
+    rotate_left_through_carry_uint8(register_file.a);
 }
 
-void CPU::rotate_right_through_carry_b_prefix_0x18() {
-    rotate_right_through_carry_register8(register_file.b);
+void CPU::rotate_right_through_carry_b_0xcb_0x18() {
+    rotate_right_through_carry_uint8(register_file.b);
 }
 
-void CPU::rotate_right_through_carry_c_prefix_0x19() {
-    rotate_right_through_carry_register8(register_file.c);
+void CPU::rotate_right_through_carry_c_0xcb_0x19() {
+    rotate_right_through_carry_uint8(register_file.c);
 }
 
-void CPU::rotate_right_through_carry_d_prefix_0x1a() {
-    rotate_right_through_carry_register8(register_file.d);
+void CPU::rotate_right_through_carry_d_0xcb_0x1a() {
+    rotate_right_through_carry_uint8(register_file.d);
 }
 
-void CPU::rotate_right_through_carry_e_prefix_0x1b() {
-    rotate_right_through_carry_register8(register_file.e);
+void CPU::rotate_right_through_carry_e_0xcb_0x1b() {
+    rotate_right_through_carry_uint8(register_file.e);
 }
 
-void CPU::rotate_right_through_carry_h_prefix_0x1c() {
-    rotate_right_through_carry_register8(register_file.h);
+void CPU::rotate_right_through_carry_h_0xcb_0x1c() {
+    rotate_right_through_carry_uint8(register_file.h);
 }
 
-void CPU::rotate_right_through_carry_l_prefix_0x1d() {
-    rotate_right_through_carry_register8(register_file.l);
+void CPU::rotate_right_through_carry_l_0xcb_0x1d() {
+    rotate_right_through_carry_uint8(register_file.l);
 }
 
-void CPU::rotate_right_through_carry_memory_hl_prefix_0x1e() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    rotate_right_through_carry_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::rotate_right_through_carry_memory_hl_0xcb_0x1e() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    rotate_right_through_carry_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::rotate_right_through_carry_a_prefix_0x1f() {
-    rotate_right_through_carry_register8(register_file.a);
+void CPU::rotate_right_through_carry_a_0xcb_0x1f() {
+    rotate_right_through_carry_uint8(register_file.a);
 }
 
-void CPU::shift_left_arithmetic_b_prefix_0x20() {
-    shift_left_arithmetic_register8(register_file.b);
+void CPU::shift_left_arithmetic_b_0xcb_0x20() {
+    shift_left_arithmetic_uint8(register_file.b);
 }
 
-void CPU::shift_left_arithmetic_c_prefix_0x21() {
-    shift_left_arithmetic_register8(register_file.c);
+void CPU::shift_left_arithmetic_c_0xcb_0x21() {
+    shift_left_arithmetic_uint8(register_file.c);
 }
 
-void CPU::shift_left_arithmetic_d_prefix_0x22() {
-    shift_left_arithmetic_register8(register_file.d);
+void CPU::shift_left_arithmetic_d_0xcb_0x22() {
+    shift_left_arithmetic_uint8(register_file.d);
 }
 
-void CPU::shift_left_arithmetic_e_prefix_0x23() {
-    shift_left_arithmetic_register8(register_file.e);
+void CPU::shift_left_arithmetic_e_0xcb_0x23() {
+    shift_left_arithmetic_uint8(register_file.e);
 }
 
-void CPU::shift_left_arithmetic_h_prefix_0x24() {
-    shift_left_arithmetic_register8(register_file.h);
+void CPU::shift_left_arithmetic_h_0xcb_0x24() {
+    shift_left_arithmetic_uint8(register_file.h);
 }
 
-void CPU::shift_left_arithmetic_l_prefix_0x25() {
-    shift_left_arithmetic_register8(register_file.l);
+void CPU::shift_left_arithmetic_l_0xcb_0x25() {
+    shift_left_arithmetic_uint8(register_file.l);
 }
 
-void CPU::shift_left_arithmetic_memory_hl_prefix_0x26() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    shift_left_arithmetic_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::shift_left_arithmetic_memory_hl_0xcb_0x26() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    shift_left_arithmetic_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::shift_left_arithmetic_a_prefix_0x27() {
-    shift_left_arithmetic_register8(register_file.a);
+void CPU::shift_left_arithmetic_a_0xcb_0x27() {
+    shift_left_arithmetic_uint8(register_file.a);
 }
 
-void CPU::shift_right_arithmetic_b_prefix_0x28() {
-    shift_right_arithmetic_register8(register_file.b);
+void CPU::shift_right_arithmetic_b_0xcb_0x28() {
+    shift_right_arithmetic_uint8(register_file.b);
 }
 
-void CPU::shift_right_arithmetic_c_prefix_0x29() {
-    shift_right_arithmetic_register8(register_file.c);
+void CPU::shift_right_arithmetic_c_0xcb_0x29() {
+    shift_right_arithmetic_uint8(register_file.c);
 }
 
-void CPU::shift_right_arithmetic_d_prefix_0x2a() {
-    shift_right_arithmetic_register8(register_file.d);
+void CPU::shift_right_arithmetic_d_0xcb_0x2a() {
+    shift_right_arithmetic_uint8(register_file.d);
 }
 
-void CPU::shift_right_arithmetic_e_prefix_0x2b() {
-    shift_right_arithmetic_register8(register_file.e);
+void CPU::shift_right_arithmetic_e_0xcb_0x2b() {
+    shift_right_arithmetic_uint8(register_file.e);
 }
 
-void CPU::shift_right_arithmetic_h_prefix_0x2c() {
-    shift_right_arithmetic_register8(register_file.h);
+void CPU::shift_right_arithmetic_h_0xcb_0x2c() {
+    shift_right_arithmetic_uint8(register_file.h);
 }
 
-void CPU::shift_right_arithmetic_l_prefix_0x2d() {
-    shift_right_arithmetic_register8(register_file.l);
+void CPU::shift_right_arithmetic_l_0xcb_0x2d() {
+    shift_right_arithmetic_uint8(register_file.l);
 }
 
-void CPU::shift_right_arithmetic_memory_hl_prefix_0x2e() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    shift_right_arithmetic_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::shift_right_arithmetic_memory_hl_0xcb_0x2e() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    shift_right_arithmetic_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::shift_right_arithmetic_a_prefix_0x2f() {
-    shift_right_arithmetic_register8(register_file.a);
+void CPU::shift_right_arithmetic_a_0xcb_0x2f() {
+    shift_right_arithmetic_uint8(register_file.a);
 }
 
-void CPU::swap_nibbles_b_prefix_0x30() {
-    swap_nibbles_register8(register_file.b);
+void CPU::swap_nibbles_b_0xcb_0x30() {
+    swap_nibbles_uint8(register_file.b);
 }
 
-void CPU::swap_nibbles_c_prefix_0x31() {
-    swap_nibbles_register8(register_file.c);
+void CPU::swap_nibbles_c_0xcb_0x31() {
+    swap_nibbles_uint8(register_file.c);
 }
 
-void CPU::swap_nibbles_d_prefix_0x32() {
-    swap_nibbles_register8(register_file.d);
+void CPU::swap_nibbles_d_0xcb_0x32() {
+    swap_nibbles_uint8(register_file.d);
 }
 
-void CPU::swap_nibbles_e_prefix_0x33() {
-    swap_nibbles_register8(register_file.e);
+void CPU::swap_nibbles_e_0xcb_0x33() {
+    swap_nibbles_uint8(register_file.e);
 }
 
-void CPU::swap_nibbles_h_prefix_0x34() {
-    swap_nibbles_register8(register_file.h);
+void CPU::swap_nibbles_h_0xcb_0x34() {
+    swap_nibbles_uint8(register_file.h);
 }
 
-void CPU::swap_nibbles_l_prefix_0x35() {
-    swap_nibbles_register8(register_file.l);
+void CPU::swap_nibbles_l_0xcb_0x35() {
+    swap_nibbles_uint8(register_file.l);
 }
 
-void CPU::swap_nibbles_memory_hl_prefix_0x36() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    swap_nibbles_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::swap_nibbles_memory_hl_0xcb_0x36() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    swap_nibbles_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::swap_nibbles_a_prefix_0x37() {
-    swap_nibbles_register8(register_file.a);
+void CPU::swap_nibbles_a_0xcb_0x37() {
+    swap_nibbles_uint8(register_file.a);
 }
 
-void CPU::shift_right_logical_b_prefix_0x38() {
-    shift_right_logical_register8(register_file.b);
+void CPU::shift_right_logical_b_0xcb_0x38() {
+    shift_right_logical_uint8(register_file.b);
 }
 
-void CPU::shift_right_logical_c_prefix_0x39() {
-    shift_right_logical_register8(register_file.c);
+void CPU::shift_right_logical_c_0xcb_0x39() {
+    shift_right_logical_uint8(register_file.c);
 }
 
-void CPU::shift_right_logical_d_prefix_0x3a() {
-    shift_right_logical_register8(register_file.d);
+void CPU::shift_right_logical_d_0xcb_0x3a() {
+    shift_right_logical_uint8(register_file.d);
 }
 
-void CPU::shift_right_logical_e_prefix_0x3b() {
-    shift_right_logical_register8(register_file.e);
+void CPU::shift_right_logical_e_0xcb_0x3b() {
+    shift_right_logical_uint8(register_file.e);
 }
 
-void CPU::shift_right_logical_h_prefix_0x3c() {
-    shift_right_logical_register8(register_file.h);
+void CPU::shift_right_logical_h_0xcb_0x3c() {
+    shift_right_logical_uint8(register_file.h);
 }
 
-void CPU::shift_right_logical_l_prefix_0x3d() {
-    shift_right_logical_register8(register_file.l);
+void CPU::shift_right_logical_l_0xcb_0x3d() {
+    shift_right_logical_uint8(register_file.l);
 }
 
-void CPU::shift_right_logical_memory_hl_prefix_0x3e() {
-    uint8_t memory_hl = read_8_and_tick(register_file.hl);
-    shift_right_logical_register8(memory_hl);
-    write_8_and_tick(register_file.hl, memory_hl);
+void CPU::shift_right_logical_memory_hl_0xcb_0x3e() {
+    uint8_t memory_hl = read_byte_and_tick(register_file.hl);
+    shift_right_logical_uint8(memory_hl);
+    write_byte_and_tick(register_file.hl, memory_hl);
 }
 
-void CPU::shift_right_logical_a_prefix_0x3f() {
-    shift_right_logical_register8(register_file.a);
+void CPU::shift_right_logical_a_0xcb_0x3f() {
+    shift_right_logical_uint8(register_file.a);
 }
 
-void CPU::test_bit_0_b_prefix_0x40() {
-    test_bit_position_register8(0, register_file.b);
+void CPU::test_bit_0_b_0xcb_0x40() {
+    test_bit_position_uint8(0, register_file.b);
 }
 
-void CPU::test_bit_0_c_prefix_0x41() {
-    test_bit_position_register8(0, register_file.c);
+void CPU::test_bit_0_c_0xcb_0x41() {
+    test_bit_position_uint8(0, register_file.c);
 }
 
-void CPU::test_bit_0_d_prefix_0x42() {
-    test_bit_position_register8(0, register_file.d);
+void CPU::test_bit_0_d_0xcb_0x42() {
+    test_bit_position_uint8(0, register_file.d);
 }
 
-void CPU::test_bit_0_e_prefix_0x43() {
-    test_bit_position_register8(0, register_file.e);
+void CPU::test_bit_0_e_0xcb_0x43() {
+    test_bit_position_uint8(0, register_file.e);
 }
 
-void CPU::test_bit_0_h_prefix_0x44() {
-    test_bit_position_register8(0, register_file.h);
+void CPU::test_bit_0_h_0xcb_0x44() {
+    test_bit_position_uint8(0, register_file.h);
 }
 
-void CPU::test_bit_0_l_prefix_0x45() {
-    test_bit_position_register8(0, register_file.l);
+void CPU::test_bit_0_l_0xcb_0x45() {
+    test_bit_position_uint8(0, register_file.l);
 }
 
-void CPU::test_bit_0_memory_hl_prefix_0x46() {
+void CPU::test_bit_0_memory_hl_0xcb_0x46() {
     test_bit_position_memory_hl(0);
 }
 
-void CPU::test_bit_0_a_prefix_0x47() {
-    test_bit_position_register8(0, register_file.a);
+void CPU::test_bit_0_a_0xcb_0x47() {
+    test_bit_position_uint8(0, register_file.a);
 }
 
-void CPU::test_bit_1_b_prefix_0x48() {
-    test_bit_position_register8(1, register_file.b);
+void CPU::test_bit_1_b_0xcb_0x48() {
+    test_bit_position_uint8(1, register_file.b);
 }
 
-void CPU::test_bit_1_c_prefix_0x49() {
-    test_bit_position_register8(1, register_file.c);
+void CPU::test_bit_1_c_0xcb_0x49() {
+    test_bit_position_uint8(1, register_file.c);
 }
 
-void CPU::test_bit_1_d_prefix_0x4a() {
-    test_bit_position_register8(1, register_file.d);
+void CPU::test_bit_1_d_0xcb_0x4a() {
+    test_bit_position_uint8(1, register_file.d);
 }
 
-void CPU::test_bit_1_e_prefix_0x4b() {
-    test_bit_position_register8(1, register_file.e);
+void CPU::test_bit_1_e_0xcb_0x4b() {
+    test_bit_position_uint8(1, register_file.e);
 }
 
-void CPU::test_bit_1_h_prefix_0x4c() {
-    test_bit_position_register8(1, register_file.h);
+void CPU::test_bit_1_h_0xcb_0x4c() {
+    test_bit_position_uint8(1, register_file.h);
 }
 
-void CPU::test_bit_1_l_prefix_0x4d() {
-    test_bit_position_register8(1, register_file.l);
+void CPU::test_bit_1_l_0xcb_0x4d() {
+    test_bit_position_uint8(1, register_file.l);
 }
 
-void CPU::test_bit_1_memory_hl_prefix_0x4e() {
+void CPU::test_bit_1_memory_hl_0xcb_0x4e() {
     test_bit_position_memory_hl(1);
 }
 
-void CPU::test_bit_1_a_prefix_0x4f() {
-    test_bit_position_register8(1, register_file.a);
+void CPU::test_bit_1_a_0xcb_0x4f() {
+    test_bit_position_uint8(1, register_file.a);
 }
 
-void CPU::test_bit_2_b_prefix_0x50(){
-    test_bit_position_register8(2, register_file.b);
+void CPU::test_bit_2_b_0xcb_0x50(){
+    test_bit_position_uint8(2, register_file.b);
 }
 
-void CPU::test_bit_2_c_prefix_0x51() {
-    test_bit_position_register8(2, register_file.c);
+void CPU::test_bit_2_c_0xcb_0x51() {
+    test_bit_position_uint8(2, register_file.c);
 }
 
-void CPU::test_bit_2_d_prefix_0x52() {
-    test_bit_position_register8(2, register_file.d);
+void CPU::test_bit_2_d_0xcb_0x52() {
+    test_bit_position_uint8(2, register_file.d);
 }
 
-void CPU::test_bit_2_e_prefix_0x53() {
-    test_bit_position_register8(2, register_file.e);
+void CPU::test_bit_2_e_0xcb_0x53() {
+    test_bit_position_uint8(2, register_file.e);
 }
 
-void CPU::test_bit_2_h_prefix_0x54() {
-    test_bit_position_register8(2, register_file.h);
+void CPU::test_bit_2_h_0xcb_0x54() {
+    test_bit_position_uint8(2, register_file.h);
 }
 
-void CPU::test_bit_2_l_prefix_0x55() {
-    test_bit_position_register8(2, register_file.l);
+void CPU::test_bit_2_l_0xcb_0x55() {
+    test_bit_position_uint8(2, register_file.l);
 }
 
-void CPU::test_bit_2_memory_hl_prefix_0x56() {
+void CPU::test_bit_2_memory_hl_0xcb_0x56() {
     test_bit_position_memory_hl(2);
 }
 
-void CPU::test_bit_2_a_prefix_0x57() {
-    test_bit_position_register8(2, register_file.a);
+void CPU::test_bit_2_a_0xcb_0x57() {
+    test_bit_position_uint8(2, register_file.a);
 }
 
-void CPU::test_bit_3_b_prefix_0x58() {
-    test_bit_position_register8(3, register_file.b);
+void CPU::test_bit_3_b_0xcb_0x58() {
+    test_bit_position_uint8(3, register_file.b);
 }
 
-void CPU::test_bit_3_c_prefix_0x59() {
-    test_bit_position_register8(3, register_file.c);
+void CPU::test_bit_3_c_0xcb_0x59() {
+    test_bit_position_uint8(3, register_file.c);
 }
 
-void CPU::test_bit_3_d_prefix_0x5a() {
-    test_bit_position_register8(3, register_file.d);
+void CPU::test_bit_3_d_0xcb_0x5a() {
+    test_bit_position_uint8(3, register_file.d);
 }
 
-void CPU::test_bit_3_e_prefix_0x5b() {
-    test_bit_position_register8(3, register_file.e);
+void CPU::test_bit_3_e_0xcb_0x5b() {
+    test_bit_position_uint8(3, register_file.e);
 }
 
-void CPU::test_bit_3_h_prefix_0x5c() {
-    test_bit_position_register8(3, register_file.h);
+void CPU::test_bit_3_h_0xcb_0x5c() {
+    test_bit_position_uint8(3, register_file.h);
 }
 
-void CPU::test_bit_3_l_prefix_0x5d() {
-    test_bit_position_register8(3, register_file.l);
+void CPU::test_bit_3_l_0xcb_0x5d() {
+    test_bit_position_uint8(3, register_file.l);
 }
 
-void CPU::test_bit_3_memory_hl_prefix_0x5e() {
+void CPU::test_bit_3_memory_hl_0xcb_0x5e() {
     test_bit_position_memory_hl(3);
 }
 
-void CPU::test_bit_3_a_prefix_0x5f() {
-    test_bit_position_register8(3, register_file.a);
+void CPU::test_bit_3_a_0xcb_0x5f() {
+    test_bit_position_uint8(3, register_file.a);
 }
 
-void CPU::test_bit_4_b_prefix_0x60() {
-    test_bit_position_register8(4, register_file.b);
+void CPU::test_bit_4_b_0xcb_0x60() {
+    test_bit_position_uint8(4, register_file.b);
 }
 
-void CPU::test_bit_4_c_prefix_0x61() {
-    test_bit_position_register8(4, register_file.c);
+void CPU::test_bit_4_c_0xcb_0x61() {
+    test_bit_position_uint8(4, register_file.c);
 }
 
-void CPU::test_bit_4_d_prefix_0x62() {
-    test_bit_position_register8(4, register_file.d);
+void CPU::test_bit_4_d_0xcb_0x62() {
+    test_bit_position_uint8(4, register_file.d);
 }
 
-void CPU::test_bit_4_e_prefix_0x63() {
-    test_bit_position_register8(4, register_file.e);
+void CPU::test_bit_4_e_0xcb_0x63() {
+    test_bit_position_uint8(4, register_file.e);
 }
 
-void CPU::test_bit_4_h_prefix_0x64() {
-    test_bit_position_register8(4, register_file.h);
+void CPU::test_bit_4_h_0xcb_0x64() {
+    test_bit_position_uint8(4, register_file.h);
 }
 
-void CPU::test_bit_4_l_prefix_0x65() {
-    test_bit_position_register8(4, register_file.l);
+void CPU::test_bit_4_l_0xcb_0x65() {
+    test_bit_position_uint8(4, register_file.l);
 }
 
-void CPU::test_bit_4_memory_hl_prefix_0x66() {
+void CPU::test_bit_4_memory_hl_0xcb_0x66() {
     test_bit_position_memory_hl(4);
 }
 
-void CPU::test_bit_4_a_prefix_0x67() {
-    test_bit_position_register8(4, register_file.a);
+void CPU::test_bit_4_a_0xcb_0x67() {
+    test_bit_position_uint8(4, register_file.a);
 }
 
-void CPU::test_bit_5_b_prefix_0x68() {
-    test_bit_position_register8(5, register_file.b);
+void CPU::test_bit_5_b_0xcb_0x68() {
+    test_bit_position_uint8(5, register_file.b);
 }
 
-void CPU::test_bit_5_c_prefix_0x69() {
-    test_bit_position_register8(5, register_file.c);
+void CPU::test_bit_5_c_0xcb_0x69() {
+    test_bit_position_uint8(5, register_file.c);
 }
 
-void CPU::test_bit_5_d_prefix_0x6a() {
-    test_bit_position_register8(5, register_file.d);
+void CPU::test_bit_5_d_0xcb_0x6a() {
+    test_bit_position_uint8(5, register_file.d);
 }
 
-void CPU::test_bit_5_e_prefix_0x6b() {
-    test_bit_position_register8(5, register_file.e);
+void CPU::test_bit_5_e_0xcb_0x6b() {
+    test_bit_position_uint8(5, register_file.e);
 }
 
-void CPU::test_bit_5_h_prefix_0x6c() {
-    test_bit_position_register8(5, register_file.h);
+void CPU::test_bit_5_h_0xcb_0x6c() {
+    test_bit_position_uint8(5, register_file.h);
 }
 
-void CPU::test_bit_5_l_prefix_0x6d() {
-    test_bit_position_register8(5, register_file.l);
+void CPU::test_bit_5_l_0xcb_0x6d() {
+    test_bit_position_uint8(5, register_file.l);
 }
 
-void CPU::test_bit_5_memory_hl_prefix_0x6e() {
+void CPU::test_bit_5_memory_hl_0xcb_0x6e() {
     test_bit_position_memory_hl(5);
 }
 
-void CPU::test_bit_5_a_prefix_0x6f() {
-    test_bit_position_register8(5, register_file.a);
+void CPU::test_bit_5_a_0xcb_0x6f() {
+    test_bit_position_uint8(5, register_file.a);
 }
 
-void CPU::test_bit_6_b_prefix_0x70() {
-    test_bit_position_register8(6, register_file.b);
+void CPU::test_bit_6_b_0xcb_0x70() {
+    test_bit_position_uint8(6, register_file.b);
 }
 
-void CPU::test_bit_6_c_prefix_0x71() {
-    test_bit_position_register8(6, register_file.c);
+void CPU::test_bit_6_c_0xcb_0x71() {
+    test_bit_position_uint8(6, register_file.c);
 }
 
-void CPU::test_bit_6_d_prefix_0x72() {
-    test_bit_position_register8(6, register_file.d);
+void CPU::test_bit_6_d_0xcb_0x72() {
+    test_bit_position_uint8(6, register_file.d);
 }
 
-void CPU::test_bit_6_e_prefix_0x73() {
-    test_bit_position_register8(6, register_file.e);
+void CPU::test_bit_6_e_0xcb_0x73() {
+    test_bit_position_uint8(6, register_file.e);
 }
 
-void CPU::test_bit_6_h_prefix_0x74() {
-    test_bit_position_register8(6, register_file.h);
+void CPU::test_bit_6_h_0xcb_0x74() {
+    test_bit_position_uint8(6, register_file.h);
 }
 
-void CPU::test_bit_6_l_prefix_0x75() {
-    test_bit_position_register8(6, register_file.l);
+void CPU::test_bit_6_l_0xcb_0x75() {
+    test_bit_position_uint8(6, register_file.l);
 }
 
-void CPU::test_bit_6_memory_hl_prefix_0x76() {
+void CPU::test_bit_6_memory_hl_0xcb_0x76() {
     test_bit_position_memory_hl(6);
 }
 
-void CPU::test_bit_6_a_prefix_0x77() {
-    test_bit_position_register8(6, register_file.a);
+void CPU::test_bit_6_a_0xcb_0x77() {
+    test_bit_position_uint8(6, register_file.a);
 }
 
-void CPU::test_bit_7_b_prefix_0x78() {
-    test_bit_position_register8(7, register_file.b);
+void CPU::test_bit_7_b_0xcb_0x78() {
+    test_bit_position_uint8(7, register_file.b);
 }
 
-void CPU::test_bit_7_c_prefix_0x79() {
-    test_bit_position_register8(7, register_file.c);
+void CPU::test_bit_7_c_0xcb_0x79() {
+    test_bit_position_uint8(7, register_file.c);
 }
 
-void CPU::test_bit_7_d_prefix_0x7a() {
-    test_bit_position_register8(7, register_file.d);
+void CPU::test_bit_7_d_0xcb_0x7a() {
+    test_bit_position_uint8(7, register_file.d);
 }
 
-void CPU::test_bit_7_e_prefix_0x7b() {
-    test_bit_position_register8(7, register_file.e);
+void CPU::test_bit_7_e_0xcb_0x7b() {
+    test_bit_position_uint8(7, register_file.e);
 }
 
-void CPU::test_bit_7_h_prefix_0x7c() {
-    test_bit_position_register8(7, register_file.h);
+void CPU::test_bit_7_h_0xcb_0x7c() {
+    test_bit_position_uint8(7, register_file.h);
 }
 
-void CPU::test_bit_7_l_prefix_0x7d() {
-    test_bit_position_register8(7, register_file.l);
+void CPU::test_bit_7_l_0xcb_0x7d() {
+    test_bit_position_uint8(7, register_file.l);
 }
 
-void CPU::test_bit_7_memory_hl_prefix_0x7e() {
+void CPU::test_bit_7_memory_hl_0xcb_0x7e() {
     test_bit_position_memory_hl(7);
 }
 
-void CPU::test_bit_7_a_prefix_0x7f() {
-    test_bit_position_register8(7, register_file.a);
+void CPU::test_bit_7_a_0xcb_0x7f() {
+    test_bit_position_uint8(7, register_file.a);
 }
 
-void CPU::reset_bit_0_b_prefix_0x80() {
-    reset_bit_position_register8(0, register_file.b);
+void CPU::reset_bit_0_b_0xcb_0x80() {
+    reset_bit_position_uint8(0, register_file.b);
 }
 
-void CPU::reset_bit_0_c_prefix_0x81() {
-    reset_bit_position_register8(0, register_file.c);
+void CPU::reset_bit_0_c_0xcb_0x81() {
+    reset_bit_position_uint8(0, register_file.c);
 }
 
-void CPU::reset_bit_0_d_prefix_0x82() {
-    reset_bit_position_register8(0, register_file.d);
+void CPU::reset_bit_0_d_0xcb_0x82() {
+    reset_bit_position_uint8(0, register_file.d);
 }
 
-void CPU::reset_bit_0_e_prefix_0x83() {
-    reset_bit_position_register8(0, register_file.e);
+void CPU::reset_bit_0_e_0xcb_0x83() {
+    reset_bit_position_uint8(0, register_file.e);
 }
 
-void CPU::reset_bit_0_h_prefix_0x84() {
-    reset_bit_position_register8(0, register_file.h);
+void CPU::reset_bit_0_h_0xcb_0x84() {
+    reset_bit_position_uint8(0, register_file.h);
 }
 
-void CPU::reset_bit_0_l_prefix_0x85() {
-    reset_bit_position_register8(0, register_file.l);
+void CPU::reset_bit_0_l_0xcb_0x85() {
+    reset_bit_position_uint8(0, register_file.l);
 }
 
-void CPU::reset_bit_0_memory_hl_prefix_0x86() {
+void CPU::reset_bit_0_memory_hl_0xcb_0x86() {
     reset_bit_position_memory_hl(0);
 }
 
-void CPU::reset_bit_0_a_prefix_0x87() {
-    reset_bit_position_register8(0, register_file.a);
+void CPU::reset_bit_0_a_0xcb_0x87() {
+    reset_bit_position_uint8(0, register_file.a);
 }
 
-void CPU::reset_bit_1_b_prefix_0x88() {
-    reset_bit_position_register8(1, register_file.b);
+void CPU::reset_bit_1_b_0xcb_0x88() {
+    reset_bit_position_uint8(1, register_file.b);
 }
 
-void CPU::reset_bit_1_c_prefix_0x89() {
-    reset_bit_position_register8(1, register_file.c);
+void CPU::reset_bit_1_c_0xcb_0x89() {
+    reset_bit_position_uint8(1, register_file.c);
 }
 
-void CPU::reset_bit_1_d_prefix_0x8a() {
-    reset_bit_position_register8(1, register_file.d);
+void CPU::reset_bit_1_d_0xcb_0x8a() {
+    reset_bit_position_uint8(1, register_file.d);
 }
 
-void CPU::reset_bit_1_e_prefix_0x8b() {
-    reset_bit_position_register8(1, register_file.e);
+void CPU::reset_bit_1_e_0xcb_0x8b() {
+    reset_bit_position_uint8(1, register_file.e);
 }
 
-void CPU::reset_bit_1_h_prefix_0x8c() {
-    reset_bit_position_register8(1, register_file.h);
+void CPU::reset_bit_1_h_0xcb_0x8c() {
+    reset_bit_position_uint8(1, register_file.h);
 }
 
-void CPU::reset_bit_1_l_prefix_0x8d() {
-    reset_bit_position_register8(1, register_file.l);
+void CPU::reset_bit_1_l_0xcb_0x8d() {
+    reset_bit_position_uint8(1, register_file.l);
 }
 
-void CPU::reset_bit_1_memory_hl_prefix_0x8e() {
+void CPU::reset_bit_1_memory_hl_0xcb_0x8e() {
     reset_bit_position_memory_hl(1);
 }
 
-void CPU::reset_bit_1_a_prefix_0x8f() {
-    reset_bit_position_register8(1, register_file.a);
+void CPU::reset_bit_1_a_0xcb_0x8f() {
+    reset_bit_position_uint8(1, register_file.a);
 }
 
-void CPU::reset_bit_2_b_prefix_0x90() {
-    reset_bit_position_register8(2, register_file.b);
+void CPU::reset_bit_2_b_0xcb_0x90() {
+    reset_bit_position_uint8(2, register_file.b);
 }
 
-void CPU::reset_bit_2_c_prefix_0x91() {
-    reset_bit_position_register8(2, register_file.c);
+void CPU::reset_bit_2_c_0xcb_0x91() {
+    reset_bit_position_uint8(2, register_file.c);
 }
 
-void CPU::reset_bit_2_d_prefix_0x92() {
-    reset_bit_position_register8(2, register_file.d);
+void CPU::reset_bit_2_d_0xcb_0x92() {
+    reset_bit_position_uint8(2, register_file.d);
 }
 
-void CPU::reset_bit_2_e_prefix_0x93() {
-    reset_bit_position_register8(2, register_file.e);
+void CPU::reset_bit_2_e_0xcb_0x93() {
+    reset_bit_position_uint8(2, register_file.e);
 }
 
-void CPU::reset_bit_2_h_prefix_0x94() {
-    reset_bit_position_register8(2, register_file.h);
+void CPU::reset_bit_2_h_0xcb_0x94() {
+    reset_bit_position_uint8(2, register_file.h);
 }
 
-void CPU::reset_bit_2_l_prefix_0x95() {
-    reset_bit_position_register8(2, register_file.l);
+void CPU::reset_bit_2_l_0xcb_0x95() {
+    reset_bit_position_uint8(2, register_file.l);
 }
 
-void CPU::reset_bit_2_memory_hl_prefix_0x96() {
+void CPU::reset_bit_2_memory_hl_0xcb_0x96() {
     reset_bit_position_memory_hl(2);
 }
 
-void CPU::reset_bit_2_a_prefix_0x97() {
-    reset_bit_position_register8(2, register_file.a);
+void CPU::reset_bit_2_a_0xcb_0x97() {
+    reset_bit_position_uint8(2, register_file.a);
 }
 
-void CPU::reset_bit_3_b_prefix_0x98() {
-    reset_bit_position_register8(3, register_file.b);
+void CPU::reset_bit_3_b_0xcb_0x98() {
+    reset_bit_position_uint8(3, register_file.b);
 }
 
-void CPU::reset_bit_3_c_prefix_0x99() {
-    reset_bit_position_register8(3, register_file.c);
+void CPU::reset_bit_3_c_0xcb_0x99() {
+    reset_bit_position_uint8(3, register_file.c);
 }
 
-void CPU::reset_bit_3_d_prefix_0x9a() {
-    reset_bit_position_register8(3, register_file.d);
+void CPU::reset_bit_3_d_0xcb_0x9a() {
+    reset_bit_position_uint8(3, register_file.d);
 }
 
-void CPU::reset_bit_3_e_prefix_0x9b() {
-    reset_bit_position_register8(3, register_file.e);
+void CPU::reset_bit_3_e_0xcb_0x9b() {
+    reset_bit_position_uint8(3, register_file.e);
 }
 
-void CPU::reset_bit_3_h_prefix_0x9c() {
-    reset_bit_position_register8(3, register_file.h);
+void CPU::reset_bit_3_h_0xcb_0x9c() {
+    reset_bit_position_uint8(3, register_file.h);
 }
 
-void CPU::reset_bit_3_l_prefix_0x9d() {
-    reset_bit_position_register8(3, register_file.l);
+void CPU::reset_bit_3_l_0xcb_0x9d() {
+    reset_bit_position_uint8(3, register_file.l);
 }
 
-void CPU::reset_bit_3_memory_hl_prefix_0x9e() {
+void CPU::reset_bit_3_memory_hl_0xcb_0x9e() {
     reset_bit_position_memory_hl(3);
 }
 
-void CPU::reset_bit_3_a_prefix_0x9f() {
-    reset_bit_position_register8(3, register_file.a);
+void CPU::reset_bit_3_a_0xcb_0x9f() {
+    reset_bit_position_uint8(3, register_file.a);
 }
 
-void CPU::reset_bit_4_b_prefix_0xa0() {
-    reset_bit_position_register8(4, register_file.b);
+void CPU::reset_bit_4_b_0xcb_0xa0() {
+    reset_bit_position_uint8(4, register_file.b);
 }
 
-void CPU::reset_bit_4_c_prefix_0xa1() {
-    reset_bit_position_register8(4, register_file.c);
+void CPU::reset_bit_4_c_0xcb_0xa1() {
+    reset_bit_position_uint8(4, register_file.c);
 }
 
-void CPU::reset_bit_4_d_prefix_0xa2() {
-    reset_bit_position_register8(4, register_file.d);
+void CPU::reset_bit_4_d_0xcb_0xa2() {
+    reset_bit_position_uint8(4, register_file.d);
 }
 
-void CPU::reset_bit_4_e_prefix_0xa3() {
-    reset_bit_position_register8(4, register_file.e);
+void CPU::reset_bit_4_e_0xcb_0xa3() {
+    reset_bit_position_uint8(4, register_file.e);
 }
 
-void CPU::reset_bit_4_h_prefix_0xa4() {
-    reset_bit_position_register8(4, register_file.h);
+void CPU::reset_bit_4_h_0xcb_0xa4() {
+    reset_bit_position_uint8(4, register_file.h);
 }
 
-void CPU::reset_bit_4_l_prefix_0xa5() {
-    reset_bit_position_register8(4, register_file.l);
+void CPU::reset_bit_4_l_0xcb_0xa5() {
+    reset_bit_position_uint8(4, register_file.l);
 }
 
-void CPU::reset_bit_4_memory_hl_prefix_0xa6() {
+void CPU::reset_bit_4_memory_hl_0xcb_0xa6() {
     reset_bit_position_memory_hl(4);
 }
 
-void CPU::reset_bit_4_a_prefix_0xa7() {
-    reset_bit_position_register8(4, register_file.a);
+void CPU::reset_bit_4_a_0xcb_0xa7() {
+    reset_bit_position_uint8(4, register_file.a);
 }
 
-void CPU::reset_bit_5_b_prefix_0xa8() {
-    reset_bit_position_register8(5, register_file.b);
+void CPU::reset_bit_5_b_0xcb_0xa8() {
+    reset_bit_position_uint8(5, register_file.b);
 }
 
-void CPU::reset_bit_5_c_prefix_0xa9() {
-    reset_bit_position_register8(5, register_file.c);
+void CPU::reset_bit_5_c_0xcb_0xa9() {
+    reset_bit_position_uint8(5, register_file.c);
 }
 
-void CPU::reset_bit_5_d_prefix_0xaa() {
-    reset_bit_position_register8(5, register_file.d);
+void CPU::reset_bit_5_d_0xcb_0xaa() {
+    reset_bit_position_uint8(5, register_file.d);
 }
 
-void CPU::reset_bit_5_e_prefix_0xab() {
-    reset_bit_position_register8(5, register_file.e);
+void CPU::reset_bit_5_e_0xcb_0xab() {
+    reset_bit_position_uint8(5, register_file.e);
 }
 
-void CPU::reset_bit_5_h_prefix_0xac() {
-    reset_bit_position_register8(5, register_file.h);
+void CPU::reset_bit_5_h_0xcb_0xac() {
+    reset_bit_position_uint8(5, register_file.h);
 }
 
-void CPU::reset_bit_5_l_prefix_0xad() {
-    reset_bit_position_register8(5, register_file.l);
+void CPU::reset_bit_5_l_0xcb_0xad() {
+    reset_bit_position_uint8(5, register_file.l);
 }
 
-void CPU::reset_bit_5_memory_hl_prefix_0xae() {
+void CPU::reset_bit_5_memory_hl_0xcb_0xae() {
     reset_bit_position_memory_hl(5);
 }
 
-void CPU::reset_bit_5_a_prefix_0xaf() {
-    reset_bit_position_register8(5, register_file.a);
+void CPU::reset_bit_5_a_0xcb_0xaf() {
+    reset_bit_position_uint8(5, register_file.a);
 }
 
-void CPU::reset_bit_6_b_prefix_0xb0() {
-    reset_bit_position_register8(6, register_file.b);
+void CPU::reset_bit_6_b_0xcb_0xb0() {
+    reset_bit_position_uint8(6, register_file.b);
 }
 
-void CPU::reset_bit_6_c_prefix_0xb1() {
-    reset_bit_position_register8(6, register_file.c);
+void CPU::reset_bit_6_c_0xcb_0xb1() {
+    reset_bit_position_uint8(6, register_file.c);
 }
 
-void CPU::reset_bit_6_d_prefix_0xb2() {
-    reset_bit_position_register8(6, register_file.d);
+void CPU::reset_bit_6_d_0xcb_0xb2() {
+    reset_bit_position_uint8(6, register_file.d);
 }
 
-void CPU::reset_bit_6_e_prefix_0xb3() {
-    reset_bit_position_register8(6, register_file.e);
+void CPU::reset_bit_6_e_0xcb_0xb3() {
+    reset_bit_position_uint8(6, register_file.e);
 }
 
-void CPU::reset_bit_6_h_prefix_0xb4() {
-    reset_bit_position_register8(6, register_file.h);
+void CPU::reset_bit_6_h_0xcb_0xb4() {
+    reset_bit_position_uint8(6, register_file.h);
 }
 
-void CPU::reset_bit_6_l_prefix_0xb5() {
-    reset_bit_position_register8(6, register_file.l);
+void CPU::reset_bit_6_l_0xcb_0xb5() {
+    reset_bit_position_uint8(6, register_file.l);
 }
 
-void CPU::reset_bit_6_memory_hl_prefix_0xb6() {
+void CPU::reset_bit_6_memory_hl_0xcb_0xb6() {
     reset_bit_position_memory_hl(6);
 }
 
-void CPU::reset_bit_6_a_prefix_0xb7() {
-    reset_bit_position_register8(6, register_file.a);
+void CPU::reset_bit_6_a_0xcb_0xb7() {
+    reset_bit_position_uint8(6, register_file.a);
 }
 
-void CPU::reset_bit_7_b_prefix_0xb8() {
-    reset_bit_position_register8(7, register_file.b);
+void CPU::reset_bit_7_b_0xcb_0xb8() {
+    reset_bit_position_uint8(7, register_file.b);
 }
 
-void CPU::reset_bit_7_c_prefix_0xb9() {
-    reset_bit_position_register8(7, register_file.c);
+void CPU::reset_bit_7_c_0xcb_0xb9() {
+    reset_bit_position_uint8(7, register_file.c);
 }
 
-void CPU::reset_bit_7_d_prefix_0xba() {
-    reset_bit_position_register8(7, register_file.d);
+void CPU::reset_bit_7_d_0xcb_0xba() {
+    reset_bit_position_uint8(7, register_file.d);
 }
 
-void CPU::reset_bit_7_e_prefix_0xbb() {
-    reset_bit_position_register8(7, register_file.e);
+void CPU::reset_bit_7_e_0xcb_0xbb() {
+    reset_bit_position_uint8(7, register_file.e);
 }
 
-void CPU::reset_bit_7_h_prefix_0xbc() {
-    reset_bit_position_register8(7, register_file.h);
+void CPU::reset_bit_7_h_0xcb_0xbc() {
+    reset_bit_position_uint8(7, register_file.h);
 }
 
-void CPU::reset_bit_7_l_prefix_0xbd() {
-    reset_bit_position_register8(7, register_file.l);
+void CPU::reset_bit_7_l_0xcb_0xbd() {
+    reset_bit_position_uint8(7, register_file.l);
 }
 
-void CPU::reset_bit_7_memory_hl_prefix_0xbe() {
+void CPU::reset_bit_7_memory_hl_0xcb_0xbe() {
     reset_bit_position_memory_hl(7);
 }
 
-void CPU::reset_bit_7_a_prefix_0xbf() {
-    reset_bit_position_register8(7, register_file.a);
+void CPU::reset_bit_7_a_0xcb_0xbf() {
+    reset_bit_position_uint8(7, register_file.a);
 }
 
-void CPU::set_bit_0_b_prefix_0xc0() {
-    set_bit_position_register8(0, register_file.b);
+void CPU::set_bit_0_b_0xcb_0xc0() {
+    set_bit_position_uint8(0, register_file.b);
 }
 
-void CPU::set_bit_0_c_prefix_0xc1() {
-    set_bit_position_register8(0, register_file.c);
+void CPU::set_bit_0_c_0xcb_0xc1() {
+    set_bit_position_uint8(0, register_file.c);
 }
 
-void CPU::set_bit_0_d_prefix_0xc2() {
-    set_bit_position_register8(0, register_file.d);
+void CPU::set_bit_0_d_0xcb_0xc2() {
+    set_bit_position_uint8(0, register_file.d);
 }
 
-void CPU::set_bit_0_e_prefix_0xc3() {
-    set_bit_position_register8(0, register_file.e);
+void CPU::set_bit_0_e_0xcb_0xc3() {
+    set_bit_position_uint8(0, register_file.e);
 }
 
-void CPU::set_bit_0_h_prefix_0xc4() {
-    set_bit_position_register8(0, register_file.h);
+void CPU::set_bit_0_h_0xcb_0xc4() {
+    set_bit_position_uint8(0, register_file.h);
 }
 
-void CPU::set_bit_0_l_prefix_0xc5() {
-    set_bit_position_register8(0, register_file.l);
+void CPU::set_bit_0_l_0xcb_0xc5() {
+    set_bit_position_uint8(0, register_file.l);
 }
 
-void CPU::set_bit_0_memory_hl_prefix_0xc6() {
+void CPU::set_bit_0_memory_hl_0xcb_0xc6() {
     set_bit_position_memory_hl(0);
 }
 
-void CPU::set_bit_0_a_prefix_0xc7() {
-    set_bit_position_register8(0, register_file.a);
+void CPU::set_bit_0_a_0xcb_0xc7() {
+    set_bit_position_uint8(0, register_file.a);
 }
 
-void CPU::set_bit_1_b_prefix_0xc8() {
-    set_bit_position_register8(1, register_file.b);
+void CPU::set_bit_1_b_0xcb_0xc8() {
+    set_bit_position_uint8(1, register_file.b);
 }
 
-void CPU::set_bit_1_c_prefix_0xc9() {
-    set_bit_position_register8(1, register_file.c);
+void CPU::set_bit_1_c_0xcb_0xc9() {
+    set_bit_position_uint8(1, register_file.c);
 }
 
-void CPU::set_bit_1_d_prefix_0xca() {
-    set_bit_position_register8(1, register_file.d);
+void CPU::set_bit_1_d_0xcb_0xca() {
+    set_bit_position_uint8(1, register_file.d);
 }
 
-void CPU::set_bit_1_e_prefix_0xcb() {
-    set_bit_position_register8(1, register_file.e);
+void CPU::set_bit_1_e_0xcb_0xcb() {
+    set_bit_position_uint8(1, register_file.e);
 }
 
-void CPU::set_bit_1_h_prefix_0xcc() {
-    set_bit_position_register8(1, register_file.h);
+void CPU::set_bit_1_h_0xcb_0xcc() {
+    set_bit_position_uint8(1, register_file.h);
 }
 
-void CPU::set_bit_1_l_prefix_0xcd() {
-    set_bit_position_register8(1, register_file.l);
+void CPU::set_bit_1_l_0xcb_0xcd() {
+    set_bit_position_uint8(1, register_file.l);
 }
 
-void CPU::set_bit_1_memory_hl_prefix_0xce() {
+void CPU::set_bit_1_memory_hl_0xcb_0xce() {
     set_bit_position_memory_hl(1);
 }
 
-void CPU::set_bit_1_a_prefix_0xcf() {
-    set_bit_position_register8(1, register_file.a);
+void CPU::set_bit_1_a_0xcb_0xcf() {
+    set_bit_position_uint8(1, register_file.a);
 }
 
-void CPU::set_bit_2_b_prefix_0xd0() {
-    set_bit_position_register8(2, register_file.b);
+void CPU::set_bit_2_b_0xcb_0xd0() {
+    set_bit_position_uint8(2, register_file.b);
 }
 
-void CPU::set_bit_2_c_prefix_0xd1() {
-    set_bit_position_register8(2, register_file.c);
+void CPU::set_bit_2_c_0xcb_0xd1() {
+    set_bit_position_uint8(2, register_file.c);
 }
 
-void CPU::set_bit_2_d_prefix_0xd2() {
-    set_bit_position_register8(2, register_file.d);
+void CPU::set_bit_2_d_0xcb_0xd2() {
+    set_bit_position_uint8(2, register_file.d);
 }
 
-void CPU::set_bit_2_e_prefix_0xd3() {
-    set_bit_position_register8(2, register_file.e);
+void CPU::set_bit_2_e_0xcb_0xd3() {
+    set_bit_position_uint8(2, register_file.e);
 }
 
-void CPU::set_bit_2_h_prefix_0xd4() {
-    set_bit_position_register8(2, register_file.h);
+void CPU::set_bit_2_h_0xcb_0xd4() {
+    set_bit_position_uint8(2, register_file.h);
 }
 
-void CPU::set_bit_2_l_prefix_0xd5() {
-    set_bit_position_register8(2, register_file.l);
+void CPU::set_bit_2_l_0xcb_0xd5() {
+    set_bit_position_uint8(2, register_file.l);
 }
 
-void CPU::set_bit_2_memory_hl_prefix_0xd6() {
+void CPU::set_bit_2_memory_hl_0xcb_0xd6() {
     set_bit_position_memory_hl(2);
 }
 
-void CPU::set_bit_2_a_prefix_0xd7() {
-    set_bit_position_register8(2, register_file.a);
+void CPU::set_bit_2_a_0xcb_0xd7() {
+    set_bit_position_uint8(2, register_file.a);
 }
 
-void CPU::set_bit_3_b_prefix_0xd8() {
-    set_bit_position_register8(3, register_file.b);
+void CPU::set_bit_3_b_0xcb_0xd8() {
+    set_bit_position_uint8(3, register_file.b);
 }
 
-void CPU::set_bit_3_c_prefix_0xd9() {
-    set_bit_position_register8(3, register_file.c);
+void CPU::set_bit_3_c_0xcb_0xd9() {
+    set_bit_position_uint8(3, register_file.c);
 }
 
-void CPU::set_bit_3_d_prefix_0xda() {
-    set_bit_position_register8(3, register_file.d);
+void CPU::set_bit_3_d_0xcb_0xda() {
+    set_bit_position_uint8(3, register_file.d);
 }
 
-void CPU::set_bit_3_e_prefix_0xdb() {
-    set_bit_position_register8(3, register_file.e);
+void CPU::set_bit_3_e_0xcb_0xdb() {
+    set_bit_position_uint8(3, register_file.e);
 }
 
-void CPU::set_bit_3_h_prefix_0xdc() {
-    set_bit_position_register8(3, register_file.h);
+void CPU::set_bit_3_h_0xcb_0xdc() {
+    set_bit_position_uint8(3, register_file.h);
 }
 
-void CPU::set_bit_3_l_prefix_0xdd() {
-    set_bit_position_register8(3, register_file.l);
+void CPU::set_bit_3_l_0xcb_0xdd() {
+    set_bit_position_uint8(3, register_file.l);
 }
 
-void CPU::set_bit_3_memory_hl_prefix_0xde() {
+void CPU::set_bit_3_memory_hl_0xcb_0xde() {
     set_bit_position_memory_hl(3);
 }
 
-void CPU::set_bit_3_a_prefix_0xdf() {
-    set_bit_position_register8(3, register_file.a);
+void CPU::set_bit_3_a_0xcb_0xdf() {
+    set_bit_position_uint8(3, register_file.a);
 }
 
-void CPU::set_bit_4_b_prefix_0xe0() {
-    set_bit_position_register8(4, register_file.b);
+void CPU::set_bit_4_b_0xcb_0xe0() {
+    set_bit_position_uint8(4, register_file.b);
 }
 
-void CPU::set_bit_4_c_prefix_0xe1() {
-    set_bit_position_register8(4, register_file.c);
+void CPU::set_bit_4_c_0xcb_0xe1() {
+    set_bit_position_uint8(4, register_file.c);
 }
 
-void CPU::set_bit_4_d_prefix_0xe2() {
-    set_bit_position_register8(4, register_file.d);
+void CPU::set_bit_4_d_0xcb_0xe2() {
+    set_bit_position_uint8(4, register_file.d);
 }
 
-void CPU::set_bit_4_e_prefix_0xe3() {
-    set_bit_position_register8(4, register_file.e);
+void CPU::set_bit_4_e_0xcb_0xe3() {
+    set_bit_position_uint8(4, register_file.e);
 }
 
-void CPU::set_bit_4_h_prefix_0xe4() {
-    set_bit_position_register8(4, register_file.h);
+void CPU::set_bit_4_h_0xcb_0xe4() {
+    set_bit_position_uint8(4, register_file.h);
 }
 
-void CPU::set_bit_4_l_prefix_0xe5() {
-    set_bit_position_register8(4, register_file.l);
+void CPU::set_bit_4_l_0xcb_0xe5() {
+    set_bit_position_uint8(4, register_file.l);
 }
 
-void CPU::set_bit_4_memory_hl_prefix_0xe6() {
+void CPU::set_bit_4_memory_hl_0xcb_0xe6() {
     set_bit_position_memory_hl(4);
 }
 
-void CPU::set_bit_4_a_prefix_0xe7() {
-    set_bit_position_register8(4, register_file.a);
+void CPU::set_bit_4_a_0xcb_0xe7() {
+    set_bit_position_uint8(4, register_file.a);
 }
 
-void CPU::set_bit_5_b_prefix_0xe8() {
-    set_bit_position_register8(5, register_file.b);
+void CPU::set_bit_5_b_0xcb_0xe8() {
+    set_bit_position_uint8(5, register_file.b);
 }
 
-void CPU::set_bit_5_c_prefix_0xe9() {
-    set_bit_position_register8(5, register_file.c);
+void CPU::set_bit_5_c_0xcb_0xe9() {
+    set_bit_position_uint8(5, register_file.c);
 }
 
-void CPU::set_bit_5_d_prefix_0xea() {
-    set_bit_position_register8(5, register_file.d);
+void CPU::set_bit_5_d_0xcb_0xea() {
+    set_bit_position_uint8(5, register_file.d);
 }
 
-void CPU::set_bit_5_e_prefix_0xeb() {
-    set_bit_position_register8(5, register_file.e);
+void CPU::set_bit_5_e_0xcb_0xeb() {
+    set_bit_position_uint8(5, register_file.e);
 }
 
-void CPU::set_bit_5_h_prefix_0xec() {
-    set_bit_position_register8(5, register_file.h);
+void CPU::set_bit_5_h_0xcb_0xec() {
+    set_bit_position_uint8(5, register_file.h);
 }
 
-void CPU::set_bit_5_l_prefix_0xed() {
-    set_bit_position_register8(5, register_file.l);
+void CPU::set_bit_5_l_0xcb_0xed() {
+    set_bit_position_uint8(5, register_file.l);
 }
 
-void CPU::set_bit_5_memory_hl_prefix_0xee() {
+void CPU::set_bit_5_memory_hl_0xcb_0xee() {
     set_bit_position_memory_hl(5);
 }
 
-void CPU::set_bit_5_a_prefix_0xef() {
-    set_bit_position_register8(5, register_file.a);
+void CPU::set_bit_5_a_0xcb_0xef() {
+    set_bit_position_uint8(5, register_file.a);
 }
 
-void CPU::set_bit_6_b_prefix_0xf0() {
-    set_bit_position_register8(6, register_file.b);
+void CPU::set_bit_6_b_0xcb_0xf0() {
+    set_bit_position_uint8(6, register_file.b);
 }
 
-void CPU::set_bit_6_c_prefix_0xf1() {
-    set_bit_position_register8(6, register_file.c);
+void CPU::set_bit_6_c_0xcb_0xf1() {
+    set_bit_position_uint8(6, register_file.c);
 }
 
-void CPU::set_bit_6_d_prefix_0xf2() {
-    set_bit_position_register8(6, register_file.d);
+void CPU::set_bit_6_d_0xcb_0xf2() {
+    set_bit_position_uint8(6, register_file.d);
 }
 
-void CPU::set_bit_6_e_prefix_0xf3() {
-    set_bit_position_register8(6, register_file.e);
+void CPU::set_bit_6_e_0xcb_0xf3() {
+    set_bit_position_uint8(6, register_file.e);
 }
 
-void CPU::set_bit_6_h_prefix_0xf4() {
-    set_bit_position_register8(6, register_file.h);
+void CPU::set_bit_6_h_0xcb_0xf4() {
+    set_bit_position_uint8(6, register_file.h);
 }
 
-void CPU::set_bit_6_l_prefix_0xf5() {
-    set_bit_position_register8(6, register_file.l);
+void CPU::set_bit_6_l_0xcb_0xf5() {
+    set_bit_position_uint8(6, register_file.l);
 }
 
-void CPU::set_bit_6_memory_hl_prefix_0xf6() {
+void CPU::set_bit_6_memory_hl_0xcb_0xf6() {
     set_bit_position_memory_hl(6);
 }
 
-void CPU::set_bit_6_a_prefix_0xf7() {
-    set_bit_position_register8(6, register_file.a);
+void CPU::set_bit_6_a_0xcb_0xf7() {
+    set_bit_position_uint8(6, register_file.a);
 }
 
-void CPU::set_bit_7_b_prefix_0xf8() {
-    set_bit_position_register8(7, register_file.b);
+void CPU::set_bit_7_b_0xcb_0xf8() {
+    set_bit_position_uint8(7, register_file.b);
 }
 
-void CPU::set_bit_7_c_prefix_0xf9() {
-    set_bit_position_register8(7, register_file.c);
+void CPU::set_bit_7_c_0xcb_0xf9() {
+    set_bit_position_uint8(7, register_file.c);
 }
 
-void CPU::set_bit_7_d_prefix_0xfa() {
-    set_bit_position_register8(7, register_file.d);
+void CPU::set_bit_7_d_0xcb_0xfa() {
+    set_bit_position_uint8(7, register_file.d);
 }
 
-void CPU::set_bit_7_e_prefix_0xfb() {
-    set_bit_position_register8(7, register_file.e);
+void CPU::set_bit_7_e_0xcb_0xfb() {
+    set_bit_position_uint8(7, register_file.e);
 }
 
-void CPU::set_bit_7_h_prefix_0xfc() {
-    set_bit_position_register8(7, register_file.h);
+void CPU::set_bit_7_h_0xcb_0xfc() {
+    set_bit_position_uint8(7, register_file.h);
 }
 
-void CPU::set_bit_7_l_prefix_0xfd() {
-    set_bit_position_register8(7, register_file.l);
+void CPU::set_bit_7_l_0xcb_0xfd() {
+    set_bit_position_uint8(7, register_file.l);
 }
 
-void CPU::set_bit_7_memory_hl_prefix_0xfe() {
+void CPU::set_bit_7_memory_hl_0xcb_0xfe() {
     set_bit_position_memory_hl(7);
 }
 
-void CPU::set_bit_7_a_prefix_0xff() {
-    set_bit_position_register8(7, register_file.a);
+void CPU::set_bit_7_a_0xcb_0xff() {
+    set_bit_position_uint8(7, register_file.a);
 }
 
 } // namespace GameBoy

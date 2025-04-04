@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "tetris.gb";
+    std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "cpu_instrs" / "individual" / "11-op a,(hl).gb";
     game_boy_emulator.try_load_file_to_memory(0x0000, GameBoy::COLLECTIVE_ROM_BANK_SIZE, test_rom_path, false);
 
     if (bootrom_path.empty()) {
@@ -35,9 +35,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    while (game_boy_emulator.get_program_counter() < 0x100) {
+    while (true) {
         game_boy_emulator.execute_next_instruction();
     }
-    game_boy_emulator.print_register_file_values();
+    //game_boy_emulator.print_register_file_state();
     return 0;
 }

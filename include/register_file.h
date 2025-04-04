@@ -5,6 +5,11 @@
 
 namespace GameBoy {
 
+constexpr uint8_t FLAG_ZERO_MASK = 1 << 7;
+constexpr uint8_t FLAG_SUBTRACT_MASK = 1 << 6; // Also known as the 'N' flag
+constexpr uint8_t FLAG_HALF_CARRY_MASK = 1 << 5; // For a carry from bit 3-4 or 11-12
+constexpr uint8_t FLAG_CARRY_MASK = 1 << 4;
+
 template <std::endian E>
 struct RegisterFile;
 

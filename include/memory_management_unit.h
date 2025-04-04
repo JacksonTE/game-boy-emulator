@@ -22,8 +22,8 @@ public:
     void set_post_boot_state();
     bool try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
 
-    virtual uint8_t read_8(uint16_t address) const;
-    virtual void write_8(uint16_t address, uint8_t value);
+    virtual uint8_t read_byte(uint16_t address) const;
+    virtual void write_byte(uint16_t address, uint8_t value);
 
     void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
 
