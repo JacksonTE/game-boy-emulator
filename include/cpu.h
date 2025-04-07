@@ -9,8 +9,15 @@
 
 namespace GameBoy {
 
-constexpr uint8_t INSTRUCTION_0xcb_BYTE = 0xcb;
+constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
+constexpr uint8_t HALT_OPCODE = 0x76;
 constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
+
+enum class InterruptMasterEnableState {
+    Disabled,
+    WillEnable,
+    Enabled
+};
 
 class CPU {
 public:
@@ -19,8 +26,8 @@ public:
     void reset_state();
     void set_post_boot_state();
 
+    void step();
     void tick_machine_cycle();
-    void execute_next_instruction();
 
     RegisterFile<std::endian::native> get_register_file() const;
     void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
@@ -29,19 +36,22 @@ public:
 private:
     std::function<void(MachineCycleInteraction)> emulator_tick_callback;
     MemoryManagementUnit &memory_interface;
-    uint8_t instruction_register{};
     RegisterFile<std::endian::native> register_file;
     uint64_t cycles_elapsed{};
-    bool interrupt_master_enable{};
+    InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
+    uint8_t instruction_register_ir{};
+    bool is_instruction_prefixed{};
     bool is_stopped{};
     bool is_halted{};
+
+    void execute_next_instruction_and_fetch();
+    void service_interrupt();
+    uint8_t get_pending_interrupt_mask();
 
     uint8_t read_byte_and_tick(uint16_t address);
     void write_byte_and_tick(uint16_t address, uint8_t value);
     uint8_t fetch_immediate8_and_tick();
     uint16_t fetch_immediate16_and_tick();
-    void handle_interrupt();
-    void execute_instruction(uint8_t opcode);
 
     using InstructionPointer = void (CPU:: *)();
     static const InstructionPointer instruction_table[0x100];
@@ -67,7 +77,7 @@ private:
     void jump_relative_conditional_signed_immediate8(bool is_condition_met);
     void jump_conditional_immediate16(bool is_condition_met);
     uint16_t pop_stack();
-    void push_stack_uint16(const uint16_t &uint16);
+    void push_stack_register16(const uint16_t &register16);
     void call_conditional_immediate16(bool is_condition_met);
     void return_conditional(bool is_condition_met);
     void restart_at_address(uint16_t address);
@@ -321,7 +331,7 @@ private:
     void push_stack_hl_0xe5();
     void and_a_immediate8_0xe6();
     void restart_at_0x20_0xe7();
-    void add_sp_signed_immediate8_0xe8();
+    void add_stack_pointer_signed_immediate8_0xe8();
     void jump_hl_0xe9();
     void load_memory_immediate16_a_0xea();
     // 0xeb is an unused opcode

@@ -91,7 +91,7 @@ bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_by
         std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
     }
 
-    if (!file.read(reinterpret_cast<char*>(is_bootrom_file ? bootrom.get() : placeholder_memory.get()), number_of_bytes_to_load)) {
+    if (!file.read(reinterpret_cast<char *>(is_bootrom_file ? bootrom.get() : placeholder_memory.get()), number_of_bytes_to_load)) {
         if (is_bootrom_file) {
             bootrom.reset();
         }
@@ -103,24 +103,94 @@ bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_by
 }
 
 uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
-    bool is_bootrom_mapped = placeholder_memory[BOOTROM_STATUS_ADDRESS] == 0;
-
-    if (is_bootrom_mapped && address < BOOTROM_SIZE) {
+    if (bootrom_status == 0 && address < BOOTROM_SIZE) {
         if (bootrom == nullptr) {
             std::cerr << std::hex << std::setfill('0');
-            std::cerr << "Warning: attempted read from address (" << std::setw(4) << address << ") pointing to an unallocated boot ROM."
+            std::cerr << "Warning: attempted read from bootrom address (" << std::setw(4) << address << ") pointing to an unallocated bootrom. "
                       << "Returning 0xff as a fallback.\n";
             return 0xff;
-        }    
+        }
         return bootrom[address];
     }
-    return address == 0xff44 ? 0x90 : placeholder_memory[address];
+    else if (address == 0xff04) {
+        return divider_div;
+    }
+    else if (address == 0xff05) {
+        return timer_counter_tima;
+    }
+    else if (address == 0xff06) {
+        return timer_modulo_tma;
+    }
+    else if (address == 0xff07) {
+        return timer_control_tac;
+    }
+    else if (address == 0xff0f) {
+        return interrupt_flag_if | 0b11100000;
+    }
+    else if (address == 0xff44) {
+        return 0x90;
+    }
+    else if (address == 0xff50) {
+        return bootrom_status;
+    }
+    else if (address == 0xffff) {
+        return interrupt_enable | 0b11100000;
+    }
+
+    return placeholder_memory[address];
 }
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
-    if (address == 0xff01)
+    if (address == 0xff01) { // For Blargg tests
         std::cout << value;
-    placeholder_memory[address] = value;
+    }
+
+    if (address == 0xff04) {
+        const bool should_tick_timer_extra = is_selected_system_counter_bit_set();
+        system_counter = 0x0000;
+        divider_div = 0x00;
+        if (should_tick_timer_extra) {
+            tick_machine_cycle();
+        }
+    }
+    else if (address == 0xff05) {
+        if (!did_timer_counter_overflow &&
+            timer_counter_tima == timer_modulo_tma &&
+            is_interrupt_type_requested(INTERRUPT_FLAG_TIMER_MASK)) {
+            return;
+        }
+        timer_counter_tima = value;
+        did_timer_counter_overflow = false;
+    }
+    else if (address == 0xff06) {
+        if (!did_timer_counter_overflow &&
+            timer_counter_tima == timer_modulo_tma &&
+            is_interrupt_type_requested(INTERRUPT_FLAG_TIMER_MASK)) {
+            timer_counter_tima = value;
+        }
+        timer_modulo_tma = value;
+    }
+    else if (address == 0xff07) {
+        const bool is_timer_enabled_before = is_timer_counter_tima_enabled();
+        const bool is_selected_bit_set_before = is_selected_system_counter_bit_set();
+        timer_control_tac = value;
+        if ((is_selected_bit_set_before && !is_selected_system_counter_bit_set()) ||
+            (is_timer_enabled_before && !is_timer_counter_tima_enabled() && !is_selected_system_counter_bit_set())) {
+            tick_machine_cycle();
+        }
+    }
+    else if (address == 0xff0f) {
+        interrupt_flag_if = value | 0b11100000;
+    }
+    else if (address == 0xff50) {
+        bootrom_status = value;
+    }
+    else if (address == 0xffff) {
+        interrupt_enable = value | 0b11100000;
+    }
+    else {
+        placeholder_memory[address] = value;
+    }
 }
 
 void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t end_address) const {
@@ -150,6 +220,61 @@ void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t
         std::cout << "\n";
     }
     std::cout << "=====================================================\n";
+}
+
+void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask) {
+    interrupt_flag_if |= interrupt_flag_mask;
+}
+
+bool MemoryManagementUnit::is_interrupt_type_requested(uint8_t interrupt_flag_mask) const {
+    return (interrupt_flag_if & interrupt_flag_mask) != 0;
+}
+
+bool MemoryManagementUnit::is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const {
+    return (interrupt_enable & interrupt_flag_mask) != 0;
+}
+
+void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask) {
+    interrupt_flag_if &= ~interrupt_flag_mask;
+}
+
+void MemoryManagementUnit::tick_machine_cycle() {
+    if (did_timer_counter_overflow) {
+        did_timer_counter_overflow = false;
+        timer_counter_tima = timer_modulo_tma;
+        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
+    }
+
+    system_counter += 4;
+    divider_div = static_cast<uint8_t>(system_counter >> 8);
+
+    if (should_increment_timer_counter_tima()) {
+        timer_counter_tima++;
+
+        if (timer_counter_tima == 0) {
+            did_timer_counter_overflow = true;
+        }
+    }
+}
+
+bool MemoryManagementUnit::is_timer_counter_tima_enabled() const {
+    return (timer_control_tac & 0b00000100) != 0;
+}
+
+bool MemoryManagementUnit::should_increment_timer_counter_tima() const {
+    uint8_t clock_select = timer_control_tac & 0b00000011;
+
+    return is_timer_counter_tima_enabled() &&
+           ((clock_select == 0b00 && system_counter % 1024 == 0) ||
+            (clock_select == 0b01 && system_counter % 16 == 0) ||
+            (clock_select == 0b10 && system_counter % 64 == 0) ||
+            (clock_select == 0b11 && system_counter % 256 == 0));
+}
+
+bool MemoryManagementUnit::is_selected_system_counter_bit_set() const {
+    const uint8_t clock_select_to_system_counter_bit[4] = {9, 3, 5, 7};
+    uint8_t clock_select = timer_control_tac & 0b00000011;
+    return (system_counter & (1 << clock_select_to_system_counter_bit[clock_select])) != 0;
 }
 
 } //namespace GameBoy

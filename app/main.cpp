@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "cpu_instrs" / "individual" / "11-op a,(hl).gb";
+    std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "cpu_instrs" / "individual" / "02-interrupts.gb";
     game_boy_emulator.try_load_file_to_memory(0x0000, GameBoy::COLLECTIVE_ROM_BANK_SIZE, test_rom_path, false);
 
     if (bootrom_path.empty()) {

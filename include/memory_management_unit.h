@@ -12,7 +12,14 @@ constexpr uint16_t COLLECTIVE_ROM_BANK_SIZE = 0x8000;
 constexpr uint16_t BOOTROM_SIZE = 0x100;
 
 constexpr uint16_t HIGH_RAM_START = 0xff00;
-constexpr uint16_t BOOTROM_STATUS_ADDRESS = 0xff50;
+
+constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
+
+constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
+constexpr uint8_t INTERRUPT_FLAG_SERIAL_MASK = 1 << 3;
+constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;
+constexpr uint8_t INTERRUPT_FLAG_LCD_MASK = 1 << 1;
+constexpr uint8_t INTERRUPT_FLAG_VBLANK_MASK = 1 << 0;
 
 class MemoryManagementUnit {
 public:
@@ -27,9 +34,30 @@ public:
 
     void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
 
+    void request_interrupt(uint8_t interrupt_flag_mask);
+    bool is_interrupt_type_requested(uint8_t interrupt_flag_mask) const;
+    bool is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const;
+    void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
+
+    void tick_machine_cycle();
+
 private:
     std::unique_ptr<uint8_t[]> placeholder_memory;
     std::unique_ptr<uint8_t[]> bootrom{};
+    uint16_t system_counter{};
+    bool did_timer_counter_overflow{};
+
+    uint8_t divider_div{};
+    uint8_t timer_counter_tima{};
+    uint8_t timer_modulo_tma{};
+    uint8_t timer_control_tac{};
+    uint8_t interrupt_flag_if{0b11100000};
+    uint8_t bootrom_status{};
+    uint8_t interrupt_enable{0b11100000};
+
+    bool is_timer_counter_tima_enabled() const;
+    bool should_increment_timer_counter_tima() const;
+    bool is_selected_system_counter_bit_set() const;
 };
 
 } // namespace GameBoy

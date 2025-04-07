@@ -33,7 +33,8 @@ void Emulator::tick_all_components() {
 }
 
 void Emulator::execute_next_instruction() {
-	cpu.execute_next_instruction();
+	cpu.step();
+	memory_interface->tick_machine_cycle();
 }
 
 RegisterFile<std::endian::native> Emulator::get_register_file() const {

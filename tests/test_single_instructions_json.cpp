@@ -187,14 +187,14 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile) {
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
-        game_boy_cpu.execute_next_instruction(); // Execute initial NOP (no operation) and fetch first instruction
-        game_boy_cpu.execute_next_instruction();
+        game_boy_cpu.step(); // Execute initial NOP (no operation) and fetch first instruction
+        game_boy_cpu.step();
 
         EXPECT_EQ(game_boy_cpu.get_register_file().af, test_case.expected_register_values.af);
         EXPECT_EQ(game_boy_cpu.get_register_file().bc, test_case.expected_register_values.bc);
         EXPECT_EQ(game_boy_cpu.get_register_file().de, test_case.expected_register_values.de);
         EXPECT_EQ(game_boy_cpu.get_register_file().hl, test_case.expected_register_values.hl);
-        EXPECT_EQ(static_cast<uint16_t>(game_boy_cpu.get_register_file().program_counter - 1), test_case.expected_register_values.program_counter); // Compare expected pc against pc-1 since I fetch instruction at the end of the current one
+        EXPECT_EQ(static_cast<uint16_t>(game_boy_cpu.get_register_file().program_counter - 1), test_case.expected_register_values.program_counter); // Compare expected program_counter against program_counter-1 since next instruction is fetched at the end of the current one
         EXPECT_EQ(game_boy_cpu.get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
 
         for (const AddressValuePair &expected_pair : test_case.expected_ram_values) {
