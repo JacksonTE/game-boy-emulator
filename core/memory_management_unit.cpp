@@ -141,13 +141,13 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
 }
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
-    if (address == 0xff01) { // For Blargg tests
-        std::cout << value;
-    }
-
     if (address == 0xff04) {
         system_counter = 0x0000;
-        // TODO handle obscure case?
+
+        if (does_timer_increment_and_overflow()) {
+            request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
+            timer_tima = timer_modulo_tma;
+        }
     }
     else if (address == 0xff05) {
         if (is_timer_tima_overflow_handled) {
@@ -166,7 +166,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
     else if (address == 0xff07) {
         timer_control_tac = value;
 
-        if (update_timer_tima_and_check_overflow()) {
+        if (does_timer_increment_and_overflow()) {
             request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
             timer_tima = timer_modulo_tma;
         }
@@ -240,16 +240,16 @@ void MemoryManagementUnit::tick_machine_cycle() {
         did_timer_tima_overflow = false;
     }
 
-    did_timer_tima_overflow = update_timer_tima_and_check_overflow();
+    did_timer_tima_overflow = does_timer_increment_and_overflow();
 }
 
-bool MemoryManagementUnit::update_timer_tima_and_check_overflow() {
+bool MemoryManagementUnit::does_timer_increment_and_overflow() {
     const bool is_timer_tima_enabled = (timer_control_tac & 0b00000100) != 0;
 
     const uint8_t clock_select = timer_control_tac & 0b00000011;
     const uint8_t clock_select_to_selected_system_counter_bit[4] = {9, 3, 5, 7};
     const uint8_t selected_system_counter_bit = clock_select_to_selected_system_counter_bit[clock_select];
-    const bool is_selected_system_counter_bit_set = is_timer_tima_enabled && 
+    const bool is_selected_system_counter_bit_set = is_timer_tima_enabled &&
                                                     (system_counter & (1 << selected_system_counter_bit)) != 0;
 
     const bool overflow = !is_selected_system_counter_bit_set &&

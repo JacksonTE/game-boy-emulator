@@ -22,8 +22,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) / 
-        "tests" / "data" / "blargg-tests" / "gb-test-roms" / "cpu_instrs" / "individual" / "06-ld r,r.gb";
+    std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) /
+        "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "timer" / "tma_write_reloading.gb";
     game_boy_emulator.try_load_file_to_memory(0x0000, GameBoy::COLLECTIVE_ROM_BANK_SIZE, test_rom_path, false);
 
     if (bootrom_path.empty()) {
@@ -37,6 +37,15 @@ int main(int argc, char *argv[]) {
     }
 
     while (true) {
+        auto r = game_boy_emulator.get_register_file();
+        if (r.b == 42 && r.c == 42 && r.d == 42 && r.e == 42 && r.h == 42 && r.l == 42) {
+            std::cout << "test failed" << "\n";
+            break;
+        }
+        if (r.b == 3 && r.c == 5 && r.d == 8 && r.e == 13 && r.h == 21 && r.l == 34) {
+            std::cout << "test passed" << "\n";
+            break;
+        }
         game_boy_emulator.execute_next_instruction();
     }
     //game_boy_emulator.print_register_file_state();

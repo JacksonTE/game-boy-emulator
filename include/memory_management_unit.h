@@ -56,7 +56,7 @@ private:
     uint8_t bootrom_status{};
     uint8_t interrupt_enable_ie{0b11100000};
 
-    bool update_timer_tima_and_check_overflow();
+    bool does_timer_increment_and_overflow();
     uint8_t get_divider_div() const;
 };
 
