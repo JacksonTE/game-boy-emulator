@@ -1,0 +1,6 @@
+[submodule "tests/data/single-instructions-json/sm83"]
+	path = tests/data/single-instructions-json/sm83
+	url = https://github.com/SingleStepTests/sm83
+[submodule "tests/data/blargg-tests/gb-test-roms"]
+	path = tests/data/blargg-tests/gb-test-roms
+	url = https://github.com/retrio/gb-test-roms
