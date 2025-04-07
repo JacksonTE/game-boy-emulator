@@ -113,10 +113,10 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
         return bootrom[address];
     }
     else if (address == 0xff04) {
-        return divider_div;
+        return get_divider_div();
     }
     else if (address == 0xff05) {
-        return timer_counter_tima;
+        return timer_tima;
     }
     else if (address == 0xff06) {
         return timer_modulo_tma;
@@ -134,7 +134,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
         return bootrom_status;
     }
     else if (address == 0xffff) {
-        return interrupt_enable | 0b11100000;
+        return interrupt_enable_ie | 0b11100000;
     }
 
     return placeholder_memory[address];
@@ -146,37 +146,29 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
     }
 
     if (address == 0xff04) {
-        const bool should_tick_timer_extra = is_selected_system_counter_bit_set();
         system_counter = 0x0000;
-        divider_div = 0x00;
-        if (should_tick_timer_extra) {
-            tick_machine_cycle();
-        }
+        // TODO handle obscure case?
     }
     else if (address == 0xff05) {
-        if (!did_timer_counter_overflow &&
-            timer_counter_tima == timer_modulo_tma &&
-            is_interrupt_type_requested(INTERRUPT_FLAG_TIMER_MASK)) {
+        if (is_timer_tima_overflow_handled) {
             return;
         }
-        timer_counter_tima = value;
-        did_timer_counter_overflow = false;
+        timer_tima = value;
+        did_timer_tima_overflow = false;
     }
     else if (address == 0xff06) {
-        if (!did_timer_counter_overflow &&
-            timer_counter_tima == timer_modulo_tma &&
-            is_interrupt_type_requested(INTERRUPT_FLAG_TIMER_MASK)) {
-            timer_counter_tima = value;
-        }
         timer_modulo_tma = value;
+
+        if (is_timer_tima_overflow_handled) {
+            timer_tima = timer_modulo_tma;
+        }
     }
     else if (address == 0xff07) {
-        const bool is_timer_enabled_before = is_timer_counter_tima_enabled();
-        const bool is_selected_bit_set_before = is_selected_system_counter_bit_set();
         timer_control_tac = value;
-        if ((is_selected_bit_set_before && !is_selected_system_counter_bit_set()) ||
-            (is_timer_enabled_before && !is_timer_counter_tima_enabled() && !is_selected_system_counter_bit_set())) {
-            tick_machine_cycle();
+
+        if (update_timer_tima_and_check_overflow()) {
+            request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
+            timer_tima = timer_modulo_tma;
         }
     }
     else if (address == 0xff0f) {
@@ -186,7 +178,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
         bootrom_status = value;
     }
     else if (address == 0xffff) {
-        interrupt_enable = value | 0b11100000;
+        interrupt_enable_ie = value | 0b11100000;
     }
     else {
         placeholder_memory[address] = value;
@@ -231,7 +223,7 @@ bool MemoryManagementUnit::is_interrupt_type_requested(uint8_t interrupt_flag_ma
 }
 
 bool MemoryManagementUnit::is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const {
-    return (interrupt_enable & interrupt_flag_mask) != 0;
+    return (interrupt_enable_ie & interrupt_flag_mask) != 0;
 }
 
 void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask) {
@@ -239,42 +231,37 @@ void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask)
 }
 
 void MemoryManagementUnit::tick_machine_cycle() {
-    if (did_timer_counter_overflow) {
-        did_timer_counter_overflow = false;
-        timer_counter_tima = timer_modulo_tma;
-        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
-    }
-
     system_counter += 4;
-    divider_div = static_cast<uint8_t>(system_counter >> 8);
 
-    if (should_increment_timer_counter_tima()) {
-        timer_counter_tima++;
-
-        if (timer_counter_tima == 0) {
-            did_timer_counter_overflow = true;
-        }
+    is_timer_tima_overflow_handled = did_timer_tima_overflow;
+    if (did_timer_tima_overflow) {
+        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
+        timer_tima = timer_modulo_tma;
+        did_timer_tima_overflow = false;
     }
+
+    did_timer_tima_overflow = update_timer_tima_and_check_overflow();
 }
 
-bool MemoryManagementUnit::is_timer_counter_tima_enabled() const {
-    return (timer_control_tac & 0b00000100) != 0;
+bool MemoryManagementUnit::update_timer_tima_and_check_overflow() {
+    const bool is_timer_tima_enabled = (timer_control_tac & 0b00000100) != 0;
+
+    const uint8_t clock_select = timer_control_tac & 0b00000011;
+    const uint8_t clock_select_to_selected_system_counter_bit[4] = {9, 3, 5, 7};
+    const uint8_t selected_system_counter_bit = clock_select_to_selected_system_counter_bit[clock_select];
+    const bool is_selected_system_counter_bit_set = is_timer_tima_enabled && 
+                                                    (system_counter & (1 << selected_system_counter_bit)) != 0;
+
+    const bool overflow = !is_selected_system_counter_bit_set &&
+                           is_previously_selected_system_counter_bit_set &&
+                           (++timer_tima == 0);
+
+    is_previously_selected_system_counter_bit_set = is_selected_system_counter_bit_set;
+    return overflow;
 }
 
-bool MemoryManagementUnit::should_increment_timer_counter_tima() const {
-    uint8_t clock_select = timer_control_tac & 0b00000011;
-
-    return is_timer_counter_tima_enabled() &&
-           ((clock_select == 0b00 && system_counter % 1024 == 0) ||
-            (clock_select == 0b01 && system_counter % 16 == 0) ||
-            (clock_select == 0b10 && system_counter % 64 == 0) ||
-            (clock_select == 0b11 && system_counter % 256 == 0));
-}
-
-bool MemoryManagementUnit::is_selected_system_counter_bit_set() const {
-    const uint8_t clock_select_to_system_counter_bit[4] = {9, 3, 5, 7};
-    uint8_t clock_select = timer_control_tac & 0b00000011;
-    return (system_counter & (1 << clock_select_to_system_counter_bit[clock_select])) != 0;
+uint8_t MemoryManagementUnit::get_divider_div() const {
+    return static_cast<uint8_t>(system_counter >> 8);
 }
 
 } //namespace GameBoy

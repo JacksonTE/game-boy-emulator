@@ -30,11 +30,11 @@ bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path) {
 
 void Emulator::tick_all_components() {
 	cpu.tick_machine_cycle();
+	memory_interface->tick_machine_cycle();
 }
 
 void Emulator::execute_next_instruction() {
 	cpu.step();
-	memory_interface->tick_machine_cycle();
 }
 
 RegisterFile<std::endian::native> Emulator::get_register_file() const {

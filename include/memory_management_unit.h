@@ -45,19 +45,19 @@ private:
     std::unique_ptr<uint8_t[]> placeholder_memory;
     std::unique_ptr<uint8_t[]> bootrom{};
     uint16_t system_counter{};
-    bool did_timer_counter_overflow{};
+    bool is_previously_selected_system_counter_bit_set{};
+    bool did_timer_tima_overflow{};
+    bool is_timer_tima_overflow_handled{};
 
-    uint8_t divider_div{};
-    uint8_t timer_counter_tima{};
+    uint8_t timer_tima{};
     uint8_t timer_modulo_tma{};
     uint8_t timer_control_tac{};
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};
-    uint8_t interrupt_enable{0b11100000};
+    uint8_t interrupt_enable_ie{0b11100000};
 
-    bool is_timer_counter_tima_enabled() const;
-    bool should_increment_timer_counter_tima() const;
-    bool is_selected_system_counter_bit_set() const;
+    bool update_timer_tima_and_check_overflow();
+    uint8_t get_divider_div() const;
 };
 
 } // namespace GameBoy

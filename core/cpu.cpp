@@ -44,7 +44,10 @@ void CPU::set_post_boot_state() {
 }
 
 void CPU::step() {
-    if (!is_halted) {
+    if (is_halted) {
+        emulator_tick_callback(MachineCycleInteraction{MemoryOperation::None});
+    }
+    else {
         execute_next_instruction_and_fetch();
     }
     service_interrupt();
