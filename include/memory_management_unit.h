@@ -15,7 +15,6 @@ constexpr uint16_t BOOTROM_SIZE = 0x100;
 constexpr uint16_t HIGH_RAM_START = 0xff00;
 
 constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
-
 constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
 constexpr uint8_t INTERRUPT_FLAG_SERIAL_MASK = 1 << 3;
 constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;

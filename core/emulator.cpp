@@ -36,10 +36,6 @@ RegisterFile<std::endian::native> Emulator::get_register_file() const {
 	return cpu.get_register_file();
 }
 
-void Emulator::set_register_file_state(const RegisterFile<std::endian::native> &new_register_values) {
-	cpu.set_register_file_state(new_register_values);
-}
-
 void Emulator::print_register_file_state() const {
 	cpu.print_register_file_state();
 }

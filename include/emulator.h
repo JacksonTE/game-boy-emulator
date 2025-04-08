@@ -21,7 +21,6 @@ public:
 	void step_cpu_single_instruction();
 
 	RegisterFile<std::endian::native> get_register_file() const;
-	void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
 	void print_register_file_state() const;
 
 	uint8_t read_byte_from_memory(uint16_t address) const;

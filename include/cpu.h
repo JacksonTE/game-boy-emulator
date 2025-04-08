@@ -10,8 +10,6 @@
 namespace GameBoy {
 
 constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
-constexpr uint8_t HALT_OPCODE = 0x76;
-constexpr uint8_t ENABLE_INTERRUPTS_OPCODE = 0xfb;
 
 enum class InterruptMasterEnableState {
     Disabled,
@@ -45,6 +43,7 @@ private:
     bool is_halted{};
 
     void execute_next_instruction_and_fetch();
+    void fetch_next_instruction();
     void service_interrupt();
     uint8_t get_pending_interrupt_mask();
 
@@ -55,7 +54,7 @@ private:
 
     using InstructionPointer = void (CPU:: *)();
     static const InstructionPointer instruction_table[0x100];
-    static const InstructionPointer extended_instruction_table[0x100];
+    static const InstructionPointer prefixed_instruction_table[0x100];
 
     // Instruction Helpers
     void update_flag(uint8_t flag_mask, bool new_flag_state);
@@ -92,9 +91,7 @@ private:
     void shift_right_logical_uint8(uint8_t &uint8);
     void test_bit_position_uint8(uint8_t bit_position_to_test, const uint8_t &uint8);
     void test_bit_position_memory_hl(uint8_t bit_position_to_test);
-    void reset_bit_position_uint8(uint8_t bit_position_to_reset, uint8_t &uint8);
     void reset_bit_position_memory_hl(uint8_t bit_position_to_reset);
-    void set_bit_position_uint8(uint8_t bit_position_to_set, uint8_t &uint8);
     void set_bit_position_memory_hl(uint8_t bit_position_to_set);
 
     // Instructions suffixed with their opcode

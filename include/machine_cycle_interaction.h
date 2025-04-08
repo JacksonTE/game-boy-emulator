@@ -12,7 +12,7 @@ enum class MemoryOperation {
     Write
 };
 
-std::string memory_operation_to_string(MemoryOperation op);
+std::string memory_operation_to_string(MemoryOperation operation);
 
 struct MachineCycleInteraction {
     MemoryOperation memory_operation;
@@ -26,6 +26,6 @@ struct MachineCycleInteraction {
     bool operator==(const MachineCycleInteraction &other) const;
 };
 
-std::ostream &operator<<(std::ostream &os, const MachineCycleInteraction &m);
+std::ostream &operator<<(std::ostream &output_stream, const MachineCycleInteraction &interaction);
 
 } // namespace GameBoy

@@ -28,10 +28,11 @@ private:
 	uint8_t timer_modulo_tma{};
 	uint8_t timer_control_tac{};
 	bool is_previously_selected_system_counter_bit_set{};
-	bool did_timer_tima_overflow{};
+	bool did_timer_tima_overflow_occur{};
 	bool is_timer_tima_overflow_handled{};
 
-	bool conditionally_increment_timer_tima_and_get_overflow_status();
+	void update_timer_tima_early();
+	bool update_timer_tima_and_get_overflow_state();
 };
 
 } // namespace GameBoy

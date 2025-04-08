@@ -10,14 +10,12 @@ Timer::Timer(std::function<void(uint8_t)> request_interrupt_callback)
 void Timer::step_single_machine_cycle() {
     system_counter += 4;
 
-    is_timer_tima_overflow_handled = did_timer_tima_overflow;
-    if (did_timer_tima_overflow) {
+    if (did_timer_tima_overflow_occur) {
         request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
-        did_timer_tima_overflow = false;
     }
-
-    did_timer_tima_overflow = conditionally_increment_timer_tima_and_get_overflow_status();
+    is_timer_tima_overflow_handled = did_timer_tima_overflow_occur;
+    did_timer_tima_overflow_occur = update_timer_tima_and_get_overflow_state();
 }
 
 uint8_t Timer::read_divider_div() const {
@@ -38,11 +36,7 @@ uint8_t Timer::read_timer_control_tac() const {
 
 void Timer::write_divider_div(uint8_t value) {
     system_counter = 0x0000;
-
-    if (conditionally_increment_timer_tima_and_get_overflow_status()) {
-        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
-        timer_tima = timer_modulo_tma;
-    }
+    update_timer_tima_early();
 }
 
 void Timer::write_timer_tima(uint8_t value) {
@@ -50,7 +44,7 @@ void Timer::write_timer_tima(uint8_t value) {
         return;
     }
     timer_tima = value;
-    did_timer_tima_overflow = false;
+    did_timer_tima_overflow_occur = false;
 }
 
 void Timer::write_timer_modulo_tma(uint8_t value) {
@@ -63,14 +57,17 @@ void Timer::write_timer_modulo_tma(uint8_t value) {
 
 void Timer::write_timer_control_tac(uint8_t value) {
     timer_control_tac = value;
+    update_timer_tima_early();
+}
 
-    if (conditionally_increment_timer_tima_and_get_overflow_status()) {
+void Timer::update_timer_tima_early() {
+    if (update_timer_tima_and_get_overflow_state()) {
         request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
 }
 
-bool Timer::conditionally_increment_timer_tima_and_get_overflow_status() {
+bool Timer::update_timer_tima_and_get_overflow_state() {
     const bool is_timer_tima_enabled = (timer_control_tac & 0b00000100) != 0;
 
     const uint8_t clock_select = timer_control_tac & 0b00000011;
@@ -79,12 +76,12 @@ bool Timer::conditionally_increment_timer_tima_and_get_overflow_status() {
     const bool is_selected_system_counter_bit_set =
         is_timer_tima_enabled && (system_counter & (1 << selected_system_counter_bit)) != 0;
 
-    const bool overflow = !is_selected_system_counter_bit_set &&
+    const bool did_overflow_occur = !is_selected_system_counter_bit_set &&
         is_previously_selected_system_counter_bit_set &&
         (++timer_tima == 0);
 
     is_previously_selected_system_counter_bit_set = is_selected_system_counter_bit_set;
-    return overflow;
+    return did_overflow_occur;
 }
 
 } // namespace Gameboy
