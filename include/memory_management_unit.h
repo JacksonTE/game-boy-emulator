@@ -3,7 +3,8 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
+
+#include "timer.h"
 
 namespace GameBoy {
 
@@ -32,32 +33,22 @@ public:
     virtual uint8_t read_byte(uint16_t address) const;
     virtual void write_byte(uint16_t address, uint8_t value);
 
-    void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
-
     void request_interrupt(uint8_t interrupt_flag_mask);
     bool is_interrupt_type_requested(uint8_t interrupt_flag_mask) const;
     bool is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const;
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
 
-    void tick_machine_cycle();
+    void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
+    void step_single_machine_cycle();
 
 private:
     std::unique_ptr<uint8_t[]> placeholder_memory;
     std::unique_ptr<uint8_t[]> bootrom{};
-    uint16_t system_counter{};
-    bool is_previously_selected_system_counter_bit_set{};
-    bool did_timer_tima_overflow{};
-    bool is_timer_tima_overflow_handled{};
+    Timer timer;
 
-    uint8_t timer_tima{};
-    uint8_t timer_modulo_tma{};
-    uint8_t timer_control_tac{};
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};
     uint8_t interrupt_enable_ie{0b11100000};
-
-    bool does_timer_increment_and_overflow();
-    uint8_t get_divider_div() const;
 };
 
 } // namespace GameBoy

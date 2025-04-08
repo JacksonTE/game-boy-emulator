@@ -187,8 +187,8 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile) {
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
-        game_boy_cpu.step(); // Execute initial NOP (no operation) and fetch first instruction
-        game_boy_cpu.step();
+        game_boy_cpu.step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
+        game_boy_cpu.step_single_instruction();
 
         EXPECT_EQ(game_boy_cpu.get_register_file().af, test_case.expected_register_values.af);
         EXPECT_EQ(game_boy_cpu.get_register_file().bc, test_case.expected_register_values.bc);

@@ -46,8 +46,7 @@ int main(int argc, char *argv[]) {
             std::cout << "test passed" << "\n";
             break;
         }
-        game_boy_emulator.execute_next_instruction();
+        game_boy_emulator.step_cpu_single_instruction();
     }
-    //game_boy_emulator.print_register_file_state();
     return 0;
 }

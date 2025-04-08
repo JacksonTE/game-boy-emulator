@@ -1,12 +1,14 @@
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include "memory_management_unit.h"
 
 namespace GameBoy {
 
-MemoryManagementUnit::MemoryManagementUnit() {
+MemoryManagementUnit::MemoryManagementUnit()
+    : timer{[this](uint8_t request_interrupt_callback) { this->request_interrupt(request_interrupt_callback); }} {
     placeholder_memory = std::make_unique<uint8_t[]>(MEMORY_SIZE);
     std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
 }
@@ -17,6 +19,7 @@ void MemoryManagementUnit::reset_state() {
 }
 
 void MemoryManagementUnit::set_post_boot_state() {
+    bootrom_status = 1;
     write_byte(0xff00, 0xcf);
     write_byte(0xff01, 0x00);
     write_byte(0xff02, 0x7e);
@@ -113,16 +116,16 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
         return bootrom[address];
     }
     else if (address == 0xff04) {
-        return get_divider_div();
+        return timer.read_divider_div();
     }
     else if (address == 0xff05) {
-        return timer_tima;
+        return timer.read_timer_tima();
     }
     else if (address == 0xff06) {
-        return timer_modulo_tma;
+        return timer.read_timer_modulo_tma();
     }
     else if (address == 0xff07) {
-        return timer_control_tac;
+        return timer.read_timer_control_tac();
     }
     else if (address == 0xff0f) {
         return interrupt_flag_if | 0b11100000;
@@ -142,34 +145,16 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
     if (address == 0xff04) {
-        system_counter = 0x0000;
-
-        if (does_timer_increment_and_overflow()) {
-            request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
-            timer_tima = timer_modulo_tma;
-        }
+        timer.write_divider_div(value);
     }
     else if (address == 0xff05) {
-        if (is_timer_tima_overflow_handled) {
-            return;
-        }
-        timer_tima = value;
-        did_timer_tima_overflow = false;
+        timer.write_timer_tima(value);
     }
     else if (address == 0xff06) {
-        timer_modulo_tma = value;
-
-        if (is_timer_tima_overflow_handled) {
-            timer_tima = timer_modulo_tma;
-        }
+        timer.write_timer_modulo_tma(value);
     }
     else if (address == 0xff07) {
-        timer_control_tac = value;
-
-        if (does_timer_increment_and_overflow()) {
-            request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
-            timer_tima = timer_modulo_tma;
-        }
+        timer.write_timer_control_tac(value);
     }
     else if (address == 0xff0f) {
         interrupt_flag_if = value | 0b11100000;
@@ -183,6 +168,22 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
     else {
         placeholder_memory[address] = value;
     }
+}
+
+void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask) {
+    interrupt_flag_if |= interrupt_flag_mask;
+}
+
+bool MemoryManagementUnit::is_interrupt_type_requested(uint8_t interrupt_flag_mask) const {
+    return (interrupt_flag_if & interrupt_flag_mask) != 0;
+}
+
+bool MemoryManagementUnit::is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const {
+    return (interrupt_enable_ie & interrupt_flag_mask) != 0;
+}
+
+void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask) {
+    interrupt_flag_if &= ~interrupt_flag_mask;
 }
 
 void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t end_address) const {
@@ -214,54 +215,8 @@ void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t
     std::cout << "=====================================================\n";
 }
 
-void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask) {
-    interrupt_flag_if |= interrupt_flag_mask;
-}
-
-bool MemoryManagementUnit::is_interrupt_type_requested(uint8_t interrupt_flag_mask) const {
-    return (interrupt_flag_if & interrupt_flag_mask) != 0;
-}
-
-bool MemoryManagementUnit::is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const {
-    return (interrupt_enable_ie & interrupt_flag_mask) != 0;
-}
-
-void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask) {
-    interrupt_flag_if &= ~interrupt_flag_mask;
-}
-
-void MemoryManagementUnit::tick_machine_cycle() {
-    system_counter += 4;
-
-    is_timer_tima_overflow_handled = did_timer_tima_overflow;
-    if (did_timer_tima_overflow) {
-        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
-        timer_tima = timer_modulo_tma;
-        did_timer_tima_overflow = false;
-    }
-
-    did_timer_tima_overflow = does_timer_increment_and_overflow();
-}
-
-bool MemoryManagementUnit::does_timer_increment_and_overflow() {
-    const bool is_timer_tima_enabled = (timer_control_tac & 0b00000100) != 0;
-
-    const uint8_t clock_select = timer_control_tac & 0b00000011;
-    const uint8_t clock_select_to_selected_system_counter_bit[4] = {9, 3, 5, 7};
-    const uint8_t selected_system_counter_bit = clock_select_to_selected_system_counter_bit[clock_select];
-    const bool is_selected_system_counter_bit_set = is_timer_tima_enabled &&
-                                                    (system_counter & (1 << selected_system_counter_bit)) != 0;
-
-    const bool overflow = !is_selected_system_counter_bit_set &&
-                           is_previously_selected_system_counter_bit_set &&
-                           (++timer_tima == 0);
-
-    is_previously_selected_system_counter_bit_set = is_selected_system_counter_bit_set;
-    return overflow;
-}
-
-uint8_t MemoryManagementUnit::get_divider_div() const {
-    return static_cast<uint8_t>(system_counter >> 8);
+void MemoryManagementUnit::step_single_machine_cycle() {
+    timer.step_single_machine_cycle();
 }
 
 } //namespace GameBoy

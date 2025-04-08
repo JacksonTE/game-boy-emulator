@@ -6,6 +6,7 @@
 #include <functional>
 #include "cpu.h"
 #include "register_file.h"
+#include "timer.h"
 
 namespace GameBoy {
 
@@ -17,8 +18,7 @@ public:
 	void set_post_boot_state();
 	bool try_load_bootrom(std::filesystem::path bootrom_path);
 
-	void tick_all_components();
-	void execute_next_instruction();
+	void step_cpu_single_instruction();
 
 	RegisterFile<std::endian::native> get_register_file() const;
 	void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
@@ -32,6 +32,8 @@ public:
 private:
 	std::unique_ptr<MemoryManagementUnit> memory_interface;
 	CPU cpu;
+
+	void step_components_single_machine_cycle();
 };
 
 } // namespace GameBoy

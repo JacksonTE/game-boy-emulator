@@ -21,20 +21,20 @@ enum class InterruptMasterEnableState {
 
 class CPU {
 public:
-    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> tick_callback);
+    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle_callback);
 
     void reset_state();
     void set_post_boot_state();
 
-    void step();
-    void tick_machine_cycle();
+    void step_single_instruction();
+    void step_single_machine_cycle();
 
     RegisterFile<std::endian::native> get_register_file() const;
     void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
     void print_register_file_state() const;
 
 private:
-    std::function<void(MachineCycleInteraction)> emulator_tick_callback;
+    std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle;
     MemoryManagementUnit &memory_interface;
     RegisterFile<std::endian::native> register_file;
     uint64_t cycles_elapsed{};

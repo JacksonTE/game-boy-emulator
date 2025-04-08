@@ -11,7 +11,7 @@ namespace GameBoy {
 
 Emulator::Emulator()
 	: memory_interface{std::make_unique<MemoryManagementUnit>()},
-      cpu{*memory_interface, [this](MachineCycleInteraction _){ this->tick_all_components(); }} {
+      cpu{*memory_interface, [this](MachineCycleInteraction _){ this->step_components_single_machine_cycle(); }} {
 }
 
 void Emulator::reset_state() {
@@ -28,13 +28,8 @@ bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path) {
 	return try_load_file_to_memory(0x0000, BOOTROM_SIZE, bootrom_path, true);
 }
 
-void Emulator::tick_all_components() {
-	cpu.tick_machine_cycle();
-	memory_interface->tick_machine_cycle();
-}
-
-void Emulator::execute_next_instruction() {
-	cpu.step();
+void Emulator::step_cpu_single_instruction() {
+	cpu.step_single_instruction();
 }
 
 RegisterFile<std::endian::native> Emulator::get_register_file() const {
@@ -63,6 +58,11 @@ void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_
 
 bool Emulator::try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file) {
 	return memory_interface->try_load_file(address, number_of_bytes_to_load, file_path, is_bootrom_file);
+}
+
+void Emulator::step_components_single_machine_cycle() {
+	cpu.step_single_machine_cycle();
+	memory_interface->step_single_machine_cycle();
 }
 
 } // namespace GameBoy
