@@ -13,7 +13,7 @@ void PixelProcessingUnit::step_single_machine_cycle() {
 
 	switch (current_mode) {
 		case PixelProcessingUnitMode::ObjectAttributeMemoryScan:
-			object_attribute_memory_scan_mode_2();
+			step_mode_2_single_machine_cycle();
 			if (current_scanline_elapsed_dots_count == OAM_SCAN_DURATION_DOTS) {
 				std::stable_sort(current_scanline_selected_objects.begin(), current_scanline_selected_objects.end(),
 					[](const ObjectAttribute &a, const ObjectAttribute &b) {
@@ -23,7 +23,7 @@ void PixelProcessingUnit::step_single_machine_cycle() {
 			}
 			break;
 		case PixelProcessingUnitMode::DrawingPixels:
-			draw_pixels_mode_3();
+			step_mode_3_single_machine_cycle();
 			// if ending early in mode 3 might have to add the remaining cycles to hblank?
 			// maybe not though since hblank has a minimum length
 			if (true) {
@@ -37,17 +37,17 @@ void PixelProcessingUnit::step_single_machine_cycle() {
 				current_mode = (lcd_y_coordinate_ly == FINAL_DRAWING_SCAN_LINE)
 					? PixelProcessingUnitMode::VerticalBlank
 					: PixelProcessingUnitMode::ObjectAttributeMemoryScan;
-				clear_queue(background_pixels_queue);
-				clear_queue(object_pixels_queue);
+				background_pixels_queue.clear();
+				object_pixels_queue.clear();
 				lcd_y_coordinate_ly++;
 				current_scanline_elapsed_dots_count = 0;
 			}
 			break;
 		case PixelProcessingUnitMode::VerticalBlank:
-			if (current_scanline_elapsed_dots_count == SCAN_LINE_DURATION_DOTS) {
-				if (lcd_y_coordinate_ly == FINAL_FRAME_SCAN_LINE) {
+			if (current_scanline_elapsed_dots_count == SCAN_LINE_DURATION_DOTS)
+			{
+				if (lcd_y_coordinate_ly == FINAL_FRAME_SCAN_LINE)
 					current_mode = PixelProcessingUnitMode::ObjectAttributeMemoryScan;
-				}
 				lcd_y_coordinate_ly = (lcd_y_coordinate_ly + 1) % (FINAL_FRAME_SCAN_LINE + 1);		
 				current_scanline_elapsed_dots_count = 0;
 			}
@@ -55,7 +55,7 @@ void PixelProcessingUnit::step_single_machine_cycle() {
 	}
 }
 
-void PixelProcessingUnit::object_attribute_memory_scan_mode_2() {
+void PixelProcessingUnit::step_mode_2_single_machine_cycle() {
 	if (current_scanline_elapsed_dots_count == 0) {
 		current_scanline_selected_objects.clear();
 	}
@@ -83,79 +83,44 @@ void PixelProcessingUnit::object_attribute_memory_scan_mode_2() {
 	}
 }
 
-void PixelProcessingUnit::draw_pixels_mode_3() {
-	for (uint8_t _ = 0; _ < DOTS_PER_MACHINE_CYCLE; _++) {
-		switch (current_pixel_slice_fetcher_step) {
-			case PixelSliceFetcherStep::GetTileId:
-				if (!background_pixels_queue.empty()) { // and trying to push pixels
-					if (!is_bit_set_uint8(1, lcd_control_lcdc)) {
-						break;
-					}
+void PixelProcessingUnit::step_mode_3_single_machine_cycle()
+{
+	for (uint8_t _ = 0; _ < DOTS_PER_MACHINE_CYCLE; _++)
+	{
+		const bool is_object_display_enabled = is_bit_set_uint8(1, lcd_control_lcdc);
 
-					if (is_in_first_dot_of_current_step) {
-						// iterate the 10 scanned sprites - first with a matching x-value (shifted 8 or something?) is fetched sprite
-						// sounds like array should be sorted by x secondarily?
-						for (ObjectAttribute object : current_scanline_selected_objects) {
-							if (object.x_position == lcd_internal_x_coordinate_lx + 8) {
-
-							}
-						}
-					}
-					else {
-
-					}
+		if (is_object_display_enabled && !object_pixels_queue.is_fetcher_enabled) 
+		{
+			for (ObjectAttribute object = current_scanline_selected_objects[current_scanline_next_object_index];
+				 current_scanline_next_object_index < 10 && object.x_position <= lcd_internal_x_coordinate_lx + 8;
+				 current_scanline_next_object_index++)
+			{
+				if (object.x_position == lcd_internal_x_coordinate_lx + 8)
+				{
+					is_pixel_output_enabled = false;
+					object_pixels_queue.is_fetcher_enabled = true;
+					break;
 				}
-				else {
-					if (is_in_first_dot_of_current_step) {
-						set_background_fetcher_address();
-					}
-					else {
-						fetched_tile_id = memory_interface.read_byte(background_fetcher_address);
-						current_pixel_slice_fetcher_step = PixelSliceFetcherStep::GetTileRowLow;
-					}
-				}
-				is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
-				break;
-			case PixelSliceFetcherStep::GetTileRowLow:
-				//handle obj
-				if (is_in_first_dot_of_current_step) {
-					set_tile_row_address(0);
-				}
-				else {
-					tile_row_low_byte = memory_interface.read_byte(tile_row_address);
-					current_pixel_slice_fetcher_step = PixelSliceFetcherStep::GetTileRowHigh;
-				}
-				is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
-				break;
-			case PixelSliceFetcherStep::GetTileRowHigh:
-				//handle obj
-				if (is_in_first_dot_of_current_step) {
-					set_tile_row_address(1);
-				}
-				else {
-					tile_row_high_byte = memory_interface.read_byte(tile_row_address);
-					current_pixel_slice_fetcher_step = PixelSliceFetcherStep::PushPixels;
-				}
-				is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
-				break;
-			case PixelSliceFetcherStep::PushPixels:
-				switch (current_fetcher_mode) {
-					case FetcherMode::BackgroundMode:
-					case FetcherMode::WindowMode:
-						if (background_pixels_queue.empty()) {
-							for (int i = 7; i >= 0; i--) {
-								background_pixels_queue.emplace(get_pixel_colour_id(tile_row_low_byte, tile_row_high_byte, i));
-							}
-							current_pixel_slice_fetcher_step = PixelSliceFetcherStep::GetTileId;
-						}
-						break;
-					case FetcherMode::ObjectMode:
-						// add logic
-						break;
-				}
-				break;
+			}
 		}
-	
+
+		if (is_object_display_enabled &&
+			object_pixels_queue.is_fetcher_enabled &&
+			background_pixels_queue.fetcher_step == PixelSliceFetcherStep::PushPixels &&
+			!background_pixels_queue.is_empty())
+		{
+			background_pixels_queue.is_fetcher_enabled = false;
+		}
+
+		if (background_pixels_queue.is_fetcher_enabled)
+			step_pixel_fetcher_single_dot(background_pixels_queue);
+		else
+			step_pixel_fetcher_single_dot(object_pixels_queue);
+
+		if (is_pixel_output_enabled) {
+
+		}
+
 		//During each cycle, after clocking the Pixel Fetchers, the PPU attempts to push a pixel to the LCD, 
 		// which can only be done if there are pixels in the background FIFO. If the Sprite FIFO contains any 
 		// pixels, a sprite pixel is shifted out and “merged” with the background pixel.
@@ -167,45 +132,123 @@ void PixelProcessingUnit::draw_pixels_mode_3() {
 	}
 }
 
-void PixelProcessingUnit::set_background_fetcher_address() {
-	background_fetcher_address = static_cast<uint16_t>(0b10011 << 11);
-
-	switch (current_fetcher_mode) {
-		case FetcherMode::BackgroundMode:
-			if (is_bit_set_uint8(3, lcd_control_lcdc)) {
-				background_fetcher_address |= (1 << 10);
+template <typename EntryType>
+void PixelProcessingUnit::step_pixel_fetcher_single_dot(PixelQueue<EntryType> &pixel_queue) {
+	switch (pixel_queue.fetcher_step) {
+		case PixelSliceFetcherStep::GetTileId:
+			switch (pixel_queue.fetcher_mode) {
+				case FetcherMode::BackgroundMode:
+				case FetcherMode::WindowMode:
+					if (is_in_first_dot_of_current_step) {
+						set_tile_id_fetch_address(pixel_queue);
+					}
+					else {
+						pixel_queue.fetched_tile_id = memory_interface.read_byte(pixel_queue.tile_id_fetch_address);
+						pixel_queue.fetcher_step = PixelSliceFetcherStep::GetTileRowLow;
+					}
+					break;
+				case FetcherMode::ObjectMode:
+					if (!is_in_first_dot_of_current_step) {
+						ObjectAttribute object = current_scanline_selected_objects[current_scanline_next_object_index];
+						pixel_queue.fetched_tile_id = object.tile_index;
+						pixel_queue.fetcher_step = PixelSliceFetcherStep::GetTileRowLow;
+					}
+					break;
 			}
-			background_fetcher_address |= static_cast<uint8_t>((lcd_y_coordinate_ly + viewport_y_position_scy) / 8) << 5;
-			background_fetcher_address |= static_cast<uint8_t>((lcd_internal_x_coordinate_lx + viewport_x_position_scx) / 8);
+			is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
+			break;
+		case PixelSliceFetcherStep::GetTileRowLow:
+			if (is_in_first_dot_of_current_step) {
+				set_tile_row_fetch_address(pixel_queue, 0);
+			}
+			else {
+				pixel_queue.fetched_tile_row_low_byte = memory_interface.read_byte(pixel_queue.tile_row_fetch_address);
+				pixel_queue.fetcher_step = PixelSliceFetcherStep::GetTileRowHigh;
+			}
+			is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
+			break;
+		case PixelSliceFetcherStep::GetTileRowHigh:
+			if (is_in_first_dot_of_current_step) {
+				set_tile_row_fetch_address(pixel_queue, 1);
+			}
+			else {
+				pixel_queue.fetched_tile_row_high_byte = memory_interface.read_byte(pixel_queue.tile_row_fetch_address);
+				pixel_queue.fetcher_step = PixelSliceFetcherStep::PushPixels;
+				if (object_pixels_queue.is_fetcher_enabled && pixel_queue.fetcher_mode != FetcherMode::ObjectMode) {
+					pixel_queue.is_fetcher_enabled = false;
+				}
+			}
+			is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
+			break;
+		case PixelSliceFetcherStep::PushPixels:
+			switch (pixel_queue.fetcher_mode) {
+				case FetcherMode::BackgroundMode:
+				case FetcherMode::WindowMode:
+					if (background_pixels_queue.is_empty()) {
+						for (int i = 7; i >= 0; i--) {
+							uint8_t colour_id = get_pixel_colour_id(pixel_queue.fetched_tile_row_low_byte, pixel_queue.fetched_tile_row_high_byte, i);
+							background_pixels_queue.push_back(BackgroundPixelQueueEntry{colour_id});
+						}
+						pixel_queue.fetcher_step = PixelSliceFetcherStep::GetTileId;
+					}
+					break;
+				case FetcherMode::ObjectMode:
+					for (int i = 0; i < 8; i++) {
+						if (object_pixels_queue[i].colour_index == 0) {
+							object_pixels_queue[i].colour_index = get_pixel_colour_id(pixel_queue.fetched_tile_row_low_byte, pixel_queue.fetched_tile_row_high_byte, 7 - i);
+							object_pixels_queue[i].is_priority_bit_set = is_bit_set_uint8(7, lcd_control_lcdc);
+							object_pixels_queue[i].is_palette_bit_set = is_bit_set_uint8(4, lcd_control_lcdc);
+						}
+					}
+					pixel_queue.fetcher_step = PixelSliceFetcherStep::GetTileId;
+					is_pixel_output_enabled = true;
+					object_pixels_queue.is_fetcher_enabled = false;
+					break;
+			}
+			break;
+		}
+}
+
+void PixelProcessingUnit::set_tile_id_fetch_address(PixelQueue<BackgroundPixelQueueEntry> &pixel_queue) {
+	uint16_t tile_map_area_bit = 0x0000;
+	switch (pixel_queue.fetcher_mode) {
+		case FetcherMode::BackgroundMode:
+			pixel_queue.tile_id_fetch_address = static_cast<uint16_t>(0b10011 << 11);
+			tile_map_area_bit = is_bit_set_uint8(3, lcd_control_lcdc) ? (1 << 10) : 0;
+			pixel_queue.tile_id_fetch_address |= tile_map_area_bit;
+			pixel_queue.tile_id_fetch_address |= static_cast<uint8_t>((lcd_y_coordinate_ly + viewport_y_position_scy) / 8) << 5;
+			pixel_queue.tile_id_fetch_address |= static_cast<uint8_t>((lcd_internal_x_coordinate_lx + viewport_x_position_scx) / 8);
 			break;
 		case FetcherMode::WindowMode:
-			if (is_bit_set_uint8(6, lcd_control_lcdc)) {
-				background_fetcher_address |= (1 << 10);
-			}
-			background_fetcher_address |= static_cast<uint8_t>(window_internal_line_counter_wly / 8) << 5;
-			background_fetcher_address |= static_cast<uint8_t>(lcd_internal_x_coordinate_lx / 8);
+			pixel_queue.tile_id_fetch_address = static_cast<uint16_t>(0b10011 << 11);
+			tile_map_area_bit = is_bit_set_uint8(6, lcd_control_lcdc) ? (1 << 10) : 0;
+			pixel_queue.tile_id_fetch_address |= tile_map_area_bit;
+			pixel_queue.tile_id_fetch_address |= static_cast<uint8_t>(window_internal_line_counter_wly / 8) << 5;
+			pixel_queue.tile_id_fetch_address |= static_cast<uint8_t>(lcd_internal_x_coordinate_lx / 8);
 			break;
 	}
 }
 
-void PixelProcessingUnit::set_tile_row_address(uint8_t offset) {
-	tile_row_address = static_cast<uint16_t>((0b100 << 13) | (fetched_tile_id << 4));
+template <typename T>
+void PixelProcessingUnit::set_tile_row_fetch_address(PixelQueue<T> &pixel_queue, uint8_t offset) {
+	pixel_queue.tile_row_fetch_address = static_cast<uint16_t>((0b100 << 13) | (pixel_queue.fetched_tile_id << 4)) | offset;
 
-	switch (current_fetcher_mode) {
+	switch (pixel_queue.fetcher_mode) {
 		case FetcherMode::BackgroundMode:
-			if (!is_bit_set_uint8(4, lcd_control_lcdc) && !is_bit_set_uint8(7, fetched_tile_id)) {
-				tile_row_address |= (1 << 12);
+			if (!is_bit_set_uint8(4, lcd_control_lcdc) && !is_bit_set_uint8(7, pixel_queue.fetched_tile_id)) {
+				pixel_queue.tile_row_fetch_address |= (1 << 12);
 			}
-			tile_row_address |= ((lcd_y_coordinate_ly + viewport_y_position_scy) % 8) << 1;
+			pixel_queue.tile_row_fetch_address |= ((lcd_y_coordinate_ly + viewport_y_position_scy) % 8) << 1;
 			break;
 		case FetcherMode::WindowMode:
-			if (!is_bit_set_uint8(4, lcd_control_lcdc) && !is_bit_set_uint8(7, fetched_tile_id)) {
-				tile_row_address |= (1 << 12);
+			if (!is_bit_set_uint8(4, lcd_control_lcdc) && !is_bit_set_uint8(7, pixel_queue.fetched_tile_id)) {
+				pixel_queue.tile_row_fetch_address |= (1 << 12);
 			}
-			tile_row_address |= (window_internal_line_counter_wly % 8) << 1;
+			pixel_queue.tile_row_fetch_address |= (window_internal_line_counter_wly % 8) << 1;
 			break;
 		case FetcherMode::ObjectMode:
-			// fill in
+			ObjectAttribute object = current_scanline_selected_objects[current_scanline_next_object_index];
+			pixel_queue.tile_row_fetch_address |= ((lcd_y_coordinate_ly - object.y_position) % 8) << 1;
 			break;
 	}
 }
@@ -220,13 +263,6 @@ bool PixelProcessingUnit::is_bit_set_uint8(const uint8_t &bit_position_to_test, 
 
 uint8_t PixelProcessingUnit::get_pixel_colour_id(uint8_t tile_low_byte, uint8_t tile_high_byte, uint8_t bit_position) const {
 	return ((tile_low_byte >> (bit_position - 1)) & 0b10) | ((tile_low_byte >> bit_position) & 0b01);
-}
-
-template <typename T>
-void PixelProcessingUnit::clear_queue(std::queue<T> &queue) {
-	while (!queue.empty()) {
-		queue.pop();
-	}
 }
 
 } // namespace GameBoy
