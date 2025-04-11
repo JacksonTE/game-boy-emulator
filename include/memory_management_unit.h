@@ -9,9 +9,11 @@
 namespace GameBoy {
 
 constexpr uint32_t MEMORY_SIZE = 0x10000;
+constexpr uint16_t VIDEO_RAM_SIZE = 0x2000;
 constexpr uint16_t COLLECTIVE_ROM_BANK_SIZE = 0x8000;
 constexpr uint16_t BOOTROM_SIZE = 0x100;
 
+constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xfe00;
 constexpr uint16_t HIGH_RAM_START = 0xff00;
 
 constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
@@ -42,6 +44,7 @@ public:
 
 private:
     std::unique_ptr<uint8_t[]> placeholder_memory;
+    std::unique_ptr<uint8_t[]> video_ram;
     std::unique_ptr<uint8_t[]> bootrom{};
     Timer timer;
 

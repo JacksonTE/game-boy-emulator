@@ -11,7 +11,10 @@ namespace GameBoy {
 
 Emulator::Emulator()
 	: memory_interface{std::make_unique<MemoryManagementUnit>()},
-      cpu{*memory_interface, [this](MachineCycleInteraction _){ this->step_components_single_machine_cycle(); }} {
+      cpu{*memory_interface,
+		  [this](MachineCycleInteraction _){
+		      this->step_components_single_machine_cycle();
+		  }} {
 }
 
 void Emulator::reset_state() {

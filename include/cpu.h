@@ -35,7 +35,7 @@ private:
     std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle;
     MemoryManagementUnit &memory_interface;
     RegisterFile<std::endian::native> register_file;
-    uint64_t cycles_elapsed{};
+    uint64_t elapsed_cycle_count{};
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
     uint8_t instruction_register_ir{};
     bool is_instruction_prefixed{};

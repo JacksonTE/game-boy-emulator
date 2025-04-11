@@ -13,7 +13,7 @@ CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(Machin
 
 void CPU::reset_state() {
     set_register_file_state(RegisterFile<std::endian::native>{});
-    cycles_elapsed = 0;
+    elapsed_cycle_count = 0;
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
     instruction_register_ir = 0x00;
     is_instruction_prefixed = false;
@@ -57,7 +57,7 @@ void CPU::step_single_instruction() {
 }
 
 void CPU::step_single_machine_cycle() {
-    cycles_elapsed += 4;
+    elapsed_cycle_count += 4;
 }
 
 RegisterFile<std::endian::native> CPU::get_register_file() const {
@@ -102,7 +102,7 @@ void CPU::print_register_file_state() const {
     std::cout << "Program Counter: 0x" << std::setw(4) << register_file.program_counter << "\n";
 
     std::cout << std::dec;
-    std::cout << "Cycles Elapsed: " << cycles_elapsed << "\n";
+    std::cout << "Cycles Elapsed: " << elapsed_cycle_count << "\n";
     std::cout << "=====================================================\n";
 }
 

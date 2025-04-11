@@ -8,8 +8,11 @@
 namespace GameBoy {
 
 MemoryManagementUnit::MemoryManagementUnit()
-    : timer{[this](uint8_t request_interrupt_callback) { this->request_interrupt(request_interrupt_callback); }} {
+    : timer{[this](uint8_t interrupt_flag_mask) {
+                this->request_interrupt(interrupt_flag_mask);
+            }} {
     placeholder_memory = std::make_unique<uint8_t[]>(MEMORY_SIZE);
+    video_ram = std::make_unique<uint8_t[]>(VIDEO_RAM_SIZE);
     std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
 }
 

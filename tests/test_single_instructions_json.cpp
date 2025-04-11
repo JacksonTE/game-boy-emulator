@@ -38,7 +38,7 @@ static std::vector<std::filesystem::path> get_ordered_json_test_file_paths(const
     std::vector<std::filesystem::path> filenames;
 
     for (const auto &entry : std::filesystem::directory_iterator(directory)) {
-        // Skip Halt and Stop tests - they aren't relevant
+        // Skip 'halt' and 'stop' tests - their correct functionality isn't tested well with the json tests
         if (entry.is_regular_file() && entry.path().extension() == ".json" &&
             entry.path().filename() != "10.json" && entry.path().filename() != "76.json") {
             filenames.push_back(entry.path());
