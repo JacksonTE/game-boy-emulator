@@ -10,11 +10,10 @@
 namespace GameBoy {
 
 Emulator::Emulator()
-	: memory_interface{std::make_unique<MemoryManagementUnit>()},
-      cpu{*memory_interface,
-		  [this](MachineCycleInteraction _){
-		      this->step_components_single_machine_cycle();
-		  }} {
+	: pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+	  memory_interface{std::make_unique<MemoryManagementUnit>(&pixel_processing_unit)},
+      cpu{*memory_interface, [this](MachineCycleInteraction _) { this->step_components_single_machine_cycle(); }}
+{
 }
 
 void Emulator::reset_state() {
@@ -41,6 +40,10 @@ RegisterFile<std::endian::native> Emulator::get_register_file() const {
 
 void Emulator::print_register_file_state() const {
 	cpu.print_register_file_state();
+}
+
+void Emulator::request_interrupt(uint8_t interrupt_flag_mask) {
+	memory_interface->request_interrupt(interrupt_flag_mask);
 }
 
 uint8_t Emulator::read_byte_from_memory(uint16_t address) const {

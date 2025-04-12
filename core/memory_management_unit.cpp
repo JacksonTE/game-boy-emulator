@@ -7,12 +7,11 @@
 
 namespace GameBoy {
 
-MemoryManagementUnit::MemoryManagementUnit()
-    : timer{[this](uint8_t interrupt_flag_mask) {
-                this->request_interrupt(interrupt_flag_mask);
-            }} {
+MemoryManagementUnit::MemoryManagementUnit(PixelProcessingUnit &ppu)
+    : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+	  pixel_processing_unit{ppu}
+{
     placeholder_memory = std::make_unique<uint8_t[]>(MEMORY_SIZE);
-    video_ram = std::make_unique<uint8_t[]>(VIDEO_RAM_SIZE);
     std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
 }
 
@@ -118,6 +117,12 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
         }
         return bootrom[address];
     }
+	else if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE) {
+		return pixel_processing_unit.read_byte_video_ram(address - VIDEO_RAM_START);
+	}
+	else if (address >= OBJECT_ATTRIBUTE_MEMORY_START && address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE) {
+		return pixel_processing_unit.read_byte_object_attribute_memory(address - OBJECT_ATTRIBUTE_MEMORY_START);
+	}
     else if (address == 0xff04) {
         return timer.read_divider_div();
     }
@@ -147,7 +152,13 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const {
 }
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value) {
-    if (address == 0xff04) {
+	if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE) {
+		pixel_processing_unit.write_byte_video_ram(address - VIDEO_RAM_START, value);
+	}
+	else if (address >= OBJECT_ATTRIBUTE_MEMORY_START && address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE) {
+		pixel_processing_unit.write_byte_object_attribute_memory(address - OBJECT_ATTRIBUTE_MEMORY_START, value);
+	}
+    else if (address == 0xff04) {
         timer.write_divider_div(value);
     }
     else if (address == 0xff05) {

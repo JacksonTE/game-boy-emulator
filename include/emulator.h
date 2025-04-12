@@ -23,12 +23,14 @@ public:
 	RegisterFile<std::endian::native> get_register_file() const;
 	void print_register_file_state() const;
 
+	void request_interrupt(uint8_t interrupt_flag_mask);
 	uint8_t read_byte_from_memory(uint16_t address) const;
 	void write_byte_to_memory(uint16_t address, uint8_t value);
 	void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
 	bool try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
 
 private:
+	PixelProcessingUnit pixel_processing_unit;
 	std::unique_ptr<MemoryManagementUnit> memory_interface;
 	CPU cpu;
 
