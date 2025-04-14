@@ -16,6 +16,53 @@ PixelProcessingUnit::PixelProcessingUnit(std::function<void(uint8_t)> request_in
 	std::fill_n(video_ram.get(), OBJECT_ATTRIBUTE_MEMORY_SIZE, 0);
 }
 
+uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
+{
+	if (current_mode == PixelProcessingUnitMode::DrawingPixels)
+		return 0xff;
+
+	const uint16_t local_address = memory_address - VIDEO_RAM_START;
+	return video_ram[local_address];
+}
+
+void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
+{
+	if (current_mode == PixelProcessingUnitMode::DrawingPixels)
+		return;
+
+	const uint16_t local_address = memory_address - VIDEO_RAM_START;
+	video_ram[local_address] = value;
+}
+
+uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const {
+	if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || current_mode == PixelProcessingUnitMode::DrawingPixels)
+		return 0xff;
+
+	const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
+	return object_attribute_memory[local_address];
+}
+
+void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value)
+{
+	if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || current_mode == PixelProcessingUnitMode::DrawingPixels)
+		return;
+
+	const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
+	object_attribute_memory[local_address] = value;
+}
+
+uint8_t PixelProcessingUnit::read_lcd_status_stat() const {
+	return lcd_status_stat;
+}
+
+void PixelProcessingUnit::write_lcd_status_stat(uint8_t value) {
+	lcd_status_stat = (value & 0b11111000) | (lcd_status_stat & 0b00000111);
+}
+
+uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const {
+	return lcd_y_coordinate_compare_lyc;
+}
+
 void PixelProcessingUnit::step_single_machine_cycle()
 {
 	current_scanline_elapsed_dots_count += DOTS_PER_MACHINE_CYCLE;
@@ -57,9 +104,8 @@ void PixelProcessingUnit::step_single_machine_cycle()
 				break;
 
 			if (lcd_y_coordinate_ly == FINAL_FRAME_SCAN_LINE)
-			{
 				current_mode = PixelProcessingUnitMode::ObjectAttributeMemoryScan;
-			}
+
 			lcd_y_coordinate_ly = (lcd_y_coordinate_ly + 1) % (FINAL_FRAME_SCAN_LINE + 1);
 			current_scanline_elapsed_dots_count = 0;
 			break;
@@ -314,43 +360,6 @@ uint8_t PixelProcessingUnit::get_object_fetcher_tile_row() {
 	return is_bit_set_uint8(5, current_object.flags)
 		? get_byte_horizontally_flipped(tile_row_byte)
 		: tile_row_byte;
-}
-
-uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
-{
-	if (current_mode == PixelProcessingUnitMode::DrawingPixels)
-		return 0xff;
-	const uint16_t local_address = memory_address - VIDEO_RAM_START;
-	return video_ram[local_address];
-}
-
-void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
-{
-	if (current_mode == PixelProcessingUnitMode::DrawingPixels)
-		return;
-	const uint16_t local_address = memory_address - VIDEO_RAM_START;
-	video_ram[local_address] = value;
-}
-
-uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const {
-	if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
-		current_mode == PixelProcessingUnitMode::DrawingPixels)
-	{
-		return 0xff;
-	}
-	const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
-	return object_attribute_memory[local_address];
-}
-
-void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value)
-{
-	if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
-		current_mode == PixelProcessingUnitMode::DrawingPixels)
-	{
-		return;
-	}
-	const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
-	object_attribute_memory[local_address] = value;
 }
 
 uint8_t PixelProcessingUnit::get_byte_horizontally_flipped(uint8_t byte) {

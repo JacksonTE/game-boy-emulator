@@ -150,6 +150,17 @@ private:
 class PixelProcessingUnit
 {
 public:
+	uint8_t lcd_control_lcdc{};
+	uint8_t viewport_y_position_scy{};
+	uint8_t viewport_x_position_scx{};
+	uint8_t lcd_y_coordinate_compare_lyc{};
+	uint8_t object_attribute_memory_direct_memory_access_dma{};
+	uint8_t background_palette_bgp{};
+	uint8_t object_palette_0_obp0{};
+	uint8_t object_palette_1_obp1{};
+	uint8_t window_y_position_wy{};
+	uint8_t window_x_position_plus_7_wx{};
+
 	PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt_callback);
 
 	uint8_t read_byte_video_ram(uint16_t memory_address) const;
@@ -158,25 +169,20 @@ public:
 	uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
 	void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value);
 
+	uint8_t read_lcd_status_stat() const;
+	void write_lcd_status_stat(uint8_t value);
+
+	uint8_t read_lcd_y_coordinate_ly() const;
+
 private:
 	std::function<void(uint8_t)> request_interrupt;
 
 	std::unique_ptr<uint8_t[]> video_ram;
 	std::unique_ptr<uint8_t[]> object_attribute_memory;
 
-	uint8_t lcd_control_lcdc{};
 	uint8_t lcd_status_stat{};
-	uint8_t viewport_y_position_scy{};
-	uint8_t viewport_x_position_scx{};
 	uint8_t lcd_y_coordinate_ly{};
-	uint8_t lcd_y_coordinate_compare_lyc{};
 	uint8_t lcd_internal_x_coordinate_lx{};
-	//dma
-	uint8_t background_palette_bgp{};
-	uint8_t object_palette_0_obp0{};
-	uint8_t object_palette_1_obp1{};
-	uint8_t window_y_position_wy{};
-	uint8_t window_x_position_plus_7_wx{};
 	uint8_t window_internal_line_counter_wly{};
 
 	PixelPisoShiftRegisters<BackgroundPixel> background_pixel_queue{true};

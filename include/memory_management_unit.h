@@ -7,7 +7,8 @@
 #include "pixel_processing_unit.h"
 #include "timer.h"
 
-namespace GameBoy {
+namespace GameBoy
+{
 
 constexpr uint32_t MEMORY_SIZE = 0x10000;
 constexpr uint16_t COLLECTIVE_ROM_BANK_SIZE = 0x8000;
@@ -22,7 +23,8 @@ constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;
 constexpr uint8_t INTERRUPT_FLAG_LCD_MASK = 1 << 1;
 constexpr uint8_t INTERRUPT_FLAG_VBLANK_MASK = 1 << 0;
 
-class MemoryManagementUnit {
+class MemoryManagementUnit
+{
 public:
     MemoryManagementUnit(PixelProcessingUnit &pixel_processing_unit_reference);
 	virtual ~MemoryManagementUnit() = default;
@@ -52,6 +54,8 @@ private:
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};
     uint8_t interrupt_enable_ie{0b11100000};
+
+	void wrote_to_read_only_address(uint16_t address) const;
 };
 
 } // namespace GameBoy
