@@ -79,7 +79,10 @@ struct PixelSliceFetcher
 
 struct ObjectFetcher : PixelSliceFetcher
 {
+	std::vector<ObjectAttributes> current_scanline_selected_objects;
 	uint8_t current_object_index{};
+
+	ObjectAttributes get_current_object();
 };
 
 struct BackgroundFetcher : PixelSliceFetcher
@@ -194,8 +197,6 @@ private:
 	PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::ObjectAttributeMemoryScan};
 	bool is_in_first_dot_of_current_step{true};
 	bool is_pixel_output_enabled{true};
-
-	std::vector<ObjectAttributes> current_scanline_selected_objects;
 	
 	void step_single_machine_cycle();
 	void step_object_attribute_memory_scan_single_machine_cycle();

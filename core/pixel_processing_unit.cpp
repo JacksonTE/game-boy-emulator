@@ -6,6 +6,11 @@
 namespace GameBoy
 {
 
+ObjectAttributes ObjectFetcher::get_current_object()
+{
+	return current_scanline_selected_objects[current_object_index];
+}
+
 PixelProcessingUnit::PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt_callback)
 	: request_interrupt{request_interrupt_callback}
 {
@@ -34,7 +39,8 @@ void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t 
 	video_ram[local_address] = value;
 }
 
-uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const {
+uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const
+{
 	if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || current_mode == PixelProcessingUnitMode::DrawingPixels)
 		return 0xff;
 
@@ -51,15 +57,18 @@ void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_add
 	object_attribute_memory[local_address] = value;
 }
 
-uint8_t PixelProcessingUnit::read_lcd_status_stat() const {
+uint8_t PixelProcessingUnit::read_lcd_status_stat() const
+{
 	return lcd_status_stat;
 }
 
-void PixelProcessingUnit::write_lcd_status_stat(uint8_t value) {
+void PixelProcessingUnit::write_lcd_status_stat(uint8_t value)
+{
 	lcd_status_stat = (value & 0b11111000) | (lcd_status_stat & 0b00000111);
 }
 
-uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const {
+uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const
+{
 	return lcd_y_coordinate_compare_lyc;
 }
 
@@ -74,7 +83,7 @@ void PixelProcessingUnit::step_single_machine_cycle()
 
 			if (current_scanline_elapsed_dots_count == OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS)
 			{
-				std::stable_sort(current_scanline_selected_objects.begin(), current_scanline_selected_objects.end(),
+				std::stable_sort(object_fetcher.current_scanline_selected_objects.begin(), object_fetcher.current_scanline_selected_objects.end(),
 					[](const ObjectAttributes &a, const ObjectAttributes &b) { return a.x_position < b.x_position; });
 
 				current_mode = PixelProcessingUnitMode::DrawingPixels;
@@ -115,9 +124,9 @@ void PixelProcessingUnit::step_single_machine_cycle()
 void PixelProcessingUnit::step_object_attribute_memory_scan_single_machine_cycle()
 {
 	if (current_scanline_elapsed_dots_count == 0)
-		current_scanline_selected_objects.clear();
+		object_fetcher.current_scanline_selected_objects.clear();
 
-	for (uint8_t _ = 0; _ < DOTS_PER_MACHINE_CYCLE && current_scanline_selected_objects.size() < MAX_OBJECTS_PER_LINE; _++)
+	for (uint8_t _ = 0; _ < DOTS_PER_MACHINE_CYCLE && object_fetcher.current_scanline_selected_objects.size() < MAX_OBJECTS_PER_LINE; _++)
 	{
 		if (is_in_first_dot_of_current_step)
 			is_in_first_dot_of_current_step = false;
@@ -146,7 +155,7 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_machine_cycle
 				else
 					current_object.tile_index |= 0x01;
 			}
-			current_scanline_selected_objects.push_back(current_object);
+			object_fetcher.current_scanline_selected_objects.push_back(current_object);
 		}
 		is_in_first_dot_of_current_step = true;
 	}
@@ -160,7 +169,7 @@ void PixelProcessingUnit::step_drawing_pixels_single_machine_cycle()
 
 		if (is_object_display_enabled && !object_fetcher.is_enabled) 
 		{
-			for (ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
+			for (ObjectAttributes current_object = object_fetcher.get_current_object();
 				 object_fetcher.current_object_index < MAX_OBJECTS_PER_LINE && current_object.x_position <= lcd_internal_x_coordinate_lx + 8;
 				 object_fetcher.current_object_index++)
 			{
@@ -247,6 +256,7 @@ void PixelProcessingUnit::step_background_fetcher_single_dot()
 		case PixelSliceFetcherStep::PushPixels:
 			if (!background_pixel_queue.is_empty())
 				break;
+
 			background_pixel_queue.load_new_tile_row(background_fetcher.tile_row);
 			background_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
 			break;
@@ -297,8 +307,8 @@ void PixelProcessingUnit::step_object_fetcher_single_dot() {
 		{
 			if (is_in_first_dot_of_current_step)
 				break;
-			ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
-			object_fetcher.tile_id = current_object.tile_index;
+
+			object_fetcher.tile_id = object_fetcher.get_current_object().tile_index;
 			object_fetcher.current_step = PixelSliceFetcherStep::GetTileRowLow;
 			break;
 		}
@@ -324,9 +334,11 @@ void PixelProcessingUnit::step_object_fetcher_single_dot() {
 			}
 			break;
 		case PixelSliceFetcherStep::PushPixels:
-			for (uint8_t i = 0; i < PIXELS_PER_TILE_ROW; i++) {
+			for (uint8_t i = 0; i < PIXELS_PER_TILE_ROW; i++)
+			{
 				if (object_pixel_queue[i].colour_index != 0b00)
 					break;
+
 				object_pixel_queue[i].colour_index = get_pixel_colour_id(object_fetcher, PIXELS_PER_TILE_ROW - 1 - i);
 				object_pixel_queue[i].is_priority_bit_set = is_bit_set_uint8(7, lcd_control_lcdc);
 				object_pixel_queue[i].is_palette_bit_set = is_bit_set_uint8(4, lcd_control_lcdc);
@@ -342,10 +354,8 @@ void PixelProcessingUnit::step_object_fetcher_single_dot() {
 }
 
 void PixelProcessingUnit::set_object_fetcher_tile_row_address(uint8_t offset) {
-	ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
-	
-	const bool is_flipped_vertically = is_bit_set_uint8(6, current_object.flags);
-	const uint8_t tile_row_address_bits_1_to_3 = (lcd_y_coordinate_ly - current_object.y_position) % 8;
+	const bool is_flipped_vertically = is_bit_set_uint8(6, object_fetcher.get_current_object().flags);
+	const uint8_t tile_row_address_bits_1_to_3 = (lcd_y_coordinate_ly - object_fetcher.get_current_object().y_position) % 8;
 
 	object_fetcher.tile_row_address = static_cast<uint16_t>((1 << 15) | (object_fetcher.tile_id << 4) | offset);
 	object_fetcher.tile_row_address |= is_flipped_vertically
@@ -354,10 +364,9 @@ void PixelProcessingUnit::set_object_fetcher_tile_row_address(uint8_t offset) {
 }
 
 uint8_t PixelProcessingUnit::get_object_fetcher_tile_row() {
-	ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
 	const uint8_t tile_row_byte = read_byte_video_ram(object_fetcher.tile_row_address);
 
-	return is_bit_set_uint8(5, current_object.flags)
+	return is_bit_set_uint8(5, object_fetcher.get_current_object().flags)
 		? get_byte_horizontally_flipped(tile_row_byte)
 		: tile_row_byte;
 }
