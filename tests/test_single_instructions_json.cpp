@@ -8,6 +8,7 @@
 #include "cpu.h"
 #include "machine_cycle_interaction.h"
 #include "memory_management_unit.h"
+#include "pixel_processing_unit.h"
 #include "register_file.h"
 
 namespace {
@@ -124,10 +125,22 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
     return json_test_cases;
 }
 
+class SingleInstructionTestPixelProcessingUnit : public GameBoy::PixelProcessingUnit
+{
+public:
+	SingleInstructionTestPixelProcessingUnit()
+		: PixelProcessingUnit([](uint8_t) {})
+	{
+	}
+};
+
+
 // The single instruction tests expect the memory to be a 64KB flat array with no internal read/write restrictions
 class SingleInstructionTestMemory : public GameBoy::MemoryManagementUnit {
 public:
-    SingleInstructionTestMemory() {
+    SingleInstructionTestMemory()
+		: MemoryManagementUnit{get_pixel_processing_unit()}
+	{
         flat_memory = std::make_unique<uint8_t[]>(GameBoy::MEMORY_SIZE);
         std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
     }
@@ -146,6 +159,11 @@ public:
 
 private:
     std::unique_ptr<uint8_t[]> flat_memory;
+
+	static GameBoy::PixelProcessingUnit &get_pixel_processing_unit() {
+		static SingleInstructionTestPixelProcessingUnit test_pixel_processing_unit;
+		return test_pixel_processing_unit;
+	}
 };
 
 class SingleInstructionTest : public testing::TestWithParam<std::filesystem::path> {

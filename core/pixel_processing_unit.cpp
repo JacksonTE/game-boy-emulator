@@ -29,36 +29,39 @@ void PixelProcessingUnit::step_single_machine_cycle()
 			{
 				std::stable_sort(current_scanline_selected_objects.begin(), current_scanline_selected_objects.end(),
 					[](const ObjectAttributes &a, const ObjectAttributes &b) { return a.x_position < b.x_position; });
+
 				current_mode = PixelProcessingUnitMode::DrawingPixels;
 			}
 			break;
 		case PixelProcessingUnitMode::DrawingPixels:
 			step_drawing_pixels_single_machine_cycle();
-			if (true)
+
+			if (true) // TODO add condition
 				current_mode = PixelProcessingUnitMode::HorizontalBlank;
 			break;
 		case PixelProcessingUnitMode::HorizontalBlank:
-			if (current_scanline_elapsed_dots_count == SCAN_LINE_DURATION_DOTS)
-			{
-				current_mode = (lcd_y_coordinate_ly == FINAL_DRAWING_SCAN_LINE)
-					? PixelProcessingUnitMode::VerticalBlank
-					: PixelProcessingUnitMode::ObjectAttributeMemoryScan;
-				background_pixel_queue.clear();
-				object_pixel_queue.clear();
-				lcd_y_coordinate_ly++;
-				current_scanline_elapsed_dots_count = 0;
-			}
+			if (current_scanline_elapsed_dots_count < SCAN_LINE_DURATION_DOTS)
+				break;
+
+			current_mode = (lcd_y_coordinate_ly == FINAL_DRAWING_SCAN_LINE)
+				? PixelProcessingUnitMode::VerticalBlank
+				: PixelProcessingUnitMode::ObjectAttributeMemoryScan;
+
+			background_pixel_queue.clear();
+			object_pixel_queue.clear();
+			lcd_y_coordinate_ly++;
+			current_scanline_elapsed_dots_count = 0;
 			break;
 		case PixelProcessingUnitMode::VerticalBlank:
-			if (current_scanline_elapsed_dots_count == SCAN_LINE_DURATION_DOTS)
+			if (current_scanline_elapsed_dots_count < SCAN_LINE_DURATION_DOTS)
+				break;
+
+			if (lcd_y_coordinate_ly == FINAL_FRAME_SCAN_LINE)
 			{
-				if (lcd_y_coordinate_ly == FINAL_FRAME_SCAN_LINE)
-				{
-					current_mode = PixelProcessingUnitMode::ObjectAttributeMemoryScan;
-				}
-				lcd_y_coordinate_ly = (lcd_y_coordinate_ly + 1) % (FINAL_FRAME_SCAN_LINE + 1);		
-				current_scanline_elapsed_dots_count = 0;
+				current_mode = PixelProcessingUnitMode::ObjectAttributeMemoryScan;
 			}
+			lcd_y_coordinate_ly = (lcd_y_coordinate_ly + 1) % (FINAL_FRAME_SCAN_LINE + 1);
+			current_scanline_elapsed_dots_count = 0;
 			break;
 	}
 }
@@ -71,9 +74,11 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_machine_cycle
 	for (uint8_t _ = 0; _ < DOTS_PER_MACHINE_CYCLE && current_scanline_selected_objects.size() < MAX_OBJECTS_PER_LINE; _++)
 	{
 		if (is_in_first_dot_of_current_step)
+			is_in_first_dot_of_current_step = false;
 			continue;
 
-		uint8_t starting_index = current_scanline_elapsed_dots_count / 2;
+		const uint8_t object_height = is_bit_set_uint8(2, lcd_control_lcdc) ? 16 : 8;
+		const uint8_t starting_index = current_scanline_elapsed_dots_count / 2;
 		ObjectAttributes current_object
 		{
 			object_attribute_memory[starting_index],
@@ -82,9 +87,9 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_machine_cycle
 			object_attribute_memory[starting_index + 3],
 		};
 
-		const uint8_t object_height = is_bit_set_uint8(2, lcd_control_lcdc) ? 16 : 8;
-
-		if (lcd_y_coordinate_ly >= current_object.y_position && lcd_y_coordinate_ly < current_object.y_position + object_height)
+		const bool object_intersects_with_scanline = lcd_y_coordinate_ly >= current_object.y_position &&
+                                                     lcd_y_coordinate_ly < current_object.y_position + object_height;
+		if (object_intersects_with_scanline)
 		{
 			if (object_height == 16)
 			{
@@ -97,7 +102,7 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_machine_cycle
 			}
 			current_scanline_selected_objects.push_back(current_object);
 		}
-		is_in_first_dot_of_current_step = !is_in_first_dot_of_current_step;
+		is_in_first_dot_of_current_step = true;
 	}
 }
 
@@ -109,11 +114,11 @@ void PixelProcessingUnit::step_drawing_pixels_single_machine_cycle()
 
 		if (is_object_display_enabled && !object_fetcher.is_enabled) 
 		{
-			for (ObjectAttributes object = current_scanline_selected_objects[object_fetcher.current_object_index];
-				object_fetcher.current_object_index < MAX_OBJECTS_PER_LINE && object.x_position <= lcd_internal_x_coordinate_lx + 8;
-				object_fetcher.current_object_index++)
+			for (ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
+				 object_fetcher.current_object_index < MAX_OBJECTS_PER_LINE && current_object.x_position <= lcd_internal_x_coordinate_lx + 8;
+				 object_fetcher.current_object_index++)
 			{
-				if (object.x_position == lcd_internal_x_coordinate_lx + 8)
+				if (current_object.x_position == lcd_internal_x_coordinate_lx + 8)
 				{
 					is_pixel_output_enabled = false;
 					object_fetcher.is_enabled = true;
@@ -243,12 +248,14 @@ void PixelProcessingUnit::step_object_fetcher_single_dot() {
 	switch (object_fetcher.current_step)
 	{
 		case PixelSliceFetcherStep::GetTileId:
+		{
 			if (is_in_first_dot_of_current_step)
 				break;
 			ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
 			object_fetcher.tile_id = current_object.tile_index;
 			object_fetcher.current_step = PixelSliceFetcherStep::GetTileRowLow;
 			break;
+		}
 		case PixelSliceFetcherStep::GetTileRowLow:
 			if (is_in_first_dot_of_current_step)
 				set_object_fetcher_tile_row_address(0);
@@ -302,7 +309,7 @@ void PixelProcessingUnit::set_object_fetcher_tile_row_address(uint8_t offset) {
 
 uint8_t PixelProcessingUnit::get_object_fetcher_tile_row() {
 	ObjectAttributes current_object = current_scanline_selected_objects[object_fetcher.current_object_index];
-	const uint8_t tile_row_byte = read_byte_video_ram(background_fetcher.tile_row_address);
+	const uint8_t tile_row_byte = read_byte_video_ram(object_fetcher.tile_row_address);
 
 	return is_bit_set_uint8(5, current_object.flags)
 		? get_byte_horizontally_flipped(tile_row_byte)

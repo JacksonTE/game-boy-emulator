@@ -2,16 +2,19 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <queue>
 #include <vector>
-#include "memory_management_unit.h"
 
 namespace GameBoy
 {
 
 constexpr uint16_t VIDEO_RAM_SIZE = 0x2000;
 constexpr uint8_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 160;
+
+constexpr uint16_t VIDEO_RAM_START = 0x8000;
+constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xfe00;
 
 constexpr uint8_t DOTS_PER_MACHINE_CYCLE = 4;
 constexpr uint8_t PIXELS_PER_TILE_ROW = 8;
@@ -52,6 +55,18 @@ struct ObjectAttributes
 	uint8_t flags{};
 };
 
+struct BackgroundPixel
+{
+	uint8_t colour_index{};
+};
+
+struct ObjectPixel
+{
+	uint8_t colour_index{};
+	bool is_palette_bit_set{};
+	bool is_priority_bit_set{};
+};
+
 struct PixelSliceFetcher
 {
 	PixelSliceFetcherStep current_step{PixelSliceFetcherStep::GetTileId};
@@ -72,18 +87,6 @@ struct BackgroundFetcher : PixelSliceFetcher
 	FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
 	uint16_t tile_id_address{};
 	std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
-};
-
-struct BackgroundPixel
-{
-	uint8_t colour_index{};
-};
-
-struct ObjectPixel
-{
-	uint8_t colour_index{};
-	bool is_palette_bit_set{};
-	bool is_priority_bit_set{};
 };
 
 template <typename T>
@@ -107,8 +110,8 @@ public:
 	{
 		if (is_tracking_size)
 		{
-			if (current_size == 0) 
-				std::cout << "Warning: attempted to shift out of an empty PISO shift register while tracking its size."
+			if (current_size == 0)
+				std::cout << "Warning: attempted to shift out of an empty PISO shift register while tracking its size.\n";
 			else
 				current_size--;
 		}
@@ -118,7 +121,7 @@ public:
 		{
 			entries[i] = entries[i + 1];
 		}
-		entries[PIXELS_PER_TILE_ROW - 1] = 0;
+		entries[PIXELS_PER_TILE_ROW - 1] = T{};
 		return head;
 	}
 
@@ -161,7 +164,7 @@ private:
 	std::unique_ptr<uint8_t[]> video_ram;
 	std::unique_ptr<uint8_t[]> object_attribute_memory;
 
-	uint8_t lcd_control_lcdc;
+	uint8_t lcd_control_lcdc{};
 	uint8_t lcd_status_stat{};
 	uint8_t viewport_y_position_scy{};
 	uint8_t viewport_x_position_scx{};

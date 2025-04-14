@@ -11,7 +11,7 @@ namespace GameBoy {
 
 Emulator::Emulator()
 	: pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-	  memory_interface{std::make_unique<MemoryManagementUnit>(&pixel_processing_unit)},
+	  memory_interface{std::make_unique<MemoryManagementUnit>(pixel_processing_unit)},
       cpu{*memory_interface, [this](MachineCycleInteraction _) { this->step_components_single_machine_cycle(); }}
 {
 }

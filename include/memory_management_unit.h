@@ -13,8 +13,6 @@ constexpr uint32_t MEMORY_SIZE = 0x10000;
 constexpr uint16_t COLLECTIVE_ROM_BANK_SIZE = 0x8000;
 constexpr uint16_t BOOTROM_SIZE = 0x100;
 
-constexpr uint16_t VIDEO_RAM_START = 0x8000;
-constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xfe00;
 constexpr uint16_t HIGH_RAM_START = 0xff00;
 
 constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
@@ -26,7 +24,8 @@ constexpr uint8_t INTERRUPT_FLAG_VBLANK_MASK = 1 << 0;
 
 class MemoryManagementUnit {
 public:
-    MemoryManagementUnit(PixelProcessingUnit &ppu);
+    MemoryManagementUnit(PixelProcessingUnit &pixel_processing_unit_reference);
+	virtual ~MemoryManagementUnit() = default;
 
     virtual void reset_state();
     void set_post_boot_state();
@@ -44,11 +43,11 @@ public:
     void step_single_machine_cycle();
 
 private:
-    std::unique_ptr<uint8_t[]> placeholder_memory;
+	std::unique_ptr<uint8_t[]> placeholder_memory{};
     std::unique_ptr<uint8_t[]> bootrom{};
 
     Timer timer;
-	PixelProcessingUnit &pixel_processing_unit;
+    PixelProcessingUnit &pixel_processing_unit;
 
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};

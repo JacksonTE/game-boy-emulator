@@ -7,9 +7,9 @@
 
 namespace GameBoy {
 
-MemoryManagementUnit::MemoryManagementUnit(PixelProcessingUnit &ppu)
+MemoryManagementUnit::MemoryManagementUnit(PixelProcessingUnit &pixel_processing_unit_reference)
     : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-	  pixel_processing_unit{ppu}
+	  pixel_processing_unit{pixel_processing_unit_reference}
 {
     placeholder_memory = std::make_unique<uint8_t[]>(MEMORY_SIZE);
     std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
