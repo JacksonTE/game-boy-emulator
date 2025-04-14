@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 #include "pixel_processing_unit.h"
 
