@@ -152,7 +152,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
 			case 0xff0f:
 				return interrupt_flag_if | 0b11100000;
 			case 0xff40:
-				return pixel_processing_unit.lcd_control_lcdc;
+				return pixel_processing_unit.read_lcd_control_lcdc();
 			case 0xff41:
 				return pixel_processing_unit.read_lcd_status_stat();
 			case 0xff42:
@@ -215,7 +215,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
 				interrupt_flag_if = value | 0b11100000;
 				return;
 			case 0xff40:
-				pixel_processing_unit.lcd_control_lcdc = value;
+				pixel_processing_unit.write_lcd_control_lcdc(value);
 				return;
 			case 0xff41:
 				pixel_processing_unit.write_lcd_status_stat(value);
