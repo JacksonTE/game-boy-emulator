@@ -41,7 +41,7 @@ enum class PixelProcessingUnitMode
 	HorizontalBlank,
 	VerticalBlank,
 	ObjectAttributeMemoryScan,
-	DrawingPixels
+	PixelTransfer
 };
 
 enum class FetcherMode
@@ -226,7 +226,7 @@ private:
 	void disable();
 
 	void step_object_attribute_memory_scan_single_dot();
-	void step_drawing_pixels_single_dot();
+	void step_pixel_transfer_single_dot();
 
 	void step_background_fetcher_single_dot();
 	void set_background_fetcher_tile_id_address();
@@ -235,6 +235,8 @@ private:
 	void step_object_fetcher_single_dot();
 	void set_object_fetcher_tile_row_address(uint8_t offset);
 	uint8_t get_object_fetcher_tile_row();
+
+	void update_interrupts();
 	bool is_lcd_status_stat_interrupt_condition_met();
 
 	uint8_t get_byte_horizontally_flipped(uint8_t byte);
