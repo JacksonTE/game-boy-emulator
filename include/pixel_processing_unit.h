@@ -94,7 +94,7 @@ struct PixelSliceFetcher
 struct ObjectFetcher : PixelSliceFetcher
 {
 	std::vector<ObjectAttributes> current_scanline_selected_objects;
-	int current_object_index{-1};
+	uint8_t current_object_index{};
 
 	void reset_state() override;
 	ObjectAttributes get_current_object();
@@ -103,8 +103,10 @@ struct ObjectFetcher : PixelSliceFetcher
 struct BackgroundFetcher : PixelSliceFetcher
 {
 	FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
-	uint8_t current_scanline_discarded_pixels_count{};
+	bool is_on_first_fetch_of_scanline{true};
+	int current_scanline_pixels_to_discard_count{-1};
 	uint16_t tile_id_address{};
+	uint8_t tile_row_scy_value{};
 	std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
 	void reset_state() override;
@@ -122,8 +124,9 @@ public:
 	void load_new_tile_row(std::array<T, PIXELS_PER_TILE_ROW> new_entries)
 	{
 		if (is_tracking_size)
+		{
 			current_size = PIXELS_PER_TILE_ROW;
-
+		}
 		entries = new_entries;
 	}
 
@@ -148,7 +151,9 @@ public:
 
 	void clear() {
 		if (is_tracking_size)
+		{
 			current_size = 0;
+		}
 		entries.fill(T{});
 	}
 
@@ -181,7 +186,7 @@ public:
 	uint8_t window_y_position_wy{};
 	uint8_t window_x_position_plus_7_wx{};
 
-	PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt_callback);
+	PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt);
 
 	uint8_t read_byte_video_ram(uint16_t memory_address) const;
 	void write_byte_video_ram(uint16_t memory_address, uint8_t value);
@@ -200,7 +205,7 @@ public:
 	void step_single_machine_cycle();
 
 private:
-	std::function<void(uint8_t)> request_interrupt;
+	std::function<void(uint8_t)> request_interrupt_callback;
 
 	std::unique_ptr<uint8_t[]> video_ram;
 	std::unique_ptr<uint8_t[]> object_attribute_memory;
@@ -211,22 +216,21 @@ private:
 	uint8_t lcd_internal_x_coordinate_lx{};
 	uint8_t window_internal_line_counter_wly{};
 
-	PixelProcessingUnitEnableStatus enable_status{PixelProcessingUnitEnableStatus::Disabled};
 	PixelProcessingUnitMode previous_mode{PixelProcessingUnitMode::HorizontalBlank};
 	PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
 	uint16_t current_scanline_dot_number{};
+	uint8_t stat_value_after_spurious_interrupt{};
+	bool is_in_first_horizontal_blank_after_enable{};
 	bool is_in_first_dot_of_current_step{true};
-	bool is_pixel_output_enabled{true};
-	bool did_hblank_end_last_machine_cycle{};
-	bool are_stat_interrupts_blocked{false};
 	bool is_window_enabled_for_scanline{};
+	bool did_horizontal_blank_end_last_machine_cycle{};
+	bool are_stat_interrupts_blocked{};
+	bool did_spurious_stat_interrupt_occur{};
 
 	PixelPisoShiftRegisters<BackgroundPixel> background_pixel_queue{true};
 	PixelPisoShiftRegisters<ObjectPixel> object_pixel_queue{false};
 	ObjectFetcher object_fetcher{};
 	BackgroundFetcher background_fetcher{};
-
-	void disable();
 
 	void step_object_attribute_memory_scan_single_dot();
 	void step_pixel_transfer_single_dot();
@@ -235,7 +239,7 @@ private:
 
 	void step_background_fetcher_single_dot();
 	void set_background_fetcher_tile_id_address();
-	void set_background_fetcher_tile_row_address(uint8_t offset);
+	void set_background_fetcher_tile_row_byte_address(uint8_t offset);
 
 	void step_object_fetcher_single_dot();
 	void set_object_fetcher_tile_row_address(uint8_t offset);

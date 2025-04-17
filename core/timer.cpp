@@ -3,15 +3,15 @@
 
 namespace GameBoy {
 
-Timer::Timer(std::function<void(uint8_t)> request_interrupt_callback)
-    : request_interrupt{request_interrupt_callback} {
+Timer::Timer(std::function<void(uint8_t)> request_interrupt)
+    : request_interrupt_callback{request_interrupt} {
 }
 
 void Timer::step_single_machine_cycle() {
     system_counter += 4;
 
     if (did_timer_tima_overflow_occur) {
-        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
+		request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
     is_timer_tima_overflow_handled = did_timer_tima_overflow_occur;
@@ -62,7 +62,7 @@ void Timer::write_timer_control_tac(uint8_t value) {
 
 void Timer::update_timer_tima_early() {
     if (update_timer_tima_and_get_overflow_state()) {
-        request_interrupt(INTERRUPT_FLAG_TIMER_MASK);
+		request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
 }

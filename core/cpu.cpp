@@ -6,14 +6,13 @@
 
 namespace GameBoy {
 
-CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle_callback)
-    : emulator_step_single_machine_cycle{emulator_step_single_machine_cycle_callback},
+CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle)
+    : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
       memory_interface{memory_management_unit} {
 }
 
 void CPU::reset_state() {
     set_register_file_state(RegisterFile<std::endian::native>{});
-    elapsed_cycle_count = 0;
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
     instruction_register_ir = 0x00;
     is_instruction_prefixed = false;
@@ -45,7 +44,7 @@ void CPU::set_post_boot_state() {
 
 void CPU::step_single_instruction() {
     if (is_halted) {
-        emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+		emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     }
     else {
         execute_next_instruction_and_fetch();
@@ -54,10 +53,6 @@ void CPU::step_single_instruction() {
     if (interrupt_master_enable_ime == InterruptMasterEnableState::WillEnable) {
         interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
     }
-}
-
-void CPU::step_single_machine_cycle() {
-    elapsed_cycle_count += 4;
 }
 
 RegisterFile<std::endian::native> CPU::get_register_file() const {
@@ -100,9 +95,6 @@ void CPU::print_register_file_state() const {
 
     std::cout << "Stack Pointer: 0x" << std::setw(4) << register_file.stack_pointer << "\n";
     std::cout << "Program Counter: 0x" << std::setw(4) << register_file.program_counter << "\n";
-
-    std::cout << std::dec;
-    std::cout << "Cycles Elapsed: " << elapsed_cycle_count << "\n";
     std::cout << "=====================================================\n";
 }
 
@@ -161,12 +153,12 @@ uint8_t CPU::get_pending_interrupt_mask() {
 }
 
 uint8_t CPU::read_byte_and_tick(uint16_t address) {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::Read, address});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::Read, address});
     return memory_interface.read_byte(address);
 }
 
 void CPU::write_byte_and_tick(uint16_t address, uint8_t value) {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::Write, address, value});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::Write, address, value});
     memory_interface.write_byte(address, value);
 }
 
@@ -716,17 +708,17 @@ bool CPU::is_flag_set(uint8_t flag_mask) const {
 }
 
 void CPU::increment_register16(uint16_t &register16) {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     register16++;
 }
 
 void CPU::decrement_register16(uint16_t &register16) {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     register16--;
 }
 
 void CPU::add_hl_register16(const uint16_t &register16) {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     const bool does_half_carry_occur = (register_file.hl & 0x0fff) + (register16 & 0x0fff) > 0x0fff;
     const bool does_carry_occur = static_cast<uint32_t>(register_file.hl) + register16 > 0xffff;
     register_file.hl += register16;
@@ -829,7 +821,7 @@ void CPU::compare_a_uint8(const uint8_t &uint8) {
 void CPU::jump_relative_conditional_signed_immediate8(bool is_condition_met) {
     const int8_t signed_offset = static_cast<int8_t>(fetch_immediate8_and_tick());
     if (is_condition_met) {
-        emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+		emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
         register_file.program_counter += signed_offset;
     }
 }
@@ -837,7 +829,7 @@ void CPU::jump_relative_conditional_signed_immediate8(bool is_condition_met) {
 void CPU::jump_conditional_immediate16(bool is_condition_met) {
     const uint16_t jump_address = fetch_immediate16_and_tick();
     if (is_condition_met) {
-        emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+		emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
         register_file.program_counter = jump_address;
     }
 }
@@ -861,7 +853,7 @@ void CPU::call_conditional_immediate16(bool is_condition_met) {
 }
 
 void CPU::return_conditional(bool is_condition_met) {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     if (is_condition_met) {
         return_0xc9();
     }
@@ -1822,7 +1814,7 @@ void CPU::return_if_zero_0xc8() {
 
 void CPU::return_0xc9() {
     uint16_t stack_top = pop_stack();
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     register_file.program_counter = stack_top;
 }
 
@@ -1934,8 +1926,8 @@ void CPU::restart_at_0x20_0xe7() {
 void CPU::add_stack_pointer_signed_immediate8_0xe8() {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_tick();
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
     const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
     register_file.stack_pointer += static_cast<int8_t>(unsigned_offset);
@@ -2001,7 +1993,7 @@ void CPU::restart_at_0x30_0xf7() {
 void CPU::load_hl_stack_pointer_with_signed_offset_0xf8() {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_tick();
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
     const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
     register_file.hl = register_file.stack_pointer + static_cast<int8_t>(unsigned_offset);
@@ -2012,7 +2004,7 @@ void CPU::load_hl_stack_pointer_with_signed_offset_0xf8() {
 }
 
 void CPU::load_stack_pointer_hl_0xf9() {
-    emulator_step_single_machine_cycle(MachineCycleInteraction{MemoryOperation::None});
+	emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
     register_file.stack_pointer = register_file.hl;
 }
 

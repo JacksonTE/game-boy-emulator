@@ -7,7 +7,7 @@ namespace GameBoy {
 
 class Timer {
 public:
-	Timer(std::function<void(uint8_t)> request_interrupt_callback);
+	Timer(std::function<void(uint8_t)> request_interrupt);
 
 	void step_single_machine_cycle();
 
@@ -22,7 +22,7 @@ public:
 	void write_timer_control_tac(uint8_t value);
 
 private:
-	std::function<void(uint8_t)> request_interrupt;
+	std::function<void(uint8_t)> request_interrupt_callback;
 	uint16_t system_counter{};
 	uint8_t timer_tima{};
 	uint8_t timer_modulo_tma{};

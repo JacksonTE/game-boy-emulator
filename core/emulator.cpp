@@ -63,9 +63,8 @@ bool Emulator::try_load_file_to_memory(uint16_t address, uint32_t number_of_byte
 }
 
 void Emulator::step_components_single_machine_cycle() {
-	cpu.step_single_machine_cycle();
-	pixel_processing_unit.step_single_machine_cycle();
 	memory_interface->step_single_machine_cycle();
+	pixel_processing_unit.step_single_machine_cycle();
 }
 
 } // namespace GameBoy

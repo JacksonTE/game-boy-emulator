@@ -19,7 +19,7 @@ enum class InterruptMasterEnableState {
 
 class CPU {
 public:
-    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle_callback);
+    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle);
 
     void reset_state();
     void set_post_boot_state();
@@ -32,10 +32,9 @@ public:
     void print_register_file_state() const;
 
 private:
-    std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle;
+    std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle_callback;
     MemoryManagementUnit &memory_interface;
     RegisterFile<std::endian::native> register_file;
-    uint64_t elapsed_cycle_count{};
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
     uint8_t instruction_register_ir{};
     bool is_instruction_prefixed{};
