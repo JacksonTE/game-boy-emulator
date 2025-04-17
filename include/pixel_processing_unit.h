@@ -103,6 +103,7 @@ struct ObjectFetcher : PixelSliceFetcher
 struct BackgroundFetcher : PixelSliceFetcher
 {
 	FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
+	uint8_t current_scanline_discarded_pixels_count{};
 	uint16_t tile_id_address{};
 	std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
@@ -211,12 +212,14 @@ private:
 	uint8_t window_internal_line_counter_wly{};
 
 	PixelProcessingUnitEnableStatus enable_status{PixelProcessingUnitEnableStatus::Disabled};
+	PixelProcessingUnitMode previous_mode{PixelProcessingUnitMode::HorizontalBlank};
 	PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
-	uint16_t dots_elapsed_while_disable_pending{};
-	uint16_t current_scanline_elapsed_dots_count{};
-	uint8_t current_scanline_discarded_pixels_count{};
+	uint16_t current_scanline_dot_number{};
 	bool is_in_first_dot_of_current_step{true};
 	bool is_pixel_output_enabled{true};
+	bool did_hblank_end_last_machine_cycle{};
+	bool are_stat_interrupts_blocked{false};
+	bool is_window_enabled_for_scanline{};
 
 	PixelPisoShiftRegisters<BackgroundPixel> background_pixel_queue{true};
 	PixelPisoShiftRegisters<ObjectPixel> object_pixel_queue{false};
@@ -227,6 +230,8 @@ private:
 
 	void step_object_attribute_memory_scan_single_dot();
 	void step_pixel_transfer_single_dot();
+	void step_horizontal_blank_single_dot();
+	void step_vertical_blank_single_dot();
 
 	void step_background_fetcher_single_dot();
 	void set_background_fetcher_tile_id_address();
@@ -236,11 +241,17 @@ private:
 	void set_object_fetcher_tile_row_address(uint8_t offset);
 	uint8_t get_object_fetcher_tile_row();
 
-	void update_interrupts();
-	bool is_lcd_status_stat_interrupt_condition_met();
+	void initialize_pixel_transfer();
+
+	void trigger_lcd_status_stat_interrupts();
+
+	template<typename T>
+	bool is_bit_set(T value, uint8_t bit_position_to_test) const;
+
+	template<typename T>
+	void set_bit(T &variable, uint8_t bit_position, bool new_bit_state);
 
 	uint8_t get_byte_horizontally_flipped(uint8_t byte);
-	bool is_bit_set_uint8(const uint8_t &bit_position_to_test, const uint8_t &uint8) const;
 	uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
 };
 
