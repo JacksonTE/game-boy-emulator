@@ -220,7 +220,7 @@ private:
 	PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
 	uint16_t current_scanline_dot_number{};
 	uint8_t stat_value_after_spurious_interrupt{};
-	bool is_in_first_horizontal_blank_after_enable{};
+	bool is_in_first_scanline_after_enable{};
 	bool is_in_first_dot_of_current_step{true};
 	bool is_window_enabled_for_scanline{};
 	bool did_horizontal_blank_end_last_machine_cycle{};

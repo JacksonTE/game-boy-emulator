@@ -112,7 +112,7 @@ void PixelProcessingUnit::write_lcd_control_lcdc(uint8_t value)
 
 	if (will_lcd_enable_bit_be_set && !is_lcd_enable_bit_previously_set)
 	{
-		is_in_first_horizontal_blank_after_enable = true;
+		is_in_first_scanline_after_enable = true;
 		is_in_first_dot_of_current_step = true;
 		current_scanline_dot_number = 0;
 		trigger_lcd_status_stat_interrupts();
@@ -287,9 +287,6 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 
 		if (++lcd_internal_x_coordinate_lx == 160)
 		{
-			if (is_in_first_horizontal_blank_after_enable)
-				is_in_first_horizontal_blank_after_enable = false;
-
 			current_mode = PixelProcessingUnitMode::HorizontalBlank;
 		}
 	}
@@ -297,13 +294,16 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 
 void PixelProcessingUnit::step_horizontal_blank_single_dot()
 {
-	if (is_in_first_horizontal_blank_after_enable && current_scanline_dot_number == OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS - 4)
+	if (is_in_first_scanline_after_enable && current_scanline_dot_number == OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS - 4)
 	{
 		initialize_pixel_transfer();
 		current_mode = PixelProcessingUnitMode::PixelTransfer;
 	}
-	if (current_scanline_dot_number < SCAN_LINE_DURATION_DOTS)
+	if (current_scanline_dot_number < SCAN_LINE_DURATION_DOTS &&
+		!(is_in_first_scanline_after_enable && current_scanline_dot_number == SCAN_LINE_DURATION_DOTS - 4))
+	{
 		return;
+	}
 
 	if (background_fetcher.fetcher_mode == FetcherMode::WindowMode)
 	{
@@ -320,6 +320,9 @@ void PixelProcessingUnit::step_horizontal_blank_single_dot()
 	}
 	else
 	{
+		if (is_in_first_scanline_after_enable)
+			is_in_first_scanline_after_enable = false;
+
 		object_fetcher.reset_state();
 		current_mode = PixelProcessingUnitMode::ObjectAttributeMemoryScan;
 	}

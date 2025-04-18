@@ -118,8 +118,8 @@ void CPU::fetch_next_instruction() {
 
 void CPU::service_interrupt() {
     bool is_interrupt_pending = (get_pending_interrupt_mask() != 0);
-    if (is_interrupt_pending) {
-        is_halted = false;
+    if (is_interrupt_pending && is_halted) {
+		is_halted = false;
     }
 
     if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending) {
@@ -128,7 +128,8 @@ void CPU::service_interrupt() {
 
     decrement_register16(register_file.program_counter);
     decrement_register16(register_file.stack_pointer);
-    write_byte_and_tick(register_file.stack_pointer--, register_file.program_counter >> 8);
+    write_byte_and_tick(register_file.stack_pointer, register_file.program_counter >> 8);
+	decrement_register16(register_file.stack_pointer);
     uint8_t interrupt_flag_mask = get_pending_interrupt_mask();
     write_byte_and_tick(register_file.stack_pointer, register_file.program_counter & 0xff);
 

@@ -313,7 +313,7 @@ void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t
 	std::cout << "=====================================================\n";
 }
 
-void MemoryManagementUnit::step_single_machine_cycle()
+void MemoryManagementUnit::step_timer_single_machine_cycle()
 {
     timer.step_single_machine_cycle();
 }
