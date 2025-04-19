@@ -38,8 +38,6 @@ public:
     bool is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const;
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
 
-    void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
-
 private:
     std::unique_ptr<uint8_t[]> placeholder_memory{};
     std::unique_ptr<uint8_t[]> bootrom{};

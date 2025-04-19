@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     }
 
     // TODO FIX REMAINING:
-    // passing hblank_ly_scx_timing-GS.gb, lcdon_write_timing-GS.gb, vblank_stat_intr-GS.gb - problem is fully with stat?
+    // Failing intr_1_2_timing-GS.gb, intr_2_mode0_timing_sprites.gb, intr_2_0_timing.gb 
     std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) /
         "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "ppu" / "vblank_stat_intr-GS.gb";
     game_boy_emulator.try_load_file_to_memory(0x0000, GameBoy::COLLECTIVE_ROM_BANK_SIZE, test_rom_path, false);

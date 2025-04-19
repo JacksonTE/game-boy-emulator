@@ -33,8 +33,8 @@ private:
     bool did_tima_overflow_occur{};
     bool is_tima_overflow_handled{};
 
-    void update_timer_tima_early();
-    bool update_timer_tima_and_get_overflow_state();
+    void update_tima_early();
+    bool update_tima_and_get_overflow_state();
 };
 
 } // namespace GameBoy

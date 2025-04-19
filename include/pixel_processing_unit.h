@@ -11,7 +11,7 @@
 namespace GameBoy
 {
 
-constexpr uint8_t INTERRUPT_FLAG_LCD_STAT_MASK = 1 << 1;
+constexpr uint8_t INTERRUPT_FLAG_LCD_STATUS_MASK = 1 << 1;
 constexpr uint8_t INTERRUPT_FLAG_VBLANK_MASK = 1 << 0;
 
 constexpr uint16_t VIDEO_RAM_SIZE = 0x2000;
@@ -248,12 +248,6 @@ private:
     void initialize_pixel_transfer();
 
     void trigger_lcd_status_stat_interrupts();
-
-    template<typename T>
-    bool is_bit_set(T value, uint8_t bit_position_to_test) const;
-
-    template<typename T>
-    void set_bit(T &variable, uint8_t bit_position, bool new_bit_state);
 
     uint8_t get_byte_horizontally_flipped(uint8_t byte);
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <memory>
 #include <type_traits>
+#include "helpers.h"
 #include "pixel_processing_unit.h"
 
 namespace GameBoy
@@ -392,7 +393,7 @@ void PixelProcessingUnit::trigger_lcd_status_stat_interrupts()
         if (!are_stat_interrupts_blocked)
         {
             are_stat_interrupts_blocked = true;
-            request_interrupt_callback(INTERRUPT_FLAG_LCD_STAT_MASK);
+            request_interrupt_callback(INTERRUPT_FLAG_LCD_STATUS_MASK);
         }
     }
     else
@@ -569,21 +570,6 @@ uint8_t PixelProcessingUnit::get_object_fetcher_tile_row() {
     return is_bit_set(object_fetcher.get_current_object().flags, 5)
         ? get_byte_horizontally_flipped(tile_row_byte)
         : tile_row_byte;
-}
-
-template<typename T>
-bool PixelProcessingUnit::is_bit_set(T value, uint8_t bit_position_to_test) const
-{
-    return (value & (1 << bit_position_to_test)) != 0;
-}
-
-template<typename T>
-void PixelProcessingUnit::set_bit(T &variable, uint8_t bit_position, bool new_bit_state)
-{
-    if (new_bit_state)
-        variable &= ~(1 << bit_position);
-    else
-        variable |= (1 << bit_position);
 }
 
 uint8_t PixelProcessingUnit::get_byte_horizontally_flipped(uint8_t byte) {

@@ -19,7 +19,7 @@ void Timer::step_single_machine_cycle()
         timer_tima = timer_modulo_tma;
     }
     is_tima_overflow_handled = did_tima_overflow_occur;
-    did_tima_overflow_occur = update_timer_tima_and_get_overflow_state();
+    did_tima_overflow_occur = update_tima_and_get_overflow_state();
 }
 
 uint8_t Timer::read_div() const
@@ -45,7 +45,7 @@ uint8_t Timer::read_tac() const
 void Timer::write_div(uint8_t value)
 {
     system_counter = 0x0000;
-    update_timer_tima_early();
+    update_tima_early();
 }
 
 void Timer::write_tima(uint8_t value)
@@ -70,27 +70,27 @@ void Timer::write_tma(uint8_t value)
 void Timer::write_tac(uint8_t value)
 {
     timer_control_tac = value;
-    update_timer_tima_early();
+    update_tima_early();
 }
 
-void Timer::update_timer_tima_early()
+void Timer::update_tima_early()
 {
-    if (update_timer_tima_and_get_overflow_state())
+    if (update_tima_and_get_overflow_state())
     {
         request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
 }
 
-bool Timer::update_timer_tima_and_get_overflow_state()
+bool Timer::update_tima_and_get_overflow_state()
 {
-    const bool is_timer_tima_enabled = (timer_control_tac & 0b00000100) != 0;
+    const bool is_tima_enabled = (timer_control_tac & 0b00000100) != 0;
 
     const uint8_t clock_select = timer_control_tac & 0b00000011;
     const uint8_t clock_select_to_selected_system_counter_bit[4] = {9, 3, 5, 7};
     const uint8_t selected_system_counter_bit = clock_select_to_selected_system_counter_bit[clock_select];
     const bool is_selected_system_counter_bit_set =
-        is_timer_tima_enabled && (system_counter & (1 << selected_system_counter_bit)) != 0;
+        is_tima_enabled && (system_counter & (1 << selected_system_counter_bit)) != 0;
 
     const bool did_overflow_occur = !is_selected_system_counter_bit_set &&
         is_previously_selected_system_counter_bit_set &&

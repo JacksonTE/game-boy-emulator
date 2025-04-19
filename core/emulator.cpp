@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include "emulator.h"
+#include "helpers.h"
 #include "machine_cycle_interaction.h"
 #include "memory_management_unit.h"
 #include "register_file.h"
@@ -67,7 +68,7 @@ void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    memory_interface->print_bytes_in_range(start_address, end_address);
+    print_bytes_in_range(*memory_interface, start_address, end_address);
 }
 
 bool Emulator::try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
