@@ -14,8 +14,8 @@ void Timer::step_single_machine_cycle()
     system_counter += 4;
 
     if (did_tima_overflow_occur)
-	{
-		request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
+    {
+        request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
     is_tima_overflow_handled = did_tima_overflow_occur;
@@ -61,10 +61,10 @@ void Timer::write_tma(uint8_t value)
 {
     timer_modulo_tma = value;
 
-	if (is_tima_overflow_handled)
-	{
-		timer_tima = timer_modulo_tma;
-	}
+    if (is_tima_overflow_handled)
+    {
+        timer_tima = timer_modulo_tma;
+    }
 }
 
 void Timer::write_tac(uint8_t value)
@@ -76,8 +76,8 @@ void Timer::write_tac(uint8_t value)
 void Timer::update_timer_tima_early()
 {
     if (update_timer_tima_and_get_overflow_state())
-	{
-		request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
+    {
+        request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
 }

@@ -24,7 +24,7 @@ class MemoryManagementUnit
 {
 public:
     MemoryManagementUnit(Timer &timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
-	virtual ~MemoryManagementUnit() = default;
+    virtual ~MemoryManagementUnit() = default;
 
     virtual void reset_state();
     void set_post_boot_state();
@@ -41,7 +41,7 @@ public:
     void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
 
 private:
-	std::unique_ptr<uint8_t[]> placeholder_memory{};
+    std::unique_ptr<uint8_t[]> placeholder_memory{};
     std::unique_ptr<uint8_t[]> bootrom{};
 
     Timer &timer;
@@ -51,7 +51,7 @@ private:
     uint8_t bootrom_status{};
     uint8_t interrupt_enable_ie{0b11100000};
 
-	void wrote_to_read_only_address(uint16_t address) const;
+    void wrote_to_read_only_address(uint16_t address) const;
 };
 
 } // namespace GameBoy

@@ -22,7 +22,7 @@ struct AddressValuePair
     AddressValuePair(uint16_t address, uint8_t value)
         : memory_address{address},
           value{value}
-	{
+    {
     }
 };
 
@@ -44,21 +44,21 @@ static std::vector<std::filesystem::path> get_ordered_json_test_file_paths(const
     std::vector<std::filesystem::path> filenames;
 
     for (const auto &entry : std::filesystem::directory_iterator(directory))
-	{
+    {
         // Skip 'halt' and 'stop' tests - their correct functionality isn't tested well with the json tests
         if (entry.is_regular_file() && entry.path().extension() == ".json" &&
             entry.path().filename() != "10.json" && entry.path().filename() != "76.json")
-		{
+        {
             filenames.push_back(entry.path());
         }
     }
     std::sort(filenames.begin(), filenames.end(), [](const std::filesystem::path &a, const std::filesystem::path &b)
-	{
+    {
         std::string a_string = a.string();
         std::string b_string = b.string();
     
-		if (a_string.size() != b_string.size())
-		{
+        if (a_string.size() != b_string.size())
+        {
             return a_string.size() < b_string.size();
         }
         return a_string < b_string;
@@ -78,13 +78,13 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
     std::vector<SingleInstructionTestCase> json_test_cases;
 
     for (const auto &test_case_object : json_test_file_object)
-	{
+    {
         SingleInstructionTestCase test_case;
 
         test_case.test_name = test_case_object["name"].get<std::string>();
 
         for (const auto &initial_ram_array : test_case_object["initial"]["ram"])
-		{
+        {
             const auto &address = initial_ram_array[0];
             const auto &initial_value = initial_ram_array[1];
             test_case.initial_ram_values.emplace_back(address, initial_value);
@@ -101,7 +101,7 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
         test_case.initial_register_values.l = test_case_object["initial"]["l"].get<uint8_t>();
 
         for (const auto &expected_ram_array : test_case_object["final"]["ram"])
-		{
+        {
             const auto &address = expected_ram_array[0];
             const auto &final_value = expected_ram_array[1];
             test_case.expected_ram_values.emplace_back(address, final_value);
@@ -118,21 +118,21 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
         test_case.expected_register_values.l = test_case_object["final"]["l"].get<uint8_t>();
 
         for (const auto &cycles_array : test_case_object["cycles"])
-		{
+        {
             const auto &address_accessed = cycles_array[0];
             const auto &value_written = cycles_array[1];
             const auto &operation_performed = cycles_array[2];
 
             if (operation_performed == "---")
-			{
+            {
                 test_case.expected_memory_interactions.emplace_back(GameBoy::MemoryOperation::None);
             }
             else if (operation_performed == "r-m")
-			{
+            {
                 test_case.expected_memory_interactions.emplace_back(GameBoy::MemoryOperation::Read, address_accessed);
             }
             else
-			{
+            {
                 test_case.expected_memory_interactions.emplace_back(GameBoy::MemoryOperation::Write, address_accessed, value_written);
             }
         }
@@ -147,41 +147,41 @@ class SingleInstructionTestMemory : public GameBoy::MemoryManagementUnit
 {
 public:
     SingleInstructionTestMemory()
-		: MemoryManagementUnit{get_timer(), get_pixel_processing_unit()}
-	{
+        : MemoryManagementUnit{get_timer(), get_pixel_processing_unit()}
+    {
         flat_memory = std::make_unique<uint8_t[]>(GameBoy::MEMORY_SIZE);
         std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
     }
 
     void reset_state() override
-	{
+    {
         std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
     }
 
     uint8_t read_byte(uint16_t address) const override
-	{
+    {
         return flat_memory[address];
     }
 
     void write_byte(uint16_t address, uint8_t value) override
-	{
+    {
         flat_memory[address] = value;
     }
 
 private:
     std::unique_ptr<uint8_t[]> flat_memory;
 
-	static GameBoy::Timer &get_timer()
-	{
-		static GameBoy::Timer test_timer{[](uint8_t _) { }};
-		return test_timer;
-	}
+    static GameBoy::Timer &get_timer()
+    {
+        static GameBoy::Timer test_timer{[](uint8_t _) { }};
+        return test_timer;
+    }
 
-	static GameBoy::PixelProcessingUnit &get_pixel_processing_unit()
-	{
-		static GameBoy::PixelProcessingUnit test_pixel_processing_unit{([](uint8_t) {})};
-		return test_pixel_processing_unit;
-	}
+    static GameBoy::PixelProcessingUnit &get_pixel_processing_unit()
+    {
+        static GameBoy::PixelProcessingUnit test_pixel_processing_unit{([](uint8_t) {})};
+        return test_pixel_processing_unit;
+    }
 };
 
 class SingleInstructionTest : public testing::TestWithParam<std::filesystem::path>
@@ -194,21 +194,21 @@ protected:
     SingleInstructionTest()
         : memory_interface{std::make_unique<SingleInstructionTestMemory>()},
           game_boy_cpu
-		  {
-		      *memory_interface, 
-			  [this](GameBoy::MachineCycleInteraction interaction) { this->memory_interactions.push_back(interaction); }
-		  }
-	{ 
+          {
+              *memory_interface, 
+              [this](GameBoy::MachineCycleInteraction interaction) { this->memory_interactions.push_back(interaction); }
+          }
+    { 
     }
 
     void set_initial_values(const SingleInstructionTestCase &test_case)
-	{
+    {
         memory_interactions.clear();
         memory_interface->reset_state();
         game_boy_cpu.reset_state();
 
         for (const AddressValuePair &pair : test_case.initial_ram_values)
-		{
+        {
             memory_interface->write_byte(pair.memory_address, pair.value);
         }
         game_boy_cpu.set_register_file_state(test_case.initial_register_values);
@@ -225,7 +225,7 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
     auto test_cases = load_test_cases_from_json_file(json_test_filename);
 
     for (int i = 0; i < test_cases.size(); i++)
-	{
+    {
         const auto &test_case = test_cases.at(i);
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
@@ -241,13 +241,13 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
         EXPECT_EQ(game_boy_cpu.get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
 
         for (const AddressValuePair &expected_pair : test_case.expected_ram_values)
-		{
+        {
             EXPECT_EQ(memory_interface->read_byte(expected_pair.memory_address), expected_pair.value);
         }
 
         EXPECT_EQ(memory_interactions.size() - 1, test_case.expected_memory_interactions.size());
         for (int i = 0; i < test_case.expected_memory_interactions.size(); i++)
-		{
+        {
             EXPECT_EQ(memory_interactions.at(i), test_case.expected_memory_interactions.at(i));
         }
     }

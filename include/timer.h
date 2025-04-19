@@ -9,32 +9,32 @@ namespace GameBoy
 class Timer
 {
 public:
-	Timer(std::function<void(uint8_t)> request_interrupt);
+    Timer(std::function<void(uint8_t)> request_interrupt);
 
-	void step_single_machine_cycle();
+    void step_single_machine_cycle();
 
-	uint8_t read_div() const;
-	uint8_t read_tima() const;
-	uint8_t read_tma() const;
-	uint8_t read_tac() const;
+    uint8_t read_div() const;
+    uint8_t read_tima() const;
+    uint8_t read_tma() const;
+    uint8_t read_tac() const;
 
-	void write_div(uint8_t value);
-	void write_tima(uint8_t value);
-	void write_tma(uint8_t value);
-	void write_tac(uint8_t value);
+    void write_div(uint8_t value);
+    void write_tima(uint8_t value);
+    void write_tma(uint8_t value);
+    void write_tac(uint8_t value);
 
 private:
-	std::function<void(uint8_t)> request_interrupt_callback;
-	uint16_t system_counter{};
-	uint8_t timer_tima{};
-	uint8_t timer_modulo_tma{};
-	uint8_t timer_control_tac{};
-	bool is_previously_selected_system_counter_bit_set{};
-	bool did_tima_overflow_occur{};
-	bool is_tima_overflow_handled{};
+    std::function<void(uint8_t)> request_interrupt_callback;
+    uint16_t system_counter{};
+    uint8_t timer_tima{};
+    uint8_t timer_modulo_tma{};
+    uint8_t timer_control_tac{};
+    bool is_previously_selected_system_counter_bit_set{};
+    bool did_tima_overflow_occur{};
+    bool is_tima_overflow_handled{};
 
-	void update_timer_tima_early();
-	bool update_timer_tima_and_get_overflow_state();
+    void update_timer_tima_early();
+    bool update_timer_tima_and_get_overflow_state();
 };
 
 } // namespace GameBoy
