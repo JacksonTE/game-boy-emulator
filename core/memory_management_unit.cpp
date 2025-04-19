@@ -8,8 +8,8 @@
 namespace GameBoy
 {
 
-MemoryManagementUnit::MemoryManagementUnit(PixelProcessingUnit &pixel_processing_unit_reference)
-    : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+MemoryManagementUnit::MemoryManagementUnit(Timer &timer_reference, PixelProcessingUnit &pixel_processing_unit_reference)
+    : timer{timer_reference},
 	  pixel_processing_unit{pixel_processing_unit_reference}
 {
     placeholder_memory = std::make_unique<uint8_t[]>(MEMORY_SIZE);
@@ -142,13 +142,13 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
 		switch (address)
 		{
 			case 0xff04:
-				return timer.read_divider_div();
+				return timer.read_div();
 			case 0xff05:
-				return timer.read_timer_tima();
+				return timer.read_tima();
 			case 0xff06:
-				return timer.read_timer_modulo_tma();
+				return timer.read_tma();
 			case 0xff07:
-				return timer.read_timer_control_tac();
+				return timer.read_tac();
 			case 0xff0f:
 				return interrupt_flag_if | 0b11100000;
 			case 0xff40:
@@ -200,16 +200,16 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
 		switch (address)
 		{
 			case 0xff04:
-				timer.write_divider_div(value);
+				timer.write_div(value);
 				return;
 			case 0xff05:
-				timer.write_timer_tima(value);
+				timer.write_tima(value);
 				return;
 			case 0xff06:
-				timer.write_timer_modulo_tma(value);
+				timer.write_tma(value);
 				return;
 			case 0xff07:
-				timer.write_timer_control_tac(value);
+				timer.write_tac(value);
 				return;
 			case 0xff0f:
 				interrupt_flag_if = value | 0b11100000;
@@ -311,11 +311,6 @@ void MemoryManagementUnit::print_bytes_in_range(uint16_t start_address, uint16_t
 		std::cout << "\n";
 
 	std::cout << "=====================================================\n";
-}
-
-void MemoryManagementUnit::step_timer_single_machine_cycle()
-{
-    timer.step_single_machine_cycle();
 }
 
 void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const

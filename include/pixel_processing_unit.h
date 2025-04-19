@@ -211,7 +211,7 @@ private:
 	std::unique_ptr<uint8_t[]> object_attribute_memory;
 
 	uint8_t lcd_control_lcdc{};
-	uint8_t lcd_status_stat{};
+	uint8_t lcd_status_stat{0b10000000};
 	uint8_t lcd_y_coordinate_ly{};
 	uint8_t lcd_internal_x_coordinate_lx{};
 	uint8_t window_internal_line_counter_wly{};

@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
-
 #include "pixel_processing_unit.h"
 #include "timer.h"
 
@@ -21,11 +20,10 @@ constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
 constexpr uint8_t INTERRUPT_FLAG_SERIAL_MASK = 1 << 3;
 constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;
 
-
 class MemoryManagementUnit
 {
 public:
-    MemoryManagementUnit(PixelProcessingUnit &pixel_processing_unit_reference);
+    MemoryManagementUnit(Timer &timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
 	virtual ~MemoryManagementUnit() = default;
 
     virtual void reset_state();
@@ -41,13 +39,12 @@ public:
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
 
     void print_bytes_in_range(uint16_t start_address, uint16_t end_address) const;
-    void step_timer_single_machine_cycle();
 
 private:
 	std::unique_ptr<uint8_t[]> placeholder_memory{};
     std::unique_ptr<uint8_t[]> bootrom{};
 
-    Timer timer;
+    Timer &timer;
     PixelProcessingUnit &pixel_processing_unit;
 
     uint8_t interrupt_flag_if{0b11100000};

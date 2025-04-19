@@ -1,73 +1,89 @@
 #include "memory_management_unit.h"
 #include "timer.h"
 
-namespace GameBoy {
+namespace GameBoy
+{
 
 Timer::Timer(std::function<void(uint8_t)> request_interrupt)
-    : request_interrupt_callback{request_interrupt} {
+    : request_interrupt_callback{request_interrupt}
+{
 }
 
-void Timer::step_single_machine_cycle() {
+void Timer::step_single_machine_cycle()
+{
     system_counter += 4;
 
-    if (did_timer_tima_overflow_occur) {
+    if (did_tima_overflow_occur)
+	{
 		request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
-    is_timer_tima_overflow_handled = did_timer_tima_overflow_occur;
-    did_timer_tima_overflow_occur = update_timer_tima_and_get_overflow_state();
+    is_tima_overflow_handled = did_tima_overflow_occur;
+    did_tima_overflow_occur = update_timer_tima_and_get_overflow_state();
 }
 
-uint8_t Timer::read_divider_div() const {
+uint8_t Timer::read_div() const
+{
     return static_cast<uint8_t>(system_counter >> 8);
 }
 
-uint8_t Timer::read_timer_tima() const {
+uint8_t Timer::read_tima() const
+{
     return timer_tima;
 }
 
-uint8_t Timer::read_timer_modulo_tma() const {
+uint8_t Timer::read_tma() const
+{
     return timer_modulo_tma;
 }
 
-uint8_t Timer::read_timer_control_tac() const {
+uint8_t Timer::read_tac() const
+{
     return timer_control_tac;
 }
 
-void Timer::write_divider_div(uint8_t value) {
+void Timer::write_div(uint8_t value)
+{
     system_counter = 0x0000;
     update_timer_tima_early();
 }
 
-void Timer::write_timer_tima(uint8_t value) {
-    if(is_timer_tima_overflow_handled) {
+void Timer::write_tima(uint8_t value)
+{
+    if (is_tima_overflow_handled)
         return;
-    }
+
     timer_tima = value;
-    did_timer_tima_overflow_occur = false;
+    did_tima_overflow_occur = false;
 }
 
-void Timer::write_timer_modulo_tma(uint8_t value) {
+void Timer::write_tma(uint8_t value)
+{
     timer_modulo_tma = value;
 
-    if (is_timer_tima_overflow_handled) {
-        timer_tima = timer_modulo_tma;
-    }
+	if (is_tima_overflow_handled)
+	{
+		timer_tima = timer_modulo_tma;
+	}
 }
 
-void Timer::write_timer_control_tac(uint8_t value) {
+void Timer::write_tac(uint8_t value)
+{
     timer_control_tac = value;
     update_timer_tima_early();
 }
 
-void Timer::update_timer_tima_early() {
-    if (update_timer_tima_and_get_overflow_state()) {
+void Timer::update_timer_tima_early()
+{
+    if (update_timer_tima_and_get_overflow_state())
+	{
 		request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
         timer_tima = timer_modulo_tma;
     }
 }
 
-bool Timer::update_timer_tima_and_get_overflow_state() {
+bool Timer::update_timer_tima_and_get_overflow_state()
+{
     const bool is_timer_tima_enabled = (timer_control_tac & 0b00000100) != 0;
 
     const uint8_t clock_select = timer_control_tac & 0b00000011;

@@ -7,17 +7,23 @@
 #include "memory_management_unit.h"
 #include "register_file.h"
 
-namespace GameBoy {
+namespace GameBoy
+{
 
 constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
 
-enum class InterruptMasterEnableState {
+constexpr uint8_t CARTRIDGE_HEADER_START = 0x0134;
+constexpr uint8_t CARTRIDGE_HEADER_END = 0x014c;
+
+enum class InterruptMasterEnableState
+{
     Disabled,
     WillEnable,
     Enabled
 };
 
-class CPU {
+class CPU
+{
 public:
     CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle);
 

@@ -129,19 +129,21 @@ void PixelProcessingUnit::write_lcd_control_lcdc(uint8_t value)
 
 uint8_t PixelProcessingUnit::read_lcd_status_stat() const
 {
-	return (lcd_status_stat & 0b11111100) | static_cast<uint8_t>(previous_mode);
+	return 0b10000000 | (lcd_status_stat & 0b11111100) | static_cast<uint8_t>(previous_mode);
 }
 
 void PixelProcessingUnit::write_lcd_status_stat(uint8_t value)
 {
+	uint8_t new_stat_value = (value & 0b01111000) | (lcd_status_stat & 0b10000111);
+
 	if (current_mode == PixelProcessingUnitMode::VerticalBlank || lcd_y_coordinate_ly == lcd_y_coordinate_compare_lyc)
 	{
-		stat_value_after_spurious_interrupt = value;
+		stat_value_after_spurious_interrupt = new_stat_value;
 		did_spurious_stat_interrupt_occur = true;
 		lcd_status_stat = 0xff;
 	}
 	else
-		lcd_status_stat = (value & 0b11111000) | (lcd_status_stat & 0b10000111);
+		lcd_status_stat = new_stat_value;
 }
 
 uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const

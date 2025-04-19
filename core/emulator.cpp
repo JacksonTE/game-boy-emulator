@@ -7,63 +7,77 @@
 #include "memory_management_unit.h"
 #include "register_file.h"
 
-namespace GameBoy {
+namespace GameBoy
+{
 
 Emulator::Emulator()
-	: pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-	  memory_interface{std::make_unique<MemoryManagementUnit>(pixel_processing_unit)},
+	: timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+	  pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+	  memory_interface{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
       cpu{*memory_interface, [this](MachineCycleInteraction _) { this->step_components_single_machine_cycle(); }}
 {
 }
 
-void Emulator::reset_state() {
-	cpu.reset_state();
+void Emulator::reset_state()
+{
 	memory_interface->reset_state();
+	cpu.reset_state();
 }
 
-void Emulator::set_post_boot_state() {
-	cpu.set_post_boot_state();
+void Emulator::set_post_boot_state()
+{
 	memory_interface->set_post_boot_state();
+	cpu.set_post_boot_state();
 }
 
-bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path) {
+bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
+{
 	return try_load_file_to_memory(0x0000, BOOTROM_SIZE, bootrom_path, true);
 }
 
-void Emulator::step_cpu_single_instruction() {
+void Emulator::step_cpu_single_instruction()
+{
 	cpu.step_single_instruction();
 }
 
-RegisterFile<std::endian::native> Emulator::get_register_file() const {
+RegisterFile<std::endian::native> Emulator::get_register_file() const
+{
 	return cpu.get_register_file();
 }
 
-void Emulator::print_register_file_state() const {
+void Emulator::print_register_file_state() const
+{
 	cpu.print_register_file_state();
 }
 
-void Emulator::request_interrupt(uint8_t interrupt_flag_mask) {
+void Emulator::request_interrupt(uint8_t interrupt_flag_mask)
+{
 	memory_interface->request_interrupt(interrupt_flag_mask);
 }
 
-uint8_t Emulator::read_byte_from_memory(uint16_t address) const {
+uint8_t Emulator::read_byte_from_memory(uint16_t address) const
+{
 	return memory_interface->read_byte(address);
 }
 
-void Emulator::write_byte_to_memory(uint16_t address, uint8_t value) {
+void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
+{
 	memory_interface->write_byte(address, value);
 }
 
-void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const {
+void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
+{
 	memory_interface->print_bytes_in_range(start_address, end_address);
 }
 
-bool Emulator::try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file) {
+bool Emulator::try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
+{
 	return memory_interface->try_load_file(address, number_of_bytes_to_load, file_path, is_bootrom_file);
 }
 
-void Emulator::step_components_single_machine_cycle() {
-	memory_interface->step_timer_single_machine_cycle();
+void Emulator::step_components_single_machine_cycle()
+{
+	timer.step_single_machine_cycle();
 	pixel_processing_unit.step_single_machine_cycle();
 }
 
