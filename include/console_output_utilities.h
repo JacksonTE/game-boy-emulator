@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include "bitwise_utilities.h"
-#include "cpu.h"
+#include "central_processing_unit.h"
 #include "memory_management_unit.h"
 
 namespace GameBoy

@@ -1,5 +1,5 @@
 add_library(emulate-game-boy-core-library
-    "cpu.cpp"
+    "central_processing_unit.cpp"
     "emulator.cpp"
     "memory_management_unit.cpp"
     "pixel_processing_unit.cpp"

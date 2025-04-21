@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <functional>
 
-#include "cpu.h"
+#include "central_processing_unit.h"
 #include "timer.h"
 
 namespace GameBoy
@@ -33,9 +33,9 @@ private:
     Timer timer;
     PixelProcessingUnit pixel_processing_unit;
     std::unique_ptr<MemoryManagementUnit> memory_interface;
-    CPU cpu;
+    CentralProcessingUnit central_processing_unit;
 
-    void step_components_single_machine_cycle_from_cpu();
+    void step_components_single_machine_cycle();
     void request_interrupt(uint8_t interrupt_flag_mask);
 };
 

@@ -14,7 +14,7 @@ Emulator::Emulator()
     : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       memory_interface{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
-      cpu{*memory_interface, [this](MachineCycleOperation) { this->step_components_single_machine_cycle_from_cpu(); }}
+      central_processing_unit{*memory_interface, [this](MachineCycleOperation) { this->step_components_single_machine_cycle(); }}
 {
 }
 
@@ -23,7 +23,7 @@ void Emulator::reset_state()
     timer.reset_state();
     pixel_processing_unit.reset_state();
     memory_interface->reset_state();
-    cpu.reset_state();
+    central_processing_unit.reset_state();
 }
 
 void Emulator::set_post_boot_state()
@@ -31,7 +31,7 @@ void Emulator::set_post_boot_state()
     timer.set_post_boot_state();
     pixel_processing_unit.set_post_boot_state();
     memory_interface->set_post_boot_state();
-    cpu.set_post_boot_state();
+    central_processing_unit.set_post_boot_state();
 }
 
 bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
@@ -61,20 +61,20 @@ void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 
 RegisterFile<std::endian::native> Emulator::get_register_file() const
 {
-    return cpu.get_register_file();
+    return central_processing_unit.get_register_file();
 }
 
 void Emulator::print_register_file_state() const
 {
-    GameBoy::print_register_file_state(cpu.get_register_file());
+    GameBoy::print_register_file_state(central_processing_unit.get_register_file());
 }
 
 void Emulator::step_cpu_single_instruction()
 {
-    cpu.step_single_instruction();
+    central_processing_unit.step_single_instruction();
 }
 
-void Emulator::step_components_single_machine_cycle_from_cpu()
+void Emulator::step_components_single_machine_cycle()
 {
     timer.step_single_machine_cycle();
     pixel_processing_unit.step_single_machine_cycle();

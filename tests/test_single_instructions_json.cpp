@@ -7,7 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <vector>
 
-#include "cpu.h"
+#include "central_processing_unit.h"
 #include "memory_management_unit.h"
 #include "pixel_processing_unit.h"
 
@@ -198,11 +198,11 @@ class SingleInstructionTest : public testing::TestWithParam<std::filesystem::pat
 protected:
     std::vector<GameBoy::MachineCycleOperation> machine_cycle_operations;
     std::unique_ptr<SingleInstructionTestMemory> memory_interface;
-    GameBoy::CPU game_boy_cpu;
+    GameBoy::CentralProcessingUnit game_boy_central_processing_unit;
 
     SingleInstructionTest()
         : memory_interface{std::make_unique<SingleInstructionTestMemory>()},
-          game_boy_cpu
+          game_boy_central_processing_unit
           {
               *memory_interface, 
               [this](GameBoy::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); }
@@ -214,13 +214,13 @@ protected:
     {
         machine_cycle_operations.clear();
         memory_interface->reset_state();
-        game_boy_cpu.reset_state();
+        game_boy_central_processing_unit.reset_state();
 
         for (const std::pair<uint16_t, uint8_t> &pair : test_case.initial_ram_address_value_pairs)
         {
             memory_interface->write_byte(pair.first, pair.second);
         }
-        game_boy_cpu.set_register_file_state(test_case.initial_register_values);
+        game_boy_central_processing_unit.set_register_file_state(test_case.initial_register_values);
     }
 };
 
@@ -237,20 +237,20 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
-        game_boy_cpu.step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
-        game_boy_cpu.step_single_instruction();
+        game_boy_central_processing_unit.step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
+        game_boy_central_processing_unit.step_single_instruction();
 
-        EXPECT_EQ(game_boy_cpu.get_register_file().af, test_case.expected_register_values.af);
-        EXPECT_EQ(game_boy_cpu.get_register_file().bc, test_case.expected_register_values.bc);
-        EXPECT_EQ(game_boy_cpu.get_register_file().de, test_case.expected_register_values.de);
-        EXPECT_EQ(game_boy_cpu.get_register_file().hl, test_case.expected_register_values.hl);
+        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().af, test_case.expected_register_values.af);
+        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().bc, test_case.expected_register_values.bc);
+        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().de, test_case.expected_register_values.de);
+        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().hl, test_case.expected_register_values.hl);
 
         // Compare expected program_counter against program_counter-1 since next instruction is 
         // fetched at the end of the current one, advancing the program counter an extra time
-        EXPECT_EQ(static_cast<uint16_t>(game_boy_cpu.get_register_file().program_counter - 1), 
+        EXPECT_EQ(static_cast<uint16_t>(game_boy_central_processing_unit.get_register_file().program_counter - 1), 
                   test_case.expected_register_values.program_counter);
 
-        EXPECT_EQ(game_boy_cpu.get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
+        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
 
         for (const std::pair<uint16_t, uint8_t> &expected_pair : test_case.expected_ram_address_value_pairs)
         {

@@ -32,4 +32,4 @@ inline void update_flag(T &variable, T flag_mask, bool new_flag_state)
         : (variable & ~flag_mask);
 }
 
-}
+} // namespace GameBoy
