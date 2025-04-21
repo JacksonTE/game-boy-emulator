@@ -15,14 +15,14 @@ MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction)
 
 MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction, uint16_t address)
     : memory_interaction{interaction},
-    address_accessed{address}
+      address_accessed{address}
 {
 }
 
 MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction, uint16_t address, uint8_t value)
     : memory_interaction{interaction},
-    address_accessed{address},
-    value_written{value}
+      address_accessed{address},
+      value_written{value}
 {
 }
 

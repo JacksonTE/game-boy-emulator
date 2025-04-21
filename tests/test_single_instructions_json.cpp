@@ -1,6 +1,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>

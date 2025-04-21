@@ -11,8 +11,8 @@ namespace GameBoy
 
 constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
 
-constexpr uint8_t CARTRIDGE_HEADER_START = 0x0134;
-constexpr uint8_t CARTRIDGE_HEADER_END = 0x014c;
+constexpr uint16_t CARTRIDGE_HEADER_START = 0x0134;
+constexpr uint16_t CARTRIDGE_HEADER_END = 0x014c;
 
 constexpr uint8_t FLAG_ZERO_MASK = 1 << 7;
 constexpr uint8_t FLAG_SUBTRACT_MASK = 1 << 6; // Also known as the 'N' flag
