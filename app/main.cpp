@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string_view>
+
 #include "emulator.h"
 
 int main(int argc, char *argv[])
@@ -30,7 +31,8 @@ int main(int argc, char *argv[])
     // TODO FIX REMAINING:
     // Failing intr_1_2_timing-GS.gb, intr_2_mode0_timing_sprites.gb, intr_2_0_timing.gb 
     std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) /
-        "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "ppu" / "vblank_stat_intr-GS.gb";
+        //"bootrom" / "Tetris (JUE) (V1.1) [!].gb";
+        "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "ppu" / "hblank_ly_scx_timing-GS.gb";
     game_boy_emulator.try_load_file_to_memory(0x0000, GameBoy::COLLECTIVE_ROM_BANK_SIZE, test_rom_path, false);
 
     if (bootrom_path.empty())
@@ -49,12 +51,13 @@ int main(int argc, char *argv[])
     while (true)
     {
         auto r = game_boy_emulator.get_register_file();
-        if (r.b == 42 && r.c == 42 && r.d == 42 && r.e == 42 && r.h == 42 && r.l == 42)
+
+        if (r.b == 0x42 && r.c == 0x42 && r.d == 0x42 && r.e == 0x42 && r.h == 0x42 && r.l == 0x42)
         {
             std::cout << "test failed" << "\n";
             break;
         }
-        if (r.b == 3 && r.c == 5 && r.d == 8 && r.e == 13 && r.h == 21 && r.l == 34)
+        else if (r.b == 3 && r.c == 5 && r.d == 8 && r.e == 13 && r.h == 21 && r.l == 34)
         {
             std::cout << "test passed" << "\n";
             break;

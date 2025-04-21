@@ -3,9 +3,8 @@
 #include <bit>
 #include <cstdint>
 #include <functional>
-#include "machine_cycle_interaction.h"
+
 #include "memory_management_unit.h"
-#include "register_file.h"
 
 namespace GameBoy
 {
@@ -15,6 +14,11 @@ constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
 constexpr uint8_t CARTRIDGE_HEADER_START = 0x0134;
 constexpr uint8_t CARTRIDGE_HEADER_END = 0x014c;
 
+constexpr uint8_t FLAG_ZERO_MASK = 1 << 7;
+constexpr uint8_t FLAG_SUBTRACT_MASK = 1 << 6; // Also known as the 'N' flag
+constexpr uint8_t FLAG_HALF_CARRY_MASK = 1 << 5; // For a carry from bit 3-4 or 11-12
+constexpr uint8_t FLAG_CARRY_MASK = 1 << 4;
+
 enum class InterruptMasterEnableState
 {
     Disabled,
@@ -22,10 +26,122 @@ enum class InterruptMasterEnableState
     Enabled
 };
 
+enum class MemoryInteraction
+{
+    None,
+    Read,
+    Write
+};
+
+struct MachineCycleOperation
+{
+    MemoryInteraction memory_interaction;
+    uint16_t address_accessed{};
+    uint8_t value_written{};
+
+    MachineCycleOperation(MemoryInteraction interaction);
+    MachineCycleOperation(MemoryInteraction interaction, uint16_t address);
+    MachineCycleOperation(MemoryInteraction interaction, uint16_t address, uint8_t value);
+
+    bool operator==(const MachineCycleOperation &other) const;
+};
+
+template <std::endian E>
+struct RegisterFile;
+
+template <>
+struct RegisterFile<std::endian::little>
+{
+    union
+    {
+        struct
+        {
+            uint8_t flags;
+            uint8_t a;
+        };
+        uint16_t af{};
+    };
+    union
+    {
+        struct
+        {
+            uint8_t c;
+            uint8_t b;
+        };
+        uint16_t bc{};
+    };
+    union
+    {
+        struct
+        {
+            uint8_t e;
+            uint8_t d;
+        };
+        uint16_t de{};
+    };
+    union
+    {
+        struct
+        {
+            uint8_t l;
+            uint8_t h;
+        };
+        uint16_t hl{};
+    };
+    uint16_t stack_pointer{};
+    uint16_t program_counter{};
+};
+
+template <>
+struct RegisterFile<std::endian::big>
+{
+    union
+    {
+        struct
+        {
+            uint8_t a;
+            uint8_t flags;
+        };
+        uint16_t af{};
+    };
+    union
+    {
+        struct
+        {
+            uint8_t b;
+            uint8_t c;
+        };
+        uint16_t bc{};
+    };
+    union
+    {
+        struct
+        {
+            uint8_t d;
+            uint8_t e;
+        };
+        uint16_t de{};
+    };
+    union
+    {
+        struct
+        {
+            uint8_t h;
+            uint8_t l;
+        };
+        uint16_t hl{};
+    };
+    uint16_t stack_pointer{};
+    uint16_t program_counter{};
+};
+
 class CPU
 {
 public:
-    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle);
+    CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle);
+
+    RegisterFile<std::endian::native> get_register_file() const;
+    void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
 
     void reset_state();
     void set_post_boot_state();
@@ -33,24 +149,18 @@ public:
     void step_single_instruction();
     void step_single_machine_cycle();
 
-    RegisterFile<std::endian::native> get_register_file() const;
-    void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
-    void print_register_file_state() const;
-
 private:
-    std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle_callback;
+    std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle_callback;
     MemoryManagementUnit &memory_interface;
     RegisterFile<std::endian::native> register_file;
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
     uint8_t instruction_register_ir{};
     bool is_instruction_prefixed{};
-    bool is_stopped{};
     bool is_halted{};
 
-    void execute_next_instruction_and_fetch();
+    void execute_current_instruction();
     void fetch_next_instruction();
     void service_interrupt();
-    uint8_t get_pending_interrupt_mask();
 
     uint8_t read_byte_and_tick(uint16_t address);
     void write_byte_and_tick(uint16_t address, uint8_t value);
@@ -62,9 +172,6 @@ private:
     static const InstructionPointer prefixed_instruction_table[0x100];
 
     // Instruction Helpers
-    void update_flag(uint8_t flag_mask, bool new_flag_state);
-    bool is_flag_set(uint8_t flag_mask) const;
-
     void increment_register16(uint16_t &register16);
     void decrement_register16(uint16_t &register16);
     void add_hl_register16(const uint16_t &register16);

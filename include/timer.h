@@ -11,6 +11,9 @@ class Timer
 public:
     Timer(std::function<void(uint8_t)> request_interrupt);
 
+    void reset_state();
+    void set_post_boot_state();
+
     void step_single_machine_cycle();
 
     uint8_t read_div() const;
@@ -28,7 +31,7 @@ private:
     uint16_t system_counter{};
     uint8_t timer_tima{};
     uint8_t timer_modulo_tma{};
-    uint8_t timer_control_tac{};
+    uint8_t timer_control_tac{0b11111000};
     bool is_previously_selected_system_counter_bit_set{};
     bool did_tima_overflow_occur{};
     bool is_tima_overflow_handled{};

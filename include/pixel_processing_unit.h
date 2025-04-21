@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <iostream>
-#include <memory>
-#include <queue>
 #include <vector>
 
 namespace GameBoy
@@ -188,12 +186,6 @@ public:
 
     PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt);
 
-    uint8_t read_byte_video_ram(uint16_t memory_address) const;
-    void write_byte_video_ram(uint16_t memory_address, uint8_t value);
-
-    uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
-    void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value);
-
     uint8_t read_lcd_control_lcdc() const;
     void write_lcd_control_lcdc(uint8_t value);
 
@@ -201,6 +193,15 @@ public:
     void write_lcd_status_stat(uint8_t value);
 
     uint8_t read_lcd_y_coordinate_ly() const;
+
+    void reset_state();
+    void set_post_boot_state();
+
+    uint8_t read_byte_video_ram(uint16_t memory_address) const;
+    void write_byte_video_ram(uint16_t memory_address, uint8_t value);
+
+    uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
+    void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value);
 
     void step_single_machine_cycle();
 

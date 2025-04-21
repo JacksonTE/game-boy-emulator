@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+
 #include "pixel_processing_unit.h"
 #include "timer.h"
 
@@ -34,9 +35,8 @@ public:
     virtual void write_byte(uint16_t address, uint8_t value);
 
     void request_interrupt(uint8_t interrupt_flag_mask);
-    bool is_interrupt_type_requested(uint8_t interrupt_flag_mask) const;
-    bool is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const;
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
+    uint8_t get_pending_interrupt_mask() const;
 
 private:
     std::unique_ptr<uint8_t[]> placeholder_memory{};
@@ -47,7 +47,7 @@ private:
 
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};
-    uint8_t interrupt_enable_ie{0b11100000};
+    uint8_t interrupt_enable_ie{};
 
     void wrote_to_read_only_address(uint16_t address) const;
 };

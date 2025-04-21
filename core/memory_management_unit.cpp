@@ -3,6 +3,8 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+
+#include "bitwise_utilities.h"
 #include "memory_management_unit.h"
 
 namespace GameBoy
@@ -28,11 +30,7 @@ void MemoryManagementUnit::set_post_boot_state()
     write_byte(0xff00, 0xcf);
     write_byte(0xff01, 0x00);
     write_byte(0xff02, 0x7e);
-    write_byte(0xff04, 0xab);
-    write_byte(0xff05, 0x00);
-    write_byte(0xff06, 0x00);
-    write_byte(0xff07, 0xf8);
-    write_byte(0xff0f, 0xe1);
+    interrupt_flag_if = 0xe1;
     write_byte(0xff10, 0x80);
     write_byte(0xff11, 0xbf);
     write_byte(0xff12, 0xf3);
@@ -54,19 +52,7 @@ void MemoryManagementUnit::set_post_boot_state()
     write_byte(0xff24, 0x77);
     write_byte(0xff25, 0xf3);
     write_byte(0xff26, 0xf1);
-    write_byte(0xff40, 0x90);
-    write_byte(0xff41, 0x85);
-    write_byte(0xff42, 0x00);
-    write_byte(0xff43, 0x00);
-    write_byte(0xff44, 0x00);
-    write_byte(0xff45, 0x00);
-    write_byte(0xff46, 0xff);
-    write_byte(0xff47, 0xfc);
-    write_byte(0xff48, 0x00);
-    write_byte(0xff49, 0x00);
-    write_byte(0xff4a, 0x00);
-    write_byte(0xff4b, 0x00);
-    write_byte(0xffff, 0x00);
+    interrupt_enable_ie = 0x00;
 }
 
 bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
@@ -178,7 +164,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
             case 0xff50:
                 return bootrom_status;
             case 0xffff:
-                return interrupt_enable_ie | 0b11100000;
+                return interrupt_enable_ie;
             default:
                 return placeholder_memory[address];
         }
@@ -254,7 +240,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
                 bootrom_status = value;
                 return;
             case 0xffff:
-                interrupt_enable_ie = value | 0b11100000;
+                interrupt_enable_ie = value;
                 return;
             default:
                 placeholder_memory[address] = value;
@@ -265,22 +251,26 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
 
 void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask)
 {
-    interrupt_flag_if |= interrupt_flag_mask;
-}
-
-bool MemoryManagementUnit::is_interrupt_type_requested(uint8_t interrupt_flag_mask) const
-{
-    return (interrupt_flag_if & interrupt_flag_mask) != 0;
-}
-
-bool MemoryManagementUnit::is_interrupt_type_enabled(uint8_t interrupt_flag_mask) const
-{
-    return (interrupt_enable_ie & interrupt_flag_mask) != 0;
+    update_flag(interrupt_flag_if, interrupt_flag_mask, true);
 }
 
 void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask)
 {
-    interrupt_flag_if &= ~interrupt_flag_mask;
+    update_flag(interrupt_flag_if, interrupt_flag_mask, false);
+}
+
+uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
+{
+    for (uint8_t i = 0; i < NUMBER_OF_INTERRUPT_TYPES; i++)
+    {
+        uint8_t interrupt_flag_mask = 1 << i;
+        const bool is_interrupt_type_requested = is_flag_set(interrupt_flag_if, interrupt_flag_mask);
+        const bool is_interrupt_type_enabled = is_flag_set(interrupt_enable_ie, interrupt_flag_mask);
+
+        if (is_interrupt_type_requested && is_interrupt_type_enabled)
+            return interrupt_flag_mask;
+    }
+    return 0x00;
 }
 
 void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const

@@ -2,7 +2,8 @@
 #include <cstdint>
 #include <memory>
 #include <type_traits>
-#include "helpers.h"
+
+#include "bitwise_utilities.h"
 #include "pixel_processing_unit.h"
 
 namespace GameBoy
@@ -16,6 +17,11 @@ void PixelSliceFetcher::reset_state()
     tile_row_low = 0;
     tile_row_high = 0;
     is_in_first_dot_of_current_step = true;
+}
+
+ObjectAttributes ObjectFetcher::get_current_object()
+{
+    return current_scanline_selected_objects[current_object_index];
 }
 
 void ObjectFetcher::reset_state()
@@ -38,11 +44,6 @@ void BackgroundFetcher::reset_state()
     tile_row.fill(BackgroundPixel{});
 }
 
-ObjectAttributes ObjectFetcher::get_current_object()
-{
-    return current_scanline_selected_objects[current_object_index];
-}
-
 PixelProcessingUnit::PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt)
     : request_interrupt_callback{request_interrupt}
 {
@@ -54,51 +55,6 @@ PixelProcessingUnit::PixelProcessingUnit(std::function<void(uint8_t)> request_in
 
     object_fetcher.reset_state();
     background_fetcher.reset_state();
-}
-
-uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
-{
-    if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-        (previous_mode != PixelProcessingUnitMode::HorizontalBlank && 
-         current_mode == PixelProcessingUnitMode::PixelTransfer))
-    {
-        return 0xff;
-    }
-    const uint16_t local_address = memory_address - VIDEO_RAM_START;
-    return video_ram[local_address];
-}
-
-void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
-{
-    if (previous_mode == PixelProcessingUnitMode::PixelTransfer)
-        return;
-
-    const uint16_t local_address = memory_address - VIDEO_RAM_START;
-    video_ram[local_address] = value;
-}
-
-uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const
-{
-    if ((previous_mode != PixelProcessingUnitMode::HorizontalBlank || 
-         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan) &&
-        current_mode != PixelProcessingUnitMode::VerticalBlank)
-    {
-        return 0xff;
-    }
-    const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
-    return object_attribute_memory[local_address];
-}
-
-void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value)
-{
-    if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-        (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan &&
-         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan))
-    {
-        return;
-    }
-    const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
-    object_attribute_memory[local_address] = value;
 }
 
 uint8_t PixelProcessingUnit::read_lcd_control_lcdc() const
@@ -145,6 +101,88 @@ void PixelProcessingUnit::write_lcd_status_stat(uint8_t value)
     }
     else
         lcd_status_stat = new_stat_value;
+}
+
+void PixelProcessingUnit::reset_state()
+{
+    std::fill_n(video_ram.get(), VIDEO_RAM_SIZE, 0);
+    std::fill_n(video_ram.get(), OBJECT_ATTRIBUTE_MEMORY_SIZE, 0);
+
+    lcd_control_lcdc = 0;
+    lcd_status_stat = 0b10000000;
+    lcd_y_coordinate_ly = 0;
+    lcd_internal_x_coordinate_lx = 0;
+    window_internal_line_counter_wly = 0;
+
+    previous_mode = PixelProcessingUnitMode::HorizontalBlank;
+    current_mode = PixelProcessingUnitMode::HorizontalBlank;
+    current_scanline_dot_number = 0;
+    stat_value_after_spurious_interrupt = 0;
+    is_in_first_scanline_after_enable = false;
+    is_in_first_dot_of_current_step = true;
+    is_window_enabled_for_scanline = false;
+    did_horizontal_blank_end_last_machine_cycle = false;
+    are_stat_interrupts_blocked = false;
+    did_spurious_stat_interrupt_occur = false;
+
+    background_pixel_queue.clear();
+    object_pixel_queue.clear();
+    object_fetcher.reset_state();
+    background_fetcher.reset_state();
+}
+
+void PixelProcessingUnit::set_post_boot_state()
+{
+    reset_state(); // TODO confirm what mode it should be in
+    lcd_control_lcdc = 0x91;
+    lcd_status_stat = 0x85;
+    object_attribute_memory_direct_memory_access_dma = 0xff;
+    background_palette_bgp = 0xfc;
+}
+
+uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
+{
+    if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+        (previous_mode != PixelProcessingUnitMode::HorizontalBlank && 
+         current_mode == PixelProcessingUnitMode::PixelTransfer))
+    {
+        return 0xff;
+    }
+    const uint16_t local_address = memory_address - VIDEO_RAM_START;
+    return video_ram[local_address];
+}
+
+void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
+{
+    if (previous_mode == PixelProcessingUnitMode::PixelTransfer)
+        return;
+
+    const uint16_t local_address = memory_address - VIDEO_RAM_START;
+    video_ram[local_address] = value;
+}
+
+uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const
+{
+    if ((previous_mode != PixelProcessingUnitMode::HorizontalBlank || 
+         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan) &&
+        current_mode != PixelProcessingUnitMode::VerticalBlank)
+    {
+        return 0xff;
+    }
+    const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
+    return object_attribute_memory[local_address];
+}
+
+void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value)
+{
+    if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+        (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan &&
+         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan))
+    {
+        return;
+    }
+    const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
+    object_attribute_memory[local_address] = value;
 }
 
 uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const

@@ -1,59 +1,53 @@
 #include <bit>
 #include <iomanip>
 #include <iostream>
+
 #include "cpu.h"
-#include "register_file.h"
+#include "bitwise_utilities.h"
 
 namespace GameBoy
 {
 
-CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleInteraction)> emulator_step_single_machine_cycle)
+MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction)
+    : memory_interaction{interaction}
+{
+}
+
+MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction, uint16_t address)
+    : memory_interaction{interaction},
+    address_accessed{address}
+{
+}
+
+MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction, uint16_t address, uint8_t value)
+    : memory_interaction{interaction},
+    address_accessed{address},
+    value_written{value}
+{
+}
+
+bool MachineCycleOperation::operator==(const MachineCycleOperation &other) const
+{
+    if (memory_interaction != other.memory_interaction)
+        return false;
+
+    switch (memory_interaction)
+    {
+        case MemoryInteraction::None:
+            return true;
+        case MemoryInteraction::Read:
+            return address_accessed == other.address_accessed;
+        case MemoryInteraction::Write:
+            return address_accessed == other.address_accessed && value_written == other.value_written;
+        default:
+            return false;
+    }
+}
+
+CPU::CPU(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle)
     : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
       memory_interface{memory_management_unit}
 {
-}
-
-void CPU::reset_state()
-{
-    set_register_file_state(RegisterFile<std::endian::native>{});
-    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
-    instruction_register_ir = 0x00;
-    is_instruction_prefixed = false;
-    is_stopped = false;
-    is_halted = false;
-}
-
-void CPU::set_post_boot_state()
-{
-    uint8_t header_checksum = 0;
-    for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
-        header_checksum -= memory_interface.read_byte(BOOTROM_SIZE + address) - 1;
-
-    register_file.a = 0x01;
-    update_flag(FLAG_ZERO_MASK, true);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, header_checksum != 0);
-    update_flag(FLAG_CARRY_MASK, header_checksum != 0);
-    register_file.b = 0x00;
-    register_file.c = 0x13;
-    register_file.d = 0x00;
-    register_file.e = 0xd8;
-    register_file.h = 0x01;
-    register_file.l = 0x4d;
-    register_file.program_counter = 0x100;
-    register_file.stack_pointer = 0xfffe;
-}
-
-void CPU::step_single_instruction()
-{
-    if (is_halted)
-        emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
-    else
-        execute_next_instruction_and_fetch();
-
-    service_interrupt();
-    if (interrupt_master_enable_ime == InterruptMasterEnableState::WillEnable)
-        interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
 }
 
 RegisterFile<std::endian::native> CPU::get_register_file() const
@@ -72,37 +66,54 @@ void CPU::set_register_file_state(const RegisterFile<std::endian::native> &new_r
     register_file.stack_pointer = new_register_values.stack_pointer;
 }
 
-void CPU::print_register_file_state() const
+void CPU::reset_state()
 {
-    std::cout << "=================== CPU Registers ===================\n";
-    std::cout << std::hex << std::setfill('0');
-
-    std::cout << "AF: 0x" << std::setw(4) << register_file.af << "   "
-              << "(A: 0x" << std::setw(2) << static_cast<int>(register_file.a) << ","
-              << " F: 0x" << std::setw(2) << static_cast<int>(register_file.flags) << ")   "
-              << "Flags ZNHC: " << (is_flag_set(FLAG_ZERO_MASK) ? "1" : "0")
-                                << (is_flag_set(FLAG_SUBTRACT_MASK) ? "1" : "0")
-                                << (is_flag_set(FLAG_HALF_CARRY_MASK) ? "1" : "0")
-                                << (is_flag_set(FLAG_CARRY_MASK) ? "1" : "0") << "\n";
-
-    std::cout << "BC: 0x" << std::setw(4) << register_file.bc << "   "
-              << "(B: 0x" << std::setw(2) << static_cast<int>(register_file.b) << ","
-              << " C: 0x" << std::setw(2) << static_cast<int>(register_file.c) << ")\n";
-
-    std::cout << "DE: 0x" << std::setw(4) << register_file.de << "   "
-              << "(D: 0x" << std::setw(2) << static_cast<int>(register_file.d) << ","
-              << " E: 0x" << std::setw(2) << static_cast<int>(register_file.e) << ")\n";
-
-    std::cout << "HL: 0x" << std::setw(4) << register_file.hl << "   "
-              << "(H: 0x" << std::setw(2) << static_cast<int>(register_file.h) << ","
-              << " L: 0x" << std::setw(2) << static_cast<int>(register_file.l) << ")\n";
-
-    std::cout << "Stack Pointer: 0x" << std::setw(4) << register_file.stack_pointer << "\n";
-    std::cout << "Program Counter: 0x" << std::setw(4) << register_file.program_counter << "\n";
-    std::cout << "=====================================================\n";
+    set_register_file_state(RegisterFile<std::endian::native>{});
+    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
+    instruction_register_ir = 0x00;
+    is_instruction_prefixed = false;
+    is_halted = false;
 }
 
-void CPU::execute_next_instruction_and_fetch()
+void CPU::set_post_boot_state()
+{
+    reset_state();
+
+    uint8_t header_checksum = 0;
+    for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
+        header_checksum -= memory_interface.read_byte(BOOTROM_SIZE + address) - 1;
+
+    register_file.a = 0x01;
+    update_flag(register_file.flags, FLAG_ZERO_MASK, true);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, header_checksum != 0);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, header_checksum != 0);
+    register_file.b = 0x00;
+    register_file.c = 0x13;
+    register_file.d = 0x00;
+    register_file.e = 0xd8;
+    register_file.h = 0x01;
+    register_file.l = 0x4d;
+    register_file.program_counter = 0x100;
+    register_file.stack_pointer = 0xfffe;
+}
+
+void CPU::step_single_instruction()
+{
+    if (is_halted)
+        emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
+    else
+    {
+        execute_current_instruction();
+        fetch_next_instruction();
+    }
+
+    service_interrupt();
+    if (interrupt_master_enable_ime == InterruptMasterEnableState::WillEnable)
+        interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
+}
+
+void CPU::execute_current_instruction()
 {
     if (is_instruction_prefixed)
     {
@@ -112,7 +123,6 @@ void CPU::execute_next_instruction_and_fetch()
     {
         (this->*instruction_table[instruction_register_ir])();
     }
-    fetch_next_instruction();
 }
 
 void CPU::fetch_next_instruction()
@@ -126,7 +136,7 @@ void CPU::fetch_next_instruction()
 
 void CPU::service_interrupt()
 {
-    bool is_interrupt_pending = (get_pending_interrupt_mask() != 0);
+    bool is_interrupt_pending = (memory_interface.get_pending_interrupt_mask() != 0);
     if (is_interrupt_pending && is_halted)
         is_halted = false;
 
@@ -137,7 +147,7 @@ void CPU::service_interrupt()
     decrement_register16(register_file.stack_pointer);
     write_byte_and_tick(register_file.stack_pointer, register_file.program_counter >> 8);
     decrement_register16(register_file.stack_pointer);
-    uint8_t interrupt_flag_mask = get_pending_interrupt_mask();
+    uint8_t interrupt_flag_mask = memory_interface.get_pending_interrupt_mask();
     write_byte_and_tick(register_file.stack_pointer, register_file.program_counter & 0xff);
 
     memory_interface.clear_interrupt_flag_bit(interrupt_flag_mask);
@@ -149,30 +159,15 @@ void CPU::service_interrupt()
     fetch_next_instruction();
 }
 
-uint8_t CPU::get_pending_interrupt_mask()
-{
-    for (uint8_t i = 0; i < NUMBER_OF_INTERRUPT_TYPES; i++)
-    {
-        uint8_t interrupt_flag_mask = 1 << i;
-
-        if (memory_interface.is_interrupt_type_requested(interrupt_flag_mask) &&
-            memory_interface.is_interrupt_type_enabled(interrupt_flag_mask))
-        {
-            return interrupt_flag_mask;
-        }
-    }
-    return 0x00;
-}
-
 uint8_t CPU::read_byte_and_tick(uint16_t address)
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::Read, address});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Read, address});
     return memory_interface.read_byte(address);
 }
 
 void CPU::write_byte_and_tick(uint16_t address, uint8_t value)
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::Write, address, value});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Write, address, value});
     memory_interface.write_byte(address, value);
 }
 
@@ -716,57 +711,45 @@ const CPU::InstructionPointer CPU::prefixed_instruction_table[0x100] =
 // ===== Instruction Helpers =====
 // ===============================
 
-void CPU::update_flag(uint8_t flag_mask, bool new_flag_state)
-{
-    register_file.flags = new_flag_state
-        ? (register_file.flags | flag_mask)
-        : (register_file.flags & ~flag_mask);
-}
-
-bool CPU::is_flag_set(uint8_t flag_mask) const
-{
-    return (register_file.flags & flag_mask) != 0;
-}
-
 void CPU::increment_register16(uint16_t &register16)
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     register16++;
 }
 
 void CPU::decrement_register16(uint16_t &register16)
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     register16--;
 }
 
 void CPU::add_hl_register16(const uint16_t &register16)
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     const bool does_half_carry_occur = (register_file.hl & 0x0fff) + (register16 & 0x0fff) > 0x0fff;
     const bool does_carry_occur = static_cast<uint32_t>(register_file.hl) + register16 > 0xffff;
     register_file.hl += register16;
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::increment_uint8(uint8_t &uint8)
 {
     const bool does_half_carry_occur = (uint8 & 0x0f) == 0x0f;
     uint8++;
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
 }
 
 void CPU::decrement_uint8(uint8_t &uint8)
 {
     const bool does_half_carry_occur = (uint8 & 0x0f) == 0x00;
     uint8--;
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, true);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
 }
 
 void CPU::add_a_uint8(const uint8_t &uint8)
@@ -774,22 +757,22 @@ void CPU::add_a_uint8(const uint8_t &uint8)
     const bool does_half_carry_occur = (register_file.a & 0x0f) + (uint8 & 0x0f) > 0x0f;
     const bool does_carry_occur = static_cast<uint16_t>(register_file.a) + uint8 > 0xff;
     register_file.a += uint8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::add_with_carry_a_uint8(const uint8_t &uint8)
 {
-    const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
+    const uint8_t carry_in = is_flag_set(register_file.flags, FLAG_CARRY_MASK) ? 1 : 0;
     const bool does_half_carry_occur = (register_file.a & 0x0f) + (uint8 & 0x0f) + carry_in > 0x0f;
     const bool does_carry_occur = static_cast<uint16_t>(register_file.a) + uint8 + carry_in > 0xff;
     register_file.a += uint8 + carry_in;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::subtract_a_uint8(const uint8_t &uint8)
@@ -797,59 +780,59 @@ void CPU::subtract_a_uint8(const uint8_t &uint8)
     const bool does_half_carry_occur = (register_file.a & 0x0f) < (uint8 & 0x0f);
     const bool does_carry_occur = register_file.a < uint8;
     register_file.a -= uint8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, true);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::subtract_with_carry_a_uint8(const uint8_t &uint8)
 {
-    const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
+    const uint8_t carry_in = is_flag_set(register_file.flags, FLAG_CARRY_MASK) ? 1 : 0;
     const bool does_half_carry_occur = (register_file.a & 0x0f) < (uint8 & 0x0f) + carry_in;
     const bool does_carry_occur = register_file.a < uint8 + carry_in;
     register_file.a -= uint8 + carry_in;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, true);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::and_a_uint8(const uint8_t &uint8)
 {
     register_file.a &= uint8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, true);
-    update_flag(FLAG_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, true);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, false);
 }
 
 void CPU::xor_a_uint8(const uint8_t &uint8)
 {
     register_file.a ^= uint8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, false);
 }
 
 void CPU::or_a_uint8(const uint8_t &uint8)
 {
     register_file.a |= uint8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, false);
 }
 
 void CPU::compare_a_uint8(const uint8_t &uint8)
 {
     const bool does_half_carry_occur = (register_file.a & 0x0f) < (uint8 & 0x0f);
     const bool does_carry_occur = register_file.a < uint8;
-    update_flag(FLAG_ZERO_MASK, register_file.a == uint8);
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == uint8);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, true);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::jump_relative_conditional_signed_immediate8(bool is_condition_met)
@@ -857,7 +840,7 @@ void CPU::jump_relative_conditional_signed_immediate8(bool is_condition_met)
     const int8_t signed_offset = static_cast<int8_t>(fetch_immediate8_and_tick());
     if (is_condition_met)
     {
-        emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+        emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
         register_file.program_counter += signed_offset;
     }
 }
@@ -867,7 +850,7 @@ void CPU::jump_conditional_immediate16(bool is_condition_met)
     const uint16_t jump_address = fetch_immediate16_and_tick();
     if (is_condition_met)
     {
-        emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+        emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
         register_file.program_counter = jump_address;
     }
 }
@@ -894,7 +877,7 @@ void CPU::call_conditional_immediate16(bool is_condition_met)
 
 void CPU::return_conditional(bool is_condition_met)
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     if (is_condition_met)
         return_0xc9();
 }
@@ -909,52 +892,52 @@ void CPU::rotate_left_circular_uint8(uint8_t &uint8)
 {
     const bool does_carry_occur = (uint8 & 0b10000000) != 0;
     uint8 = (uint8 << 1) | (uint8 >> 7);
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::rotate_right_circular_uint8(uint8_t &uint8)
 {
     const bool does_carry_occur = (uint8 & 0b00000001) != 0;
     uint8 = (uint8 << 7) | (uint8 >> 1);
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::rotate_left_through_carry_uint8(uint8_t &uint8)
 {
-    const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
+    const uint8_t carry_in = is_flag_set(register_file.flags, FLAG_CARRY_MASK) ? 1 : 0;
     const bool does_carry_occur = (uint8 & 0b10000000) != 0;
     uint8 = (uint8 << 1) | carry_in;
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::rotate_right_through_carry_uint8(uint8_t &uint8)
 {
-    const uint8_t carry_in = is_flag_set(FLAG_CARRY_MASK) ? 1 : 0;
+    const uint8_t carry_in = is_flag_set(register_file.flags, FLAG_CARRY_MASK) ? 1 : 0;
     const bool does_carry_occur = (uint8 & 0b00000001) != 0;
     uint8 = (carry_in << 7) | (uint8 >> 1);
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::shift_left_arithmetic_uint8(uint8_t &uint8)
 {
     const bool does_carry_occur = (uint8 & 0b10000000) != 0;
     uint8 <<= 1;
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::shift_right_arithmetic_uint8(uint8_t &uint8)
@@ -962,37 +945,37 @@ void CPU::shift_right_arithmetic_uint8(uint8_t &uint8)
     const bool does_carry_occur = (uint8 & 0b00000001) != 0;
     const uint8_t preserved_sign_bit = uint8 & 0b10000000;
     uint8 = preserved_sign_bit | (uint8 >> 1);
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::swap_nibbles_uint8(uint8_t &uint8)
 {
     uint8 = ((uint8 & 0x0f) << 4) | ((uint8 & 0xf0) >> 4);
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, false);
 }
 
 void CPU::shift_right_logical_uint8(uint8_t &uint8)
 {
     const bool does_carry_occur = (uint8 & 0b00000001) != 0;
     uint8 >>= 1;
-    update_flag(FLAG_ZERO_MASK, uint8 == 0);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, uint8 == 0);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::test_bit_position_uint8(uint8_t bit_position_to_test, const uint8_t &uint8)
 {
     const bool is_bit_set = (uint8 & (1 << bit_position_to_test)) != 0;
-    update_flag(FLAG_ZERO_MASK, !is_bit_set);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, true);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, !is_bit_set);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, true);
 }
 
 void CPU::test_bit_position_memory_hl(uint8_t bit_position_to_test)
@@ -1065,7 +1048,7 @@ void CPU::load_b_immediate8_0x06()
 void CPU::rotate_left_circular_a_0x07()
 {
     rotate_left_circular_uint8(register_file.a);
-    update_flag(FLAG_ZERO_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, false);
 }
 
 void CPU::load_memory_immediate16_stack_pointer_0x08()
@@ -1110,13 +1093,12 @@ void CPU::load_c_immediate8_0x0e()
 void CPU::rotate_right_circular_a_0x0f()
 {
     rotate_right_circular_uint8(register_file.a);
-    update_flag(FLAG_ZERO_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, false);
 }
 
 void CPU::stop_0x10()
 {
-    // TODO implement this properly eventually
-    is_stopped = true;
+    // unused until Game Boy Color
 }
 
 void CPU::load_de_immediate16_0x11()
@@ -1152,7 +1134,7 @@ void CPU::load_d_immediate8_0x16()
 void CPU::rotate_left_through_carry_a_0x17()
 {
     rotate_left_through_carry_uint8(register_file.a);
-    update_flag(FLAG_ZERO_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, false);
 }
 
 void CPU::jump_relative_signed_immediate8_0x18()
@@ -1193,12 +1175,12 @@ void CPU::load_e_immediate8_0x1e()
 void CPU::rotate_right_through_carry_a_0x1f()
 {
     rotate_right_through_carry_uint8(register_file.a);
-    update_flag(FLAG_ZERO_MASK, false);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, false);
 }
 
 void CPU::jump_relative_if_not_zero_signed_immediate8_0x20()
 {
-    jump_relative_conditional_signed_immediate8(!is_flag_set(FLAG_ZERO_MASK));
+    jump_relative_conditional_signed_immediate8(!is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::load_hl_immediate16_0x21()
@@ -1233,15 +1215,15 @@ void CPU::load_h_immediate8_0x26()
 
 void CPU::decimal_adjust_a_0x27()
 {
-    const bool was_addition_most_recent = !is_flag_set(FLAG_SUBTRACT_MASK);
+    const bool was_addition_most_recent = !is_flag_set(register_file.flags, FLAG_SUBTRACT_MASK);
     bool does_carry_occur = false;
     uint8_t adjustment = 0;
     // Previous operation was between two binary coded decimals (BCDs) and this corrects register A back to BCD format
-    if (is_flag_set(FLAG_HALF_CARRY_MASK) || (was_addition_most_recent && (register_file.a & 0x0f) > 0x09))
+    if (is_flag_set(register_file.flags, FLAG_HALF_CARRY_MASK) || (was_addition_most_recent && (register_file.a & 0x0f) > 0x09))
     {
         adjustment |= 0x06;
     }
-    if (is_flag_set(FLAG_CARRY_MASK) || (was_addition_most_recent && register_file.a > 0x99))
+    if (is_flag_set(register_file.flags, FLAG_CARRY_MASK) || (was_addition_most_recent && register_file.a > 0x99))
     {
         adjustment |= 0x60;
         does_carry_occur = true;
@@ -1249,14 +1231,14 @@ void CPU::decimal_adjust_a_0x27()
     register_file.a = was_addition_most_recent
         ? (register_file.a + adjustment)
         : (register_file.a - adjustment);
-    update_flag(FLAG_ZERO_MASK, register_file.a == 0);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, register_file.a == 0);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::jump_relative_if_zero_signed_immediate8_0x28()
 {
-    jump_relative_conditional_signed_immediate8(is_flag_set(FLAG_ZERO_MASK));
+    jump_relative_conditional_signed_immediate8(is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::add_hl_hl_0x29()
@@ -1292,13 +1274,13 @@ void CPU::load_l_immediate8_0x2e()
 void CPU::complement_a_0x2f()
 {
     register_file.a = ~register_file.a;
-    update_flag(FLAG_SUBTRACT_MASK, true);
-    update_flag(FLAG_HALF_CARRY_MASK, true);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, true);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, true);
 }
 
 void CPU::jump_relative_if_not_carry_signed_immediate8_0x30()
 {
-    jump_relative_conditional_signed_immediate8(!is_flag_set(FLAG_CARRY_MASK));
+    jump_relative_conditional_signed_immediate8(!is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 void CPU::load_stack_pointer_immediate16_0x31()
@@ -1337,14 +1319,14 @@ void CPU::load_memory_hl_immediate8_0x36()
 
 void CPU::set_carry_flag_0x37()
 {
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, true);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, true);
 }
 
 void CPU::jump_relative_if_carry_signed_immediate8_0x38()
 {
-    jump_relative_conditional_signed_immediate8(is_flag_set(FLAG_CARRY_MASK));
+    jump_relative_conditional_signed_immediate8(is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 void CPU::add_hl_stack_pointer_0x39()
@@ -1379,9 +1361,9 @@ void CPU::load_a_immediate8_0x3e()
 
 void CPU::complement_carry_flag_0x3f()
 {
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, false);
-    update_flag(FLAG_CARRY_MASK, !is_flag_set(FLAG_CARRY_MASK));
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, false);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, !is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 void CPU::load_b_b_0x40()
@@ -2026,7 +2008,7 @@ void CPU::compare_a_a_0xbf()
 
 void CPU::return_if_not_zero_0xc0()
 {
-    return_conditional(!is_flag_set(FLAG_ZERO_MASK));
+    return_conditional(!is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::pop_stack_bc_0xc1()
@@ -2036,7 +2018,7 @@ void CPU::pop_stack_bc_0xc1()
 
 void CPU::jump_if_not_zero_immediate16_0xc2()
 {
-    jump_conditional_immediate16(!is_flag_set(FLAG_ZERO_MASK));
+    jump_conditional_immediate16(!is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::jump_immediate16_0xc3()
@@ -2046,7 +2028,7 @@ void CPU::jump_immediate16_0xc3()
 
 void CPU::call_if_not_zero_immediate16_0xc4()
 {
-    call_conditional_immediate16(!is_flag_set(FLAG_ZERO_MASK));
+    call_conditional_immediate16(!is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::push_stack_bc_0xc5()
@@ -2066,26 +2048,26 @@ void CPU::restart_at_0x00_0xc7()
 
 void CPU::return_if_zero_0xc8()
 {
-    return_conditional(is_flag_set(FLAG_ZERO_MASK));
+    return_conditional(is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::return_0xc9()
 {
     uint16_t stack_top = pop_stack();
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     register_file.program_counter = stack_top;
 }
 
 void CPU::jump_if_zero_immediate16_0xca()
 {
-    jump_conditional_immediate16(is_flag_set(FLAG_ZERO_MASK));
+    jump_conditional_immediate16(is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 // 0xcb is only used to prefix an extended instruction
 
 void CPU::call_if_zero_immediate16_0xcc()
 {
-    call_conditional_immediate16(is_flag_set(FLAG_ZERO_MASK));
+    call_conditional_immediate16(is_flag_set(register_file.flags, FLAG_ZERO_MASK));
 }
 
 void CPU::call_immediate16_0xcd()
@@ -2105,7 +2087,7 @@ void CPU::restart_at_0x08_0xcf()
 
 void CPU::return_if_not_carry_0xd0()
 {
-    return_conditional(!is_flag_set(FLAG_CARRY_MASK));
+    return_conditional(!is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 void CPU::pop_stack_de_0xd1()
@@ -2115,14 +2097,14 @@ void CPU::pop_stack_de_0xd1()
 
 void CPU::jump_if_not_carry_immediate16_0xd2()
 {
-    jump_conditional_immediate16(!is_flag_set(FLAG_CARRY_MASK));
+    jump_conditional_immediate16(!is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 // 0xd3 is an unused opcode
 
 void CPU::call_if_not_carry_immediate16_0xd4()
 {
-    call_conditional_immediate16(!is_flag_set(FLAG_CARRY_MASK));
+    call_conditional_immediate16(!is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 void CPU::push_stack_de_0xd5()
@@ -2142,7 +2124,7 @@ void CPU::restart_at_0x10_0xd7()
 
 void CPU::return_if_carry_0xd8()
 {
-    return_conditional(is_flag_set(FLAG_CARRY_MASK));
+    return_conditional(is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 void CPU::return_from_interrupt_0xd9()
@@ -2153,14 +2135,14 @@ void CPU::return_from_interrupt_0xd9()
 
 void CPU::jump_if_carry_immediate16_0xda()
 {
-    jump_conditional_immediate16(is_flag_set(FLAG_CARRY_MASK));
+    jump_conditional_immediate16(is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 // 0xdb is an unused opcode
 
 void CPU::call_if_carry_immediate16_0xdc()
 {
-    call_conditional_immediate16(is_flag_set(FLAG_CARRY_MASK));
+    call_conditional_immediate16(is_flag_set(register_file.flags, FLAG_CARRY_MASK));
 }
 
 // 0xdd is an unused opcode
@@ -2209,15 +2191,15 @@ void CPU::add_stack_pointer_signed_immediate8_0xe8()
 {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_tick();
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
     const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
     register_file.stack_pointer += static_cast<int8_t>(unsigned_offset);
-    update_flag(FLAG_ZERO_MASK, false);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, false);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
  }
 
 void CPU::jump_hl_0xe9()
@@ -2288,19 +2270,19 @@ void CPU::load_hl_stack_pointer_with_signed_offset_0xf8()
 {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_tick();
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
     const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
     register_file.hl = register_file.stack_pointer + static_cast<int8_t>(unsigned_offset);
-    update_flag(FLAG_ZERO_MASK, false);
-    update_flag(FLAG_SUBTRACT_MASK, false);
-    update_flag(FLAG_HALF_CARRY_MASK, does_half_carry_occur);
-    update_flag(FLAG_CARRY_MASK, does_carry_occur);
+    update_flag(register_file.flags, FLAG_ZERO_MASK, false);
+    update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, FLAG_CARRY_MASK, does_carry_occur);
 }
 
 void CPU::load_stack_pointer_hl_0xf9()
 {
-    emulator_step_single_machine_cycle_callback(MachineCycleInteraction{MemoryOperation::None});
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     register_file.stack_pointer = register_file.hl;
 }
 
