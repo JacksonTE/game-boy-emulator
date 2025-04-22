@@ -36,7 +36,7 @@ void Emulator::set_post_boot_state()
 
 bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
 {
-    return try_load_file_to_memory(0x0000, BOOTROM_SIZE, bootrom_path, true);
+    return try_load_file_to_memory(BOOTROM_SIZE, bootrom_path, true);
 }
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
@@ -44,9 +44,9 @@ void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_
     print_bytes_in_range(*memory_interface, start_address, end_address);
 }
 
-bool Emulator::try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
+bool Emulator::try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
 {
-    return memory_interface->try_load_file(address, number_of_bytes_to_load, file_path, is_bootrom_file);
+    return memory_interface->try_load_file(number_of_bytes_to_load, file_path, is_bootrom_file);
 }
 
 uint8_t Emulator::read_byte_from_memory(uint16_t address) const

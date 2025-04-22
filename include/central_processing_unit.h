@@ -169,7 +169,7 @@ private:
     uint8_t fetch_immediate8_and_step_emulator_components();
     uint16_t fetch_immediate16_and_step_emulator_components();
 
-    // Grouped Instructions
+    // Generic Instructions
     template <typename T>
     void load(T &destination_register, T value);
     void load_memory(uint16_t address, uint8_t value);

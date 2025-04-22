@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -14,14 +15,31 @@ MemoryManagementUnit::MemoryManagementUnit(Timer &timer_reference, PixelProcessi
     : timer{timer_reference},
       pixel_processing_unit{pixel_processing_unit_reference}
 {
-    placeholder_memory = std::make_unique<uint8_t[]>(MEMORY_SIZE);
-    std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
+    bootrom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
+    rom_bank_00 = std::make_unique<uint8_t[]>(ROM_BANK_SIZE);
+    rom_bank_01 = std::make_unique<uint8_t[]>(ROM_BANK_SIZE);
+    external_ram = std::make_unique<uint8_t[]>(EXTERNAL_RAM_SIZE);
+    work_ram = std::make_unique<uint8_t[]>(WORK_RAM_SIZE);
+    unmapped_input_output_registers = std::make_unique<uint8_t[]>(INPUT_OUTPUT_REGISTERS_SIZE);
+    high_ram = std::make_unique<uint8_t[]>(HIGH_RAM_SIZE);
+
+    std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
+    std::fill_n(rom_bank_00.get(), ROM_BANK_SIZE, 0);
+    std::fill_n(rom_bank_01.get(), ROM_BANK_SIZE, 0);
+    std::fill_n(external_ram.get(), EXTERNAL_RAM_SIZE, 0);
+    std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
+    std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
+    std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
 }
 
 void MemoryManagementUnit::reset_state()
 {
-    std::fill_n(placeholder_memory.get(), MEMORY_SIZE, 0);
-    bootrom.reset();
+    std::fill_n(rom_bank_00.get(), ROM_BANK_SIZE, 0);
+    std::fill_n(rom_bank_01.get(), ROM_BANK_SIZE, 0);
+    std::fill_n(external_ram.get(), EXTERNAL_RAM_SIZE, 0);
+    std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
+    std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
+    std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
 }
 
 void MemoryManagementUnit::set_post_boot_state()
@@ -55,7 +73,7 @@ void MemoryManagementUnit::set_post_boot_state()
     interrupt_enable_ie = 0x00;
 }
 
-bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
+bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const std::filesystem::path &file_path, bool is_bootrom_file)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -72,34 +90,41 @@ bool MemoryManagementUnit::try_load_file(uint16_t address, uint32_t number_of_by
         return false;
     }
 
-    if (address + number_of_bytes_to_load > (is_bootrom_file ? BOOTROM_SIZE : COLLECTIVE_ROM_BANK_SIZE))
+    if (number_of_bytes_to_load > (is_bootrom_file ? BOOTROM_SIZE : 2 * ROM_BANK_SIZE))
     {
         std::cerr << std::hex << std::setfill('0');
-        std::cerr << "Error: insufficient space from starting address (" << std::setw(4) << address
+        std::cerr << "Error: insufficient space from starting address (" << std::setw(4) << 0x0000
                   << ") to load requested number of bytes (" << number_of_bytes_to_load << ").\n";
         return false;
     }
 
     file.seekg(0, std::ios::beg);
+    bool was_file_load_successful = true;
 
     if (is_bootrom_file)
     {
-        if (bootrom == nullptr)
-            bootrom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
-
-        std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
+        was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), number_of_bytes_to_load));
     }
-
-    if (!file.read(reinterpret_cast<char *>(is_bootrom_file ? bootrom.get() : placeholder_memory.get()), number_of_bytes_to_load))
+    else
     {
-        if (is_bootrom_file)
-            bootrom.reset();
-
-        std::cerr << "Error: could not read file " << file_path << ".\n";
-        return false;
+        uint16_t first_rom_bank_bytes_count = std::min(number_of_bytes_to_load, ROM_BANK_SIZE);
+        uint16_t second_rom_bank_bytes_count = number_of_bytes_to_load - first_rom_bank_bytes_count;
+        
+        if (first_rom_bank_bytes_count > 0)
+        {
+            was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(rom_bank_00.get()), first_rom_bank_bytes_count));
+        }
+        if (second_rom_bank_bytes_count > 0)
+        {
+            was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(rom_bank_01.get()), second_rom_bank_bytes_count));
+        }
     }
 
-    return true;
+    if (!was_file_load_successful)
+    {
+        std::cerr << "Error: could not read file " << file_path << ".\n";
+    }
+    return was_file_load_successful;
 }
 
 uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
@@ -115,15 +140,45 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
         }
         return bootrom[address];
     }
+    else if (address >= ROM_BANK_00_START && address < ROM_BANK_00_START + ROM_BANK_SIZE)
+    {
+        const uint16_t local_address = address - ROM_BANK_00_START;
+        return rom_bank_00[local_address];
+    }
+    else if (address >= ROM_BANK_01_START && address < ROM_BANK_01_START + ROM_BANK_SIZE)
+    {
+        const uint16_t local_address = address - ROM_BANK_01_START;
+        return rom_bank_01[local_address];
+    }
     else if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
     {
         return pixel_processing_unit.read_byte_video_ram(address);
+    }
+    else if (address >= EXTERNAL_RAM_START && address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
+    {
+        const uint16_t local_address = address - EXTERNAL_RAM_START;
+        return external_ram[local_address];
+    }
+    else if (address >= WORK_RAM_START && address < WORK_RAM_START + WORK_RAM_SIZE)
+    {
+        const uint16_t local_address = address - WORK_RAM_START;
+        return work_ram[local_address];
+    }
+    else if (address >= ECHO_RAM_START && address < ECHO_RAM_START + ECHO_RAM_SIZE)
+    {
+        const uint16_t local_address = address - ECHO_RAM_START;
+        return work_ram[local_address];
     }
     else if (address >= OBJECT_ATTRIBUTE_MEMORY_START && address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
     {
         return pixel_processing_unit.read_byte_object_attribute_memory(address);
     }
-    else
+    else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
+    {
+        // TODO eventually add OAM corruption check
+        return 0x00;
+    }
+    else if (address >= INPUT_OUTPUT_REGISTERS_START && address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
     {
         switch (address)
         {
@@ -163,25 +218,59 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
                 return pixel_processing_unit.window_x_position_plus_7_wx;
             case 0xff50:
                 return bootrom_status;
-            case 0xffff:
-                return interrupt_enable_ie;
             default:
-                return placeholder_memory[address];
+                const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;
+                return unmapped_input_output_registers[local_address];
         }
     }
+    else if (address >= HIGH_RAM_START && address < HIGH_RAM_START + HIGH_RAM_SIZE)
+    {
+        const uint16_t local_address = address - HIGH_RAM_START;
+        return high_ram[local_address];
+    }
+    else
+        return interrupt_enable_ie;
 }
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
 {
-    if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
+    if (address >= ROM_BANK_00_START && address < ROM_BANK_00_START + ROM_BANK_SIZE)
+    {
+        wrote_to_read_only_address(address);
+    }
+    else if (address >= ROM_BANK_01_START && address < ROM_BANK_01_START + ROM_BANK_SIZE)
+    {
+        wrote_to_read_only_address(address);
+    }
+    else if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
     {
         pixel_processing_unit.write_byte_video_ram(address, value);
+    }
+    else if (address >= EXTERNAL_RAM_START && address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
+    {
+        const uint16_t local_address = address - EXTERNAL_RAM_START;
+        external_ram[local_address] = value;
+    }
+    else if (address >= WORK_RAM_START && address < WORK_RAM_START + WORK_RAM_SIZE)
+    {
+        const uint16_t local_address = address - WORK_RAM_START;
+        work_ram[local_address] = value;
+    }
+    else if (address >= ECHO_RAM_START && address < ECHO_RAM_START + ECHO_RAM_SIZE)
+    {
+        const uint16_t local_address = address - ECHO_RAM_START;
+        work_ram[local_address] = value;
     }
     else if (address >= OBJECT_ATTRIBUTE_MEMORY_START && address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
     {
         pixel_processing_unit.write_byte_object_attribute_memory(address, value);
     }
-    else
+    else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
+    {
+        // TODO check if OAM corruption is relevant here
+        std::cout << "Attempted to write to unusable address " << address << ". No write will occur.\n";
+    }
+    else if (address >= INPUT_OUTPUT_REGISTERS_START && address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
     {
         switch (address)
         {
@@ -239,14 +328,19 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
             case 0xff50:
                 bootrom_status = value;
                 return;
-            case 0xffff:
-                interrupt_enable_ie = value;
-                return;
             default:
-                placeholder_memory[address] = value;
+                const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;
+                unmapped_input_output_registers[local_address] = value;
                 return;
         }
     }
+    else if (address >= HIGH_RAM_START && address < HIGH_RAM_START + HIGH_RAM_SIZE)
+    {
+        const uint16_t local_address = address - HIGH_RAM_START;
+        high_ram[local_address] = value;
+    }
+    else
+        interrupt_enable_ie = value;
 }
 
 void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask)

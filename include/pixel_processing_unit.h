@@ -13,7 +13,7 @@ constexpr uint8_t INTERRUPT_FLAG_LCD_STATUS_MASK = 1 << 1;
 constexpr uint8_t INTERRUPT_FLAG_VBLANK_MASK = 1 << 0;
 
 constexpr uint16_t VIDEO_RAM_SIZE = 0x2000;
-constexpr uint8_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 160;
+constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 0x00a0;
 
 constexpr uint16_t VIDEO_RAM_START = 0x8000;
 constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xfe00;

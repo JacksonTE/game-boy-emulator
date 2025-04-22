@@ -11,10 +11,24 @@ namespace GameBoy
 {
 
 constexpr uint32_t MEMORY_SIZE = 0x10000;
-constexpr uint16_t COLLECTIVE_ROM_BANK_SIZE = 0x8000;
 constexpr uint16_t BOOTROM_SIZE = 0x100;
 
-constexpr uint16_t HIGH_RAM_START = 0xff00;
+constexpr uint16_t ROM_BANK_SIZE = 0x4000;
+constexpr uint16_t EXTERNAL_RAM_SIZE = 0x2000;
+constexpr uint16_t WORK_RAM_SIZE = 0x2000;
+constexpr uint16_t ECHO_RAM_SIZE = 0x1e00;
+constexpr uint16_t UNUSABLE_MEMORY_SIZE = 0x0060;
+constexpr uint16_t INPUT_OUTPUT_REGISTERS_SIZE = 0x0080;
+constexpr uint16_t HIGH_RAM_SIZE = 0x007f;
+
+constexpr uint16_t ROM_BANK_00_START = 0x0000;
+constexpr uint16_t ROM_BANK_01_START = 0x4000;
+constexpr uint16_t EXTERNAL_RAM_START = 0xa000;
+constexpr uint16_t WORK_RAM_START = 0xc000;
+constexpr uint16_t ECHO_RAM_START = 0xe000;
+constexpr uint16_t UNUSABLE_MEMORY_START = 0xfea0;
+constexpr uint16_t INPUT_OUTPUT_REGISTERS_START = 0xff00;
+constexpr uint16_t HIGH_RAM_START = 0xff80;
 
 constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
 constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
@@ -29,7 +43,7 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
+    bool try_load_file(uint16_t number_of_bytes_to_load, const std::filesystem::path &file_path, bool is_bootrom_file);
 
     virtual uint8_t read_byte(uint16_t address) const;
     virtual void write_byte(uint16_t address, uint8_t value);
@@ -39,8 +53,13 @@ public:
     uint8_t get_pending_interrupt_mask() const;
 
 private:
-    std::unique_ptr<uint8_t[]> placeholder_memory{};
     std::unique_ptr<uint8_t[]> bootrom{};
+    std::unique_ptr<uint8_t[]> rom_bank_00{};
+    std::unique_ptr<uint8_t[]> rom_bank_01{};
+    std::unique_ptr<uint8_t[]> external_ram{};
+    std::unique_ptr<uint8_t[]> work_ram{};
+    std::unique_ptr<uint8_t[]> unmapped_input_output_registers{};
+    std::unique_ptr<uint8_t[]> high_ram{};
 
     Timer &timer;
     PixelProcessingUnit &pixel_processing_unit;

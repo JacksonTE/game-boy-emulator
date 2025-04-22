@@ -15,14 +15,14 @@ MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction)
 
 MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction, uint16_t address)
     : memory_interaction{interaction},
-    address_accessed{address}
+      address_accessed{address}
 {
 }
 
 MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction, uint16_t address, uint8_t value)
     : memory_interaction{interaction},
-    address_accessed{address},
-    value_written{value}
+      address_accessed{address},
+      value_written{value}
 {
 }
 
@@ -78,14 +78,15 @@ void CentralProcessingUnit::reset_state()
 void CentralProcessingUnit::set_post_boot_state()
 {
     reset_state();
-
-    uint8_t header_checksum = 0;
-    for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
-        header_checksum -= memory_interface.read_byte(BOOTROM_SIZE + address) - 1;
-
     register_file.a = 0x01;
     update_flag(register_file.flags, FLAG_ZERO_MASK, true);
     update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
+    
+    uint8_t header_checksum = 0;
+    for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
+    {
+        header_checksum -= memory_interface.read_byte(BOOTROM_SIZE + address) - 1;
+    }
     update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, header_checksum != 0);
     update_flag(register_file.flags, FLAG_CARRY_MASK, header_checksum != 0);
     register_file.b = 0x00;
@@ -127,6 +128,7 @@ uint8_t &CentralProcessingUnit::get_register_by_index(uint8_t index)
         case 3: return register_file.e;
         case 4: return register_file.h;
         case 5: return register_file.l;
+        // 6 would be memory[hl] but this is handled separately
         case 7: return register_file.a;
     }
 }
@@ -583,13 +585,13 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
             restart_at_address(0x18);
             break;
         case 0xe0:
-            load_memory(HIGH_RAM_START + fetch_immediate8_and_step_emulator_components(), register_file.a);
+            load_memory(INPUT_OUTPUT_REGISTERS_START + fetch_immediate8_and_step_emulator_components(), register_file.a);
             break;
         case 0xe1:
             pop_stack(register_file.hl);
             break;
         case 0xe2:
-            load_memory(HIGH_RAM_START + register_file.c, register_file.a);
+            load_memory(INPUT_OUTPUT_REGISTERS_START + register_file.c, register_file.a);
             break;
         case 0xe5:
             push_stack(register_file.hl);
@@ -616,13 +618,13 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
             restart_at_address(0x28);
             break;
         case 0xf0:
-            load(register_file.a, read_byte_and_step_emulator_components(HIGH_RAM_START + fetch_immediate8_and_step_emulator_components()));
+            load(register_file.a, read_byte_and_step_emulator_components(INPUT_OUTPUT_REGISTERS_START + fetch_immediate8_and_step_emulator_components()));
             break;
         case 0xf1:
             pop_stack_af_0xf1();
             break;
         case 0xf2:
-            load(register_file.a, read_byte_and_step_emulator_components(HIGH_RAM_START + register_file.c));
+            load(register_file.a, read_byte_and_step_emulator_components(INPUT_OUTPUT_REGISTERS_START + register_file.c));
             break;
         case 0xf3:
             disable_interrupts_0xf3();
@@ -973,7 +975,7 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
 
 void CentralProcessingUnit::fetch_next_instruction()
 {
-    uint8_t immediate8 = fetch_immediate8_and_step_emulator_components();
+    const uint8_t immediate8 = fetch_immediate8_and_step_emulator_components();
     is_current_instruction_prefixed = (immediate8 == INSTRUCTION_PREFIX_BYTE);
     instruction_register_ir = is_current_instruction_prefixed
         ? fetch_immediate8_and_step_emulator_components()
@@ -1034,7 +1036,7 @@ uint16_t CentralProcessingUnit::fetch_immediate16_and_step_emulator_components()
 }
 
 // ================================
-// ===== Grouped Instructions =====
+// ===== Generic Instructions =====
 // ================================
 
 template <typename T>

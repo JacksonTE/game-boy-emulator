@@ -21,7 +21,7 @@ public:
     bool try_load_bootrom(std::filesystem::path bootrom_path);
 
     void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
-    bool try_load_file_to_memory(uint16_t address, uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
+    bool try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
     uint8_t read_byte_from_memory(uint16_t address) const;
     void write_byte_to_memory(uint16_t address, uint8_t value);
 
