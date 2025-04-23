@@ -1,9 +1,10 @@
-#include <array>
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <vector>
 
@@ -204,8 +205,8 @@ protected:
         : memory_interface{std::make_unique<SingleInstructionTestMemory>()},
           game_boy_central_processing_unit
           {
-              *memory_interface, 
-              [this](GameBoy::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); }
+              [this](GameBoy::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); },
+              *memory_interface
           }
     { 
     }

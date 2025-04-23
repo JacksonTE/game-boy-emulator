@@ -138,7 +138,7 @@ struct RegisterFile<std::endian::big>
 class CentralProcessingUnit
 {
 public:
-    CentralProcessingUnit(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle);
+    CentralProcessingUnit(std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference);
 
     RegisterFile<std::endian::native> get_register_file() const;
     void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
@@ -158,9 +158,6 @@ private:
     bool is_current_instruction_prefixed{};
     bool is_halted{};
 
-    uint8_t &get_register_by_index(uint8_t index);
-    void decode_current_unprefixed_opcode_and_execute();
-    void decode_current_prefixed_opcode_and_execute();
     void fetch_next_instruction();
     void service_interrupt();
 
@@ -168,6 +165,10 @@ private:
     void write_byte_and_step_emulator_components(uint16_t address, uint8_t value);
     uint8_t fetch_immediate8_and_step_emulator_components();
     uint16_t fetch_immediate16_and_step_emulator_components();
+
+    uint8_t &get_register_by_index(uint8_t index);
+    void decode_current_unprefixed_opcode_and_execute();
+    void decode_current_prefixed_opcode_and_execute();
 
     // Generic Instructions
     template <typename T>

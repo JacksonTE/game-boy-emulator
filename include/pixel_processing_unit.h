@@ -6,6 +6,8 @@
 #include <iostream>
 #include <vector>
 
+#include "timer.h"
+
 namespace GameBoy
 {
 

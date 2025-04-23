@@ -1,7 +1,5 @@
 #include <cstdint>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 
 #include "emulator.h"
 #include "console_output_utilities.h"
@@ -14,7 +12,7 @@ Emulator::Emulator()
     : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       memory_interface{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
-      central_processing_unit{*memory_interface, [this](MachineCycleOperation) { this->step_components_single_machine_cycle(); }}
+      central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle(); }, *memory_interface}
 {
 }
 

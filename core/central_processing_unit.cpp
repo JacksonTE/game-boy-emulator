@@ -44,9 +44,9 @@ bool MachineCycleOperation::operator==(const MachineCycleOperation &other) const
     }
 }
 
-CentralProcessingUnit::CentralProcessingUnit(MemoryManagementUnit &memory_management_unit, std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle)
+CentralProcessingUnit::CentralProcessingUnit(std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference)
     : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
-      memory_interface{memory_management_unit}
+      memory_interface{memory_management_unit_reference}
 {
 }
 
@@ -118,6 +118,67 @@ void CentralProcessingUnit::step_single_instruction()
         interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
 }
 
+void CentralProcessingUnit::fetch_next_instruction()
+{
+    const uint8_t immediate8 = fetch_immediate8_and_step_emulator_components();
+    is_current_instruction_prefixed = (immediate8 == INSTRUCTION_PREFIX_BYTE);
+    instruction_register_ir = is_current_instruction_prefixed
+        ? fetch_immediate8_and_step_emulator_components()
+        : immediate8;
+}
+
+void CentralProcessingUnit::service_interrupt()
+{
+    bool is_interrupt_pending = (memory_interface.get_pending_interrupt_mask() != 0);
+    if (is_interrupt_pending && is_halted)
+        is_halted = false;
+
+    if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
+        return;
+
+    decrement_and_step_emulator_components(register_file.program_counter);
+    decrement_and_step_emulator_components(register_file.stack_pointer);
+    write_byte_and_step_emulator_components(register_file.stack_pointer--, register_file.program_counter >> 8);
+    uint8_t interrupt_flag_mask = memory_interface.get_pending_interrupt_mask();
+    write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xff);
+
+    memory_interface.clear_interrupt_flag_bit(interrupt_flag_mask);
+    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
+    register_file.program_counter = (interrupt_flag_mask == 0x00)
+        ? 0x00
+        : 0x0040 + 8 * static_cast<uint8_t>(std::countr_zero(interrupt_flag_mask));
+
+    fetch_next_instruction();
+}
+
+uint8_t CentralProcessingUnit::read_byte_and_step_emulator_components(uint16_t address)
+{
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Read, address});
+    return memory_interface.read_byte(address);
+}
+
+void CentralProcessingUnit::write_byte_and_step_emulator_components(uint16_t address, uint8_t value)
+{
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Write, address, value});
+    memory_interface.write_byte(address, value);
+}
+
+uint8_t CentralProcessingUnit::fetch_immediate8_and_step_emulator_components()
+{
+    uint8_t immediate8 = read_byte_and_step_emulator_components(register_file.program_counter);
+    if (!is_halted)
+    {
+        register_file.program_counter++;
+    }
+    return immediate8;
+}
+
+uint16_t CentralProcessingUnit::fetch_immediate16_and_step_emulator_components()
+{
+    const uint8_t low_byte = fetch_immediate8_and_step_emulator_components();
+    return low_byte | static_cast<uint16_t>(fetch_immediate8_and_step_emulator_components() << 8);
+}
+
 uint8_t &CentralProcessingUnit::get_register_by_index(uint8_t index)
 {
     switch (index)
@@ -128,7 +189,6 @@ uint8_t &CentralProcessingUnit::get_register_by_index(uint8_t index)
         case 3: return register_file.e;
         case 4: return register_file.h;
         case 5: return register_file.l;
-        // 6 would be memory[hl] but this is handled separately
         case 7: return register_file.a;
     }
 }
@@ -901,7 +961,6 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0xbe:
             operate_on_register_hl_and_write(&CentralProcessingUnit::reset_bit, bit_position);
             break;
-
         case 0xc0:
         case 0xc1:
         case 0xc2:
@@ -971,68 +1030,6 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
             operate_on_register_hl_and_write(&CentralProcessingUnit::set_bit, bit_position);
             break;
     }
-}
-
-void CentralProcessingUnit::fetch_next_instruction()
-{
-    const uint8_t immediate8 = fetch_immediate8_and_step_emulator_components();
-    is_current_instruction_prefixed = (immediate8 == INSTRUCTION_PREFIX_BYTE);
-    instruction_register_ir = is_current_instruction_prefixed
-        ? fetch_immediate8_and_step_emulator_components()
-        : immediate8;
-}
-
-void CentralProcessingUnit::service_interrupt()
-{
-    bool is_interrupt_pending = (memory_interface.get_pending_interrupt_mask() != 0);
-    if (is_interrupt_pending && is_halted)
-        is_halted = false;
-
-    if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
-        return;
-
-    decrement_and_step_emulator_components(register_file.program_counter);
-    decrement_and_step_emulator_components(register_file.stack_pointer);
-    write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter >> 8);
-    decrement_and_step_emulator_components(register_file.stack_pointer);
-    uint8_t interrupt_flag_mask = memory_interface.get_pending_interrupt_mask();
-    write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xff);
-
-    memory_interface.clear_interrupt_flag_bit(interrupt_flag_mask);
-    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
-    register_file.program_counter = (interrupt_flag_mask == 0x00)
-        ? 0x00
-        : 0x0040 + 8 * static_cast<uint8_t>(std::countr_zero(interrupt_flag_mask));
-
-    fetch_next_instruction();
-}
-
-uint8_t CentralProcessingUnit::read_byte_and_step_emulator_components(uint16_t address)
-{
-    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Read, address});
-    return memory_interface.read_byte(address);
-}
-
-void CentralProcessingUnit::write_byte_and_step_emulator_components(uint16_t address, uint8_t value)
-{
-    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Write, address, value});
-    memory_interface.write_byte(address, value);
-}
-
-uint8_t CentralProcessingUnit::fetch_immediate8_and_step_emulator_components()
-{
-    uint8_t immediate8 = read_byte_and_step_emulator_components(register_file.program_counter);
-    if (!is_halted)
-    {
-        register_file.program_counter++;
-    }
-    return immediate8;
-}
-
-uint16_t CentralProcessingUnit::fetch_immediate16_and_step_emulator_components()
-{
-    const uint8_t low_byte = fetch_immediate8_and_step_emulator_components();
-    return low_byte | static_cast<uint16_t>(fetch_immediate8_and_step_emulator_components() << 8);
 }
 
 // ================================

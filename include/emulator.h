@@ -3,7 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
+#include <memory>
 
 #include "central_processing_unit.h"
 #include "timer.h"

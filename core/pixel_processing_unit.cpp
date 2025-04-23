@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
-#include <type_traits>
 
 #include "bitwise_utilities.h"
 #include "pixel_processing_unit.h"
@@ -86,12 +85,12 @@ void PixelProcessingUnit::write_lcd_control_lcdc(uint8_t value)
 
 uint8_t PixelProcessingUnit::read_lcd_status_stat() const
 {
-    return 0b10000000 | (lcd_status_stat & 0b11111100) | static_cast<uint8_t>(previous_mode);
+    return (lcd_status_stat & 0b11111100) | static_cast<uint8_t>(previous_mode);
 }
 
 void PixelProcessingUnit::write_lcd_status_stat(uint8_t value)
 {
-    uint8_t new_stat_value = (value & 0b01111000) | (lcd_status_stat & 0b10000111);
+    const uint8_t new_stat_value = (value & 0b11111000) | (lcd_status_stat & 0b10000111);
 
     if (current_mode == PixelProcessingUnitMode::VerticalBlank || lcd_y_coordinate_ly == lcd_y_coordinate_compare_lyc)
     {
@@ -412,7 +411,7 @@ void PixelProcessingUnit::trigger_lcd_status_stat_interrupts()
     const bool is_vertical_blank_interrupt_select_enabled = is_bit_set(lcd_status_stat, 4);
     const bool is_horizontal_blank_interrupt_select_enabled = is_bit_set(lcd_status_stat, 3);
 
-    switch (current_mode)
+    switch (previous_mode)
     {
         case PixelProcessingUnitMode::ObjectAttributeMemoryScan:
             should_lcd_status_stat_interrupt_trigger |= is_object_attribute_memory_scan_interrupt_select_enabled;
@@ -421,10 +420,12 @@ void PixelProcessingUnit::trigger_lcd_status_stat_interrupts()
             should_lcd_status_stat_interrupt_trigger |= is_horizontal_blank_interrupt_select_enabled;
             break;
         case PixelProcessingUnitMode::VerticalBlank:
-            should_lcd_status_stat_interrupt_trigger |= (is_vertical_blank_interrupt_select_enabled ||
-                (is_object_attribute_memory_scan_interrupt_select_enabled && lcd_y_coordinate_ly == FINAL_DRAWING_SCAN_LINE + 1));
+            should_lcd_status_stat_interrupt_trigger |= is_vertical_blank_interrupt_select_enabled;
             break;
     }
+    should_lcd_status_stat_interrupt_trigger |= (current_mode == PixelProcessingUnitMode::VerticalBlank) &&
+                                                is_object_attribute_memory_scan_interrupt_select_enabled &&
+                                                lcd_y_coordinate_ly == FINAL_DRAWING_SCAN_LINE + 1;
 
     if (should_lcd_status_stat_interrupt_trigger)
     {
