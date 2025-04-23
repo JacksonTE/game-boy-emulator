@@ -240,8 +240,8 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
         const uint8_t object_start_index = (2 * current_scanline_dot_number) - 4;
         ObjectAttributes current_object
         {
-            object_attribute_memory[object_start_index],
-            object_attribute_memory[object_start_index + 1],
+            static_cast<int16_t>(object_attribute_memory[object_start_index] - 16),
+            static_cast<int16_t>(object_attribute_memory[object_start_index + 1] - 8),
             object_attribute_memory[object_start_index + 2],
             object_attribute_memory[object_start_index + 3],
         };
@@ -255,6 +255,9 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
             {
                 const bool is_flipped_vertically = is_bit_set(current_object.flags, 6);
                 set_bit(current_object.tile_index, 0, lcd_y_coordinate_ly < current_object.y_position + 8 != is_flipped_vertically);
+
+                if (lcd_y_coordinate_ly >= current_object.y_position + 8)
+                    current_object.y_position += 8;
             }
             object_fetcher.current_scanline_selected_objects.push_back(current_object);
         }
@@ -275,16 +278,25 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 {
     const bool is_object_display_enabled = is_bit_set(lcd_control_lcdc, 1);
 
-    if (is_object_display_enabled && !object_fetcher.is_enabled)
+    if (is_object_display_enabled)
     {
-        if (object_fetcher.current_object_index < object_fetcher.current_scanline_selected_objects.size() &&
+        if (!object_fetcher.is_enabled &&
+            object_fetcher.current_object_index < object_fetcher.current_scanline_selected_objects.size() &&
             object_fetcher.get_current_object().x_position <= lcd_internal_x_coordinate_lx)
         {
             object_fetcher.is_enabled = true;
         }
+
+        if (object_fetcher.is_enabled &&
+            background_fetcher.is_enabled &&
+            background_fetcher.current_step == PixelSliceFetcherStep::PushPixels &&
+            !background_pixel_queue.is_empty())
+        {
+            background_fetcher.is_enabled = false;
+        }
     }
 
-    if (!object_fetcher.is_enabled)
+    if (background_fetcher.is_enabled)
         step_background_fetcher_single_dot();
     else
         step_object_fetcher_single_dot();
@@ -379,10 +391,9 @@ void PixelProcessingUnit::step_vertical_blank_single_dot()
     if (current_scanline_dot_number < SCAN_LINE_DURATION_DOTS)
         return;
 
-    lcd_y_coordinate_ly++;
     current_scanline_dot_number = 0;
 
-    if (lcd_y_coordinate_ly == 1)
+    if (++lcd_y_coordinate_ly == 1)
     {	
         lcd_y_coordinate_ly = 0;
         object_fetcher.reset_state();
@@ -569,9 +580,6 @@ void PixelProcessingUnit::step_object_fetcher_single_dot() {
             {
                 object_fetcher.tile_row_high = get_object_fetcher_tile_row();
                 object_fetcher.current_step = PixelSliceFetcherStep::PushPixels;
-
-                if (object_fetcher.is_enabled && background_fetcher.is_enabled)
-                    background_fetcher.is_enabled = false;
             }
             break;
         case PixelSliceFetcherStep::PushPixels:
@@ -584,8 +592,10 @@ void PixelProcessingUnit::step_object_fetcher_single_dot() {
                 object_pixel_queue[i].is_priority_bit_set = is_bit_set(lcd_control_lcdc, 7);
                 object_pixel_queue[i].is_palette_bit_set = is_bit_set(lcd_control_lcdc, 4);
             }
-            object_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
+            background_fetcher.is_enabled = true;
             object_fetcher.is_enabled = false;
+            object_fetcher.current_object_index++;
+            object_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
             break;
     }
 
