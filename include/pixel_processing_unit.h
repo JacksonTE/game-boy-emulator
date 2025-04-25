@@ -61,7 +61,7 @@ enum class PixelSliceFetcherStep
 struct ObjectAttributes
 {
     int16_t y_position{};
-    int16_t x_position{};
+    uint16_t x_position{};
     uint8_t tile_index{};
     uint8_t flags{};
 };
@@ -81,6 +81,7 @@ struct ObjectPixel
 struct PixelSliceFetcher
 {
     PixelSliceFetcherStep current_step{PixelSliceFetcherStep::GetTileId};
+    PixelSliceFetcherStep previous_step{PixelSliceFetcherStep::GetTileId};
     uint8_t tile_id{};
     uint16_t tile_row_address{};
     uint8_t tile_row_low{};
@@ -97,16 +98,14 @@ struct ObjectFetcher : PixelSliceFetcher
     uint8_t current_object_index{};
 
     void reset_state() override;
-    ObjectAttributes get_current_object();
+    ObjectAttributes get_current_object() const;
 };
 
 struct BackgroundFetcher : PixelSliceFetcher
 {
     FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
-    bool is_on_first_fetch_of_scanline{true};
     int current_scanline_pixels_to_discard_count{-1};
     uint16_t tile_id_address{};
-    uint8_t tile_row_scy_value{};
     std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
     void reset_state() override;
@@ -196,15 +195,14 @@ public:
 
     uint8_t read_lcd_y_coordinate_ly() const;
 
-    void reset_state();
-    void set_post_boot_state();
-
     uint8_t read_byte_video_ram(uint16_t memory_address) const;
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
 
     uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
     void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value);
 
+    void reset_state();
+    void set_post_boot_state();
     void step_single_machine_cycle();
 
 private:
@@ -239,6 +237,10 @@ private:
     void step_pixel_transfer_single_dot();
     void step_horizontal_blank_single_dot();
     void step_vertical_blank_single_dot();
+    void trigger_lcd_status_stat_interrupts();
+
+    void initialize_pixel_transfer();
+    void step_fetchers_single_dot();
 
     void step_background_fetcher_single_dot();
     void set_background_fetcher_tile_id_address();
@@ -248,9 +250,8 @@ private:
     void set_object_fetcher_tile_row_address(uint8_t offset);
     uint8_t get_object_fetcher_tile_row();
 
-    void initialize_pixel_transfer();
-
-    void trigger_lcd_status_stat_interrupts();
+    bool is_object_display_enabled() const;
+    bool is_next_object_hit() const;
 
     uint8_t get_byte_horizontally_flipped(uint8_t byte);
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
