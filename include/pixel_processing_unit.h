@@ -81,7 +81,6 @@ struct ObjectPixel
 struct PixelSliceFetcher
 {
     PixelSliceFetcherStep current_step{PixelSliceFetcherStep::GetTileId};
-    PixelSliceFetcherStep previous_step{PixelSliceFetcherStep::GetTileId};
     uint8_t tile_id{};
     uint16_t tile_row_address{};
     uint8_t tile_row_low{};

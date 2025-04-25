@@ -11,7 +11,6 @@ namespace GameBoy
 void PixelSliceFetcher::reset_state()
 {
     current_step = PixelSliceFetcherStep::GetTileId;
-    previous_step = PixelSliceFetcherStep::GetTileId;
     tile_id = 0;
     tile_row_address = 0;
     tile_row_low = 0;
@@ -266,14 +265,41 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
     if (current_scanline_dot_number == OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS)
     {
         if (object_fetcher.current_scanline_selected_objects.size() == 1)
-            auto x = 10;
+            auto x = 1;
         if (object_fetcher.current_scanline_selected_objects.size() == 2)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 && 
+            object_fetcher.current_scanline_selected_objects.front().x_position == 0)
+            auto x = 0;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 &&
+            object_fetcher.current_scanline_selected_objects.front().x_position == 1)
+            auto x = 1;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 && 
+            object_fetcher.current_scanline_selected_objects.front().x_position == 2)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 &&
+            object_fetcher.current_scanline_selected_objects.front().x_position == 3)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 &&
+            object_fetcher.current_scanline_selected_objects.front().x_position == 4)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 &&
+            object_fetcher.current_scanline_selected_objects.front().x_position == 5)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 &&
+            object_fetcher.current_scanline_selected_objects.front().x_position == 6)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 &&
+            object_fetcher.current_scanline_selected_objects.front().x_position == 7)
+            auto x = 2;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 && 
+            object_fetcher.current_scanline_selected_objects.front().x_position == 8)
+            auto x = 8;
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 && 
+            object_fetcher.current_scanline_selected_objects.front().x_position == 10)
             auto x = 10;
-        if (object_fetcher.current_scanline_selected_objects.size() == 10 && object_fetcher.current_scanline_selected_objects.front().x_position == 2)
-            auto x = 10;
-        if (object_fetcher.current_scanline_selected_objects.size() == 10 && object_fetcher.current_scanline_selected_objects.front().x_position == 10)
-            auto x = 10;
-        if (object_fetcher.current_scanline_selected_objects.size() == 10 && object_fetcher.current_scanline_selected_objects.front().x_position == 11)
+        if (object_fetcher.current_scanline_selected_objects.size() == 10 && 
+            object_fetcher.current_scanline_selected_objects.front().x_position == 11)
             auto x = 10;
 
         std::stable_sort(object_fetcher.current_scanline_selected_objects.begin(), object_fetcher.current_scanline_selected_objects.end(),
@@ -288,14 +314,12 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 {
     const uint8_t dot_number_for_dummy_push = is_in_first_scanline_after_enable
         ? OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS + 2
-        : OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS + 6; // Added 1 here to get further - not sure if this is accurate
+        : OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS + 6;
 
     if (current_scanline_dot_number < dot_number_for_dummy_push)
         return;
     else if (current_scanline_dot_number == dot_number_for_dummy_push)
         background_pixel_queue.load_new_tile_row(background_fetcher.tile_row);
-
-    step_fetchers_single_dot();
 
     if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode && // TODO update math based on lx being 8 higher?
         is_window_enabled_for_scanline &&
@@ -307,8 +331,12 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
         background_fetcher.fetcher_mode = FetcherMode::WindowMode;
     }
 
+    step_fetchers_single_dot();
+
     if (!object_fetcher.is_enabled && !background_pixel_queue.is_empty())
     {
+        lcd_internal_x_coordinate_lx++;
+
         if (background_fetcher.current_scanline_pixels_to_discard_count == -1)
         {
             if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode)
@@ -324,9 +352,6 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 
         const BackgroundPixel next_background_pixel = background_pixel_queue.shift_out();
         const ObjectPixel next_object_pixel = object_pixel_queue.shift_out();
-        
-        if (++lcd_internal_x_coordinate_lx == 168) // TODO 10 should be identical to 
-            current_mode = PixelProcessingUnitMode::HorizontalBlank;
 
         if (background_fetcher.current_scanline_pixels_to_discard_count > 0)
         {
@@ -335,6 +360,9 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
         }
 
         //handle pixel merging/selection, etc
+
+        if (lcd_internal_x_coordinate_lx == 168)
+            current_mode = PixelProcessingUnitMode::HorizontalBlank;
     }
 }
 
@@ -455,40 +483,27 @@ void PixelProcessingUnit::initialize_pixel_transfer()
 
 void PixelProcessingUnit::step_fetchers_single_dot()
 {
-    if (is_object_display_enabled() && !object_fetcher.is_enabled && is_next_object_hit())
-        object_fetcher.is_enabled = true;
-    
-    if (background_fetcher.is_enabled)
-        step_background_fetcher_single_dot();
-
-    if (is_object_display_enabled() && object_fetcher.is_enabled &&
-        background_fetcher.is_enabled && background_fetcher.current_step == PixelSliceFetcherStep::PushPixels &&
-        !background_pixel_queue.is_empty())
+    if (is_object_display_enabled())
     {
-        background_fetcher.is_enabled = false;
-    }
-
-    if (!background_fetcher.is_enabled)
-    {
-        step_object_fetcher_single_dot();
-
-        if (object_fetcher.previous_step == PixelSliceFetcherStep::PushPixels)
+        if (!object_fetcher.is_enabled)
         {
-            if (is_object_display_enabled() && is_next_object_hit())
-                step_object_fetcher_single_dot();
-            else
-            {
-                background_fetcher.is_enabled = true;
-                object_fetcher.is_enabled = false;
-            }
+            object_fetcher.is_enabled = is_next_object_hit();
+        }
+        else if (background_fetcher.is_enabled && background_fetcher.current_step == PixelSliceFetcherStep::PushPixels &&
+            !background_pixel_queue.is_empty())
+        {
+            background_fetcher.is_enabled = false;
         }
     }
+        
+    if (background_fetcher.is_enabled)
+        step_background_fetcher_single_dot();
+    else
+        step_object_fetcher_single_dot();
 }
 
 void PixelProcessingUnit::step_background_fetcher_single_dot()
 {
-    background_fetcher.previous_step = background_fetcher.current_step;
-
     switch (background_fetcher.current_step)
     {
         case PixelSliceFetcherStep::GetTileId:
@@ -499,6 +514,7 @@ void PixelProcessingUnit::step_background_fetcher_single_dot()
                 background_fetcher.tile_id = video_ram[background_fetcher.tile_id_address];
                 background_fetcher.current_step = PixelSliceFetcherStep::GetTileRowLow;
             }
+            background_fetcher.is_in_first_dot_of_current_step = !background_fetcher.is_in_first_dot_of_current_step;
             break;
         case PixelSliceFetcherStep::GetTileRowLow:
             if (background_fetcher.is_in_first_dot_of_current_step)
@@ -508,6 +524,7 @@ void PixelProcessingUnit::step_background_fetcher_single_dot()
                 background_fetcher.tile_row_low = video_ram[background_fetcher.tile_row_address];
                 background_fetcher.current_step = PixelSliceFetcherStep::GetTileRowHigh;
             }
+            background_fetcher.is_in_first_dot_of_current_step = !background_fetcher.is_in_first_dot_of_current_step;
             break;
         case PixelSliceFetcherStep::GetTileRowHigh:
             if (background_fetcher.is_in_first_dot_of_current_step)
@@ -521,18 +538,16 @@ void PixelProcessingUnit::step_background_fetcher_single_dot()
 
                 background_fetcher.current_step = PixelSliceFetcherStep::PushPixels;
             }
-            break;
-        case PixelSliceFetcherStep::PushPixels:
-            if (!background_pixel_queue.is_empty())
-                break;
-
-            background_pixel_queue.load_new_tile_row(background_fetcher.tile_row);
-            background_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
+            background_fetcher.is_in_first_dot_of_current_step = !background_fetcher.is_in_first_dot_of_current_step;
             break;
     }
 
-    if (background_fetcher.previous_step != PixelSliceFetcherStep::PushPixels)
-        background_fetcher.is_in_first_dot_of_current_step = !background_fetcher.is_in_first_dot_of_current_step;
+    if (background_fetcher.current_step == PixelSliceFetcherStep::PushPixels && background_pixel_queue.is_empty())
+    {
+        background_pixel_queue.load_new_tile_row(background_fetcher.tile_row);
+        background_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
+        step_background_fetcher_single_dot();
+    }
 }
 
 void PixelProcessingUnit::set_background_fetcher_tile_id_address()
@@ -574,17 +589,16 @@ void PixelProcessingUnit::set_background_fetcher_tile_row_byte_address(uint8_t o
 
 void PixelProcessingUnit::step_object_fetcher_single_dot()
 {
-    object_fetcher.previous_step = object_fetcher.current_step;
-
     switch (object_fetcher.current_step)
     {
         case PixelSliceFetcherStep::GetTileId:
         {
-            if (object_fetcher.is_in_first_dot_of_current_step)
-                break;
-
-            object_fetcher.tile_id = object_fetcher.get_current_object().tile_index;
-            object_fetcher.current_step = PixelSliceFetcherStep::GetTileRowLow;
+            if (!object_fetcher.is_in_first_dot_of_current_step)
+            {
+                object_fetcher.tile_id = object_fetcher.get_current_object().tile_index;
+                object_fetcher.current_step = PixelSliceFetcherStep::GetTileRowLow;
+            }
+            object_fetcher.is_in_first_dot_of_current_step = !object_fetcher.is_in_first_dot_of_current_step;
             break;
         }
         case PixelSliceFetcherStep::GetTileRowLow:
@@ -595,6 +609,7 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
                 object_fetcher.tile_row_low = get_object_fetcher_tile_row();
                 object_fetcher.current_step = PixelSliceFetcherStep::GetTileRowHigh;
             }
+            object_fetcher.is_in_first_dot_of_current_step = !object_fetcher.is_in_first_dot_of_current_step;
             break;
         case PixelSliceFetcherStep::GetTileRowHigh:
             if (object_fetcher.is_in_first_dot_of_current_step)
@@ -604,24 +619,29 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
                 object_fetcher.tile_row_high = get_object_fetcher_tile_row();
                 object_fetcher.current_step = PixelSliceFetcherStep::PushPixels;
             }
+            object_fetcher.is_in_first_dot_of_current_step = !object_fetcher.is_in_first_dot_of_current_step;
             break;
-        case PixelSliceFetcherStep::PushPixels:
-            for (uint8_t i = 0; i < PIXELS_PER_TILE_ROW; i++)
-            {
-                if (object_pixel_queue[i].colour_index != 0b00)
-                    break;
+    }
 
+    if (object_fetcher.current_step == PixelSliceFetcherStep::PushPixels)
+    {
+        for (uint8_t i = 0; i < PIXELS_PER_TILE_ROW; i++)
+        {
+            if (object_pixel_queue[i].colour_index == 0b00)
+            {
                 object_pixel_queue[i].colour_index = get_pixel_colour_id(object_fetcher, PIXELS_PER_TILE_ROW - 1 - i);
                 object_pixel_queue[i].is_priority_bit_set = is_bit_set(lcd_control_lcdc, 7);
                 object_pixel_queue[i].is_palette_bit_set = is_bit_set(lcd_control_lcdc, 4);
             }
-            object_fetcher.current_object_index++;
-            object_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
-            break;
+        }
+        object_fetcher.current_object_index++;
+        if (!is_object_display_enabled() || !is_next_object_hit())
+        {
+            background_fetcher.is_enabled = true;
+            object_fetcher.is_enabled = false;
+        }
+        object_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
     }
-
-    if (object_fetcher.previous_step != PixelSliceFetcherStep::PushPixels)
-        object_fetcher.is_in_first_dot_of_current_step = !object_fetcher.is_in_first_dot_of_current_step;
 }
 
 void PixelProcessingUnit::set_object_fetcher_tile_row_address(uint8_t offset)
