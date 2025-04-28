@@ -46,7 +46,7 @@ struct MachineCycleOperation
     bool operator==(const MachineCycleOperation &other) const;
 };
 
-template <std::endian E>
+template <std::endian compiling_device_endianness>
 struct RegisterFile;
 
 template <>

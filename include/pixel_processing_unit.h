@@ -93,7 +93,7 @@ struct PixelSliceFetcher
 
 struct ObjectFetcher : PixelSliceFetcher
 {
-    std::vector<ObjectAttributes> current_scanline_selected_objects;
+    std::vector<ObjectAttributes> scanline_selected_objects;
     uint8_t current_object_index{};
 
     void reset_state() override;
@@ -103,7 +103,8 @@ struct ObjectFetcher : PixelSliceFetcher
 struct BackgroundFetcher : PixelSliceFetcher
 {
     FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
-    int current_scanline_pixels_to_discard_count{-1};
+    uint8_t scanline_pixels_to_discard_from_dummy_fetch_count{8};
+    int scanline_pixels_to_discard_from_scrolling_count{-1};
     uint16_t tile_id_address{};
     std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
@@ -223,7 +224,7 @@ private:
     bool is_in_first_scanline_after_enable{};
     bool is_in_first_dot_of_current_step{true};
     bool is_window_enabled_for_scanline{};
-    bool did_horizontal_blank_end_last_machine_cycle{};
+    bool did_line_end_this_machine_cycle{};
     bool are_stat_interrupts_blocked{};
     bool did_spurious_stat_interrupt_occur{};
 

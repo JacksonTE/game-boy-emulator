@@ -112,8 +112,8 @@ void CentralProcessingUnit::step_single_instruction()
 
         fetch_next_instruction();
     }
-
     service_interrupt();
+
     if (interrupt_master_enable_ime == InterruptMasterEnableState::WillEnable)
         interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
 }

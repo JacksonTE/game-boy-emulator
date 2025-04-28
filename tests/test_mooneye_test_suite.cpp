@@ -21,8 +21,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
     {
         // skipping files that don't currently pass for now - TODO remove when they pass
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
-            entry.path().filename() != "unused_hwio-GS.gb" &&
-            entry.path().filename() != "intr_2_mode0_timing_sprites.gb")
+            entry.path().filename() != "unused_hwio-GS.gb")
         {
             test_rom_paths.push_back(entry.path());
         }
