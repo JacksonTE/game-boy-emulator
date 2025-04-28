@@ -225,8 +225,10 @@ private:
     bool is_in_first_dot_of_current_step{true};
     bool is_window_enabled_for_scanline{};
     bool did_line_end_this_machine_cycle{};
+    bool were_interrupts_handled_early{};
     bool are_stat_interrupts_blocked{};
     bool did_spurious_stat_interrupt_occur{};
+
 
     PixelPisoShiftRegisters<BackgroundPixel> background_pixel_queue{true};
     PixelPisoShiftRegisters<ObjectPixel> object_pixel_queue{false};

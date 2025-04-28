@@ -23,7 +23,7 @@ void Timer::reset_state()
 void Timer::set_post_boot_state()
 {
     reset_state();
-    system_counter = 0xabc4; // TODO verify that the 0xc4 portion is correct
+    system_counter = 0xabc4;
 }
 
 void Timer::step_single_machine_cycle()

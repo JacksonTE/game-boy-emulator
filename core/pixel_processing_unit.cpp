@@ -181,7 +181,7 @@ void PixelProcessingUnit::reset_state()
 
 void PixelProcessingUnit::set_post_boot_state()
 {
-    reset_state(); // TODO confirm what mode it should be in
+    reset_state();
     lcd_control_lcdc = 0x91;
     lcd_status_stat = 0x85;
     object_attribute_memory_direct_memory_access_dma = 0xff;
@@ -191,6 +191,7 @@ void PixelProcessingUnit::set_post_boot_state()
 void PixelProcessingUnit::step_single_machine_cycle()
 {
     previous_mode = current_mode;
+    were_interrupts_handled_early = false;
 
     const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
     if (!is_lcd_enable_bit_set)
@@ -207,6 +208,13 @@ void PixelProcessingUnit::step_single_machine_cycle()
                 break;
             case PixelProcessingUnitMode::PixelTransfer:
                 step_pixel_transfer_single_dot();
+
+                if (current_mode != PixelProcessingUnitMode::PixelTransfer && i != 3)
+                {
+                    trigger_lcd_status_stat_interrupts();
+                    previous_mode = current_mode;
+                    were_interrupts_handled_early = true;
+                }
                 break;
             case PixelProcessingUnitMode::HorizontalBlank:
                 step_horizontal_blank_single_dot();
@@ -215,11 +223,9 @@ void PixelProcessingUnit::step_single_machine_cycle()
                 step_vertical_blank_single_dot();
                 break;
         }
-
-        if (current_mode != previous_mode && i != 3)
-            previous_mode = current_mode;
     }
-    trigger_lcd_status_stat_interrupts();
+    if (!were_interrupts_handled_early)
+        trigger_lcd_status_stat_interrupts();
 
     if (did_spurious_stat_interrupt_occur)
     {
@@ -289,7 +295,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 
     if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode && // TODO update math based on lx being 8 higher?
         is_window_enabled_for_scanline &&
-        lcd_internal_x_coordinate_lx >= window_x_position_plus_7_wx - 7 &&
+        static_cast<int8_t>(lcd_internal_x_coordinate_lx) - 8 >= window_x_position_plus_7_wx - 7 &&
         window_x_position_plus_7_wx != 0)
     {
         background_pixel_queue.clear();
