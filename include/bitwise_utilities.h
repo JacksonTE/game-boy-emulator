@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace GameBoy
 {
 
@@ -30,6 +32,14 @@ inline void update_flag(T &variable, T flag_mask, bool new_flag_state)
     variable = new_flag_state
         ? (variable | flag_mask)
         : (variable & ~flag_mask);
+}
+
+inline uint8_t get_byte_horizontally_flipped(uint8_t byte)
+{
+    byte = ((byte & 0b11110000) >> 4) | ((byte & 0b00001111) << 4);
+    byte = ((byte & 0b11001100) >> 2) | ((byte & 0b00110011) << 2);
+    byte = ((byte & 0b10101010) >> 1) | ((byte & 0b01010101) << 1);
+    return byte;
 }
 
 } // namespace GameBoy

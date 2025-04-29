@@ -11,8 +11,8 @@
 namespace GameBoy
 {
 
-constexpr uint8_t INTERRUPT_FLAG_LCD_STATUS_MASK = 1 << 1;
-constexpr uint8_t INTERRUPT_FLAG_VBLANK_MASK = 1 << 0;
+constexpr uint8_t INTERRUPT_FLAG_STAT_MASK = 1 << 1;
+constexpr uint8_t INTERRUPT_FLAG_VERTICAL_BLANK_MASK = 1 << 0;
 
 constexpr uint16_t VIDEO_RAM_SIZE = 0x2000;
 constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 0x00a0;
@@ -26,7 +26,7 @@ constexpr uint8_t MAX_OBJECTS_PER_LINE = 10;
 
 constexpr uint8_t OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS = 80;
 constexpr uint16_t SCAN_LINE_DURATION_DOTS = 456;
-constexpr uint16_t FINAL_DRAWING_SCAN_LINE = 143;
+constexpr uint16_t FIRST_VERTICAL_BLANK_LINE = 144;
 constexpr uint16_t FINAL_FRAME_SCAN_LINE = 153;
 
 enum class PixelProcessingUnitEnableStatus
@@ -82,7 +82,6 @@ struct PixelSliceFetcher
 {
     PixelSliceFetcherStep current_step{PixelSliceFetcherStep::GetTileId};
     uint8_t tile_id{};
-    uint16_t tile_row_address{};
     uint8_t tile_row_low{};
     uint8_t tile_row_high{};
     bool is_in_first_dot_of_current_step{true};
@@ -91,21 +90,9 @@ struct PixelSliceFetcher
     virtual void reset_state();
 };
 
-struct ObjectFetcher : PixelSliceFetcher
-{
-    std::vector<ObjectAttributes> scanline_selected_objects;
-    uint8_t current_object_index{};
-
-    void reset_state() override;
-    ObjectAttributes get_current_object() const;
-};
-
 struct BackgroundFetcher : PixelSliceFetcher
 {
     FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
-    uint8_t scanline_pixels_to_discard_from_dummy_fetch_count{8};
-    int scanline_pixels_to_discard_from_scrolling_count{-1};
-    uint16_t tile_id_address{};
     std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
     void reset_state() override;
@@ -123,9 +110,8 @@ public:
     void load_new_tile_row(std::array<T, PIXELS_PER_TILE_ROW> new_entries)
     {
         if (is_tracking_size)
-        {
             current_size = PIXELS_PER_TILE_ROW;
-        }
+
         entries = new_entries;
     }
 
@@ -150,9 +136,8 @@ public:
 
     void clear() {
         if (is_tracking_size)
-        {
             current_size = 0;
-        }
+
         entries.fill(T{});
     }
 
@@ -220,42 +205,45 @@ private:
     PixelProcessingUnitMode previous_mode{PixelProcessingUnitMode::HorizontalBlank};
     PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
     uint16_t current_scanline_dot_number{};
-    uint8_t stat_value_after_spurious_interrupt{};
     bool is_in_first_scanline_after_enable{};
     bool is_in_first_dot_of_current_step{true};
     bool is_window_enabled_for_scanline{};
-    bool did_line_end_this_machine_cycle{};
-    bool were_interrupts_handled_early{};
-    bool are_stat_interrupts_blocked{};
+
+    uint8_t stat_value_after_spurious_interrupt{};
     bool did_spurious_stat_interrupt_occur{};
+    bool were_stat_interrupts_handled_early{};
+    bool are_stat_interrupts_blocked{};
+    bool did_line_end_during_this_machine_cycle{};
 
+    std::vector<ObjectAttributes> scanline_selected_objects;
+    uint8_t current_object_index{};
+    
+    uint8_t scanline_pixels_to_discard_from_dummy_fetch_count{8};
+    int scanline_pixels_to_discard_from_scrolling_count{-1};
 
-    PixelPisoShiftRegisters<BackgroundPixel> background_pixel_queue{true};
-    PixelPisoShiftRegisters<ObjectPixel> object_pixel_queue{false};
-    ObjectFetcher object_fetcher{};
     BackgroundFetcher background_fetcher{};
+    PixelSliceFetcher object_fetcher{};
+    
+    PixelPisoShiftRegisters<BackgroundPixel> background_pixel_shift_registers{true};
+    PixelPisoShiftRegisters<ObjectPixel> object_pixel_shift_registers{false};
 
     void step_object_attribute_memory_scan_single_dot();
     void step_pixel_transfer_single_dot();
     void step_horizontal_blank_single_dot();
     void step_vertical_blank_single_dot();
-    void trigger_lcd_status_stat_interrupts();
+    void trigger_stat_interrupts();
 
     void initialize_pixel_transfer();
     void step_fetchers_single_dot();
 
     void step_background_fetcher_single_dot();
-    void set_background_fetcher_tile_id_address();
-    void set_background_fetcher_tile_row_byte_address(uint8_t offset);
+    uint8_t get_background_fetcher_tile_id();
+    uint8_t get_background_fetcher_tile_row_byte(uint8_t offset);
 
     void step_object_fetcher_single_dot();
-    void set_object_fetcher_tile_row_address(uint8_t offset);
-    uint8_t get_object_fetcher_tile_row();
+    uint8_t get_object_fetcher_tile_row_byte(uint8_t offset);
 
-    bool is_object_display_enabled() const;
-    bool is_next_object_hit() const;
-
-    uint8_t get_byte_horizontally_flipped(uint8_t byte);
+    ObjectAttributes get_current_object() const;
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
 };
 
