@@ -23,7 +23,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
             entry.path().filename() != "unused_hwio-GS.gb" &&
             (directory.filename() != "acceptance" ||
              //entry.path().filename() == "add_sp_e_timing.gb" ||
-             //entry.path().filename() == "boot_div-dmgABCmgb.gb" ||
+             entry.path().filename() == "boot_div-dmgABCmgb.gb" ||
              //entry.path().filename() == "boot_hwio-dmgABCmgb.gb" ||
              entry.path().filename() == "boot_regs-dmgABC.gb" ||
              //entry.path().filename() == "call_cc_timing.gb" ||

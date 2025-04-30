@@ -48,6 +48,7 @@ CentralProcessingUnit::CentralProcessingUnit(std::function<void(MachineCycleOper
     : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
       memory_management_unit{memory_management_unit_reference}
 {
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
 }
 
 void CentralProcessingUnit::reset_state()
