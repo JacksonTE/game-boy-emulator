@@ -32,7 +32,7 @@ public:
 private:
     Timer timer;
     PixelProcessingUnit pixel_processing_unit;
-    std::unique_ptr<MemoryManagementUnit> memory_interface;
+    std::unique_ptr<MemoryManagementUnit> memory_management_unit;
     CentralProcessingUnit central_processing_unit;
 
     void step_components_single_machine_cycle();

@@ -19,9 +19,42 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
 
     for (const auto &entry : std::filesystem::directory_iterator(directory))
     {
-        // skipping files that don't currently pass for now - TODO remove when they pass
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
-            entry.path().filename() != "unused_hwio-GS.gb")
+            entry.path().filename() != "unused_hwio-GS.gb" &&
+            (directory.filename() != "acceptance" ||
+             //entry.path().filename() == "add_sp_e_timing.gb" ||
+             //entry.path().filename() == "boot_div-dmgABCmgb.gb" ||
+             //entry.path().filename() == "boot_hwio-dmgABCmgb.gb" ||
+             entry.path().filename() == "boot_regs-dmgABC.gb" ||
+             //entry.path().filename() == "call_cc_timing.gb" ||
+             //entry.path().filename() == "call_cc_timing2.gb" ||
+             //entry.path().filename() == "call_timing.gb" ||
+             //entry.path().filename() == "call_timing2.gb" ||
+             entry.path().filename() == "di_timing-GS.gb" ||
+             entry.path().filename() == "div_timing.gb" ||
+             entry.path().filename() == "ei_sequence.gb" ||
+             entry.path().filename() == "ei_timing.gb" ||
+             entry.path().filename() == "halt_ime0_ei.gb" ||
+             //entry.path().filename() == "halt_ime0_nointr_timing.gb" ||
+             entry.path().filename() == "halt_ime1_timing.gb" ||
+             entry.path().filename() == "halt_ime1_timing2-GS.gb" ||
+             entry.path().filename() == "if_ie_registers.gb" ||
+             entry.path().filename() == "intr_timing.gb" ||
+             //entry.path().filename() == "jp_cc_timing.gb" ||
+             //entry.path().filename() == "jp_timing.gb" ||
+             //entry.path().filename() == "ld_hl_sp_e_timing.gb" ||
+             //entry.path().filename() == "oam_dma_restart.gb" ||
+             //entry.path().filename() == "oam_dma_start.gb" ||
+             //entry.path().filename() == "oam_dma_timing.gb" ||
+             entry.path().filename() == "pop_timing.gb" ||
+             //entry.path().filename() == "push_timing.gb" ||
+             entry.path().filename() == "rapid_di_ei.gb"
+             //entry.path().filename() == "ret_cc_timing.gb" ||
+             //entry.path().filename() == "ret_timing.gb" ||
+             //entry.path().filename() == "reti_intr_timing.gb" ||
+             //entry.path().filename() == "reti_timing.gb" ||
+             //entry.path().filename() == "rst_timing.gb"
+             ))
         {
             test_rom_paths.push_back(entry.path());
         }
@@ -96,6 +129,19 @@ INSTANTIATE_TEST_SUITE_P
 
 INSTANTIATE_TEST_SUITE_P
 (
+    MooneyeAcceptanceTestsObjectAttributeMemoryDirectMemoryAccess,
+    MooneyeTest,
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "oam_dma")),
+    [](auto info)
+    {
+        std::string test_rom_file_name = info.param.stem().string();
+        std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), '-', '_');
+        return test_rom_file_name;
+    }
+);
+
+INSTANTIATE_TEST_SUITE_P
+(
     MooneyeAcceptanceTestsPixelProcessingUnit,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "ppu")),
@@ -113,4 +159,17 @@ INSTANTIATE_TEST_SUITE_P
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "timer")),
     [](auto info) { return info.param.stem().string(); }
+);
+
+INSTANTIATE_TEST_SUITE_P
+(
+    MooneyeAcceptanceTestsMiscellaneous,
+    MooneyeTest,
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path())),
+    [](auto info)
+    {
+        std::string test_rom_file_name = info.param.stem().string();
+        std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), '-', '_');
+        return test_rom_file_name;
+    }
 );

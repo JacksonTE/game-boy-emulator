@@ -140,18 +140,17 @@ class CentralProcessingUnit
 public:
     CentralProcessingUnit(std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference);
 
-    RegisterFile<std::endian::native> get_register_file() const;
-    void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
-
     void reset_state();
     void set_post_boot_state();
 
+    RegisterFile<std::endian::native> get_register_file() const;
+    void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
+
     void step_single_instruction();
-    void step_single_machine_cycle();
 
 private:
     std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle_callback;
-    MemoryManagementUnit &memory_interface;
+    MemoryManagementUnit &memory_management_unit;
     RegisterFile<std::endian::native> register_file;
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
     uint8_t instruction_register_ir{};

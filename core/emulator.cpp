@@ -12,8 +12,8 @@ namespace GameBoy
 Emulator::Emulator()
     : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-      memory_interface{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
-      central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle(); }, *memory_interface}
+      memory_management_unit{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
+      central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle(); }, *memory_management_unit}
 {
 }
 
@@ -21,7 +21,7 @@ void Emulator::reset_state()
 {
     timer.reset_state();
     pixel_processing_unit.reset_state();
-    memory_interface->reset_state();
+    memory_management_unit->reset_state();
     central_processing_unit.reset_state();
 }
 
@@ -29,7 +29,7 @@ void Emulator::set_post_boot_state()
 {
     timer.set_post_boot_state();
     pixel_processing_unit.set_post_boot_state();
-    memory_interface->set_post_boot_state();
+    memory_management_unit->set_post_boot_state();
     central_processing_unit.set_post_boot_state();
 }
 
@@ -40,22 +40,22 @@ bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    print_bytes_in_range(*memory_interface, start_address, end_address);
+    print_bytes_in_range(*memory_management_unit, start_address, end_address);
 }
 
 bool Emulator::try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
 {
-    return memory_interface->try_load_file(number_of_bytes_to_load, file_path, is_bootrom_file);
+    return memory_management_unit->try_load_file(number_of_bytes_to_load, file_path, is_bootrom_file);
 }
 
 uint8_t Emulator::read_byte_from_memory(uint16_t address) const
 {
-    return memory_interface->read_byte(address);
+    return memory_management_unit->read_byte(address, false);
 }
 
 void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 {
-    memory_interface->write_byte(address, value);
+    memory_management_unit->write_byte(address, value, false);
 }
 
 RegisterFile<std::endian::native> Emulator::get_register_file() const
@@ -77,11 +77,12 @@ void Emulator::step_components_single_machine_cycle()
 {
     timer.step_single_machine_cycle();
     pixel_processing_unit.step_single_machine_cycle();
+    memory_management_unit->step_single_machine_cycle();
 }
 
 void Emulator::request_interrupt(uint8_t interrupt_flag_mask)
 {
-    memory_interface->request_interrupt(interrupt_flag_mask);
+    memory_management_unit->request_interrupt(interrupt_flag_mask);
 }
 
 } // namespace GameBoy

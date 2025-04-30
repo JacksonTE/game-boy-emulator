@@ -168,12 +168,12 @@ public:
         std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
     }
 
-    uint8_t read_byte(uint16_t address) const override
+    uint8_t read_byte(uint16_t address, bool _ = false) const override
     {
         return flat_memory[address];
     }
 
-    void write_byte(uint16_t address, uint8_t value) override
+    void write_byte(uint16_t address, uint8_t value, bool _ = false) override
     {
         flat_memory[address] = value;
     }
@@ -198,15 +198,15 @@ class SingleInstructionTest : public testing::TestWithParam<std::filesystem::pat
 {
 protected:
     std::vector<GameBoy::MachineCycleOperation> machine_cycle_operations;
-    std::unique_ptr<SingleInstructionTestMemory> memory_interface;
+    std::unique_ptr<SingleInstructionTestMemory> memory_management_unit;
     GameBoy::CentralProcessingUnit game_boy_central_processing_unit;
 
     SingleInstructionTest()
-        : memory_interface{std::make_unique<SingleInstructionTestMemory>()},
+        : memory_management_unit{std::make_unique<SingleInstructionTestMemory>()},
           game_boy_central_processing_unit
           {
               [this](GameBoy::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); },
-              *memory_interface
+              *memory_management_unit
           }
     { 
     }
@@ -214,12 +214,12 @@ protected:
     void set_initial_values(const SingleInstructionTestCase &test_case)
     {
         machine_cycle_operations.clear();
-        memory_interface->reset_state();
+        memory_management_unit->reset_state();
         game_boy_central_processing_unit.reset_state();
 
         for (const std::pair<uint16_t, uint8_t> &pair : test_case.initial_ram_address_value_pairs)
         {
-            memory_interface->write_byte(pair.first, pair.second);
+            memory_management_unit->write_byte(pair.first, pair.second);
         }
         game_boy_central_processing_unit.set_register_file_state(test_case.initial_register_values);
     }
@@ -255,7 +255,7 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
 
         for (const std::pair<uint16_t, uint8_t> &expected_pair : test_case.expected_ram_address_value_pairs)
         {
-            EXPECT_EQ(memory_interface->read_byte(expected_pair.first), expected_pair.second);
+            EXPECT_EQ(memory_management_unit->read_byte(expected_pair.first), expected_pair.second);
         }
 
         // Compare expected_memory_interactions size against machine_cycle_operations.size()-1 since 

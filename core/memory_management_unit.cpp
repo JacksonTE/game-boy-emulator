@@ -44,31 +44,31 @@ void MemoryManagementUnit::reset_state()
 void MemoryManagementUnit::set_post_boot_state()
 {
     bootrom_status = 1;
-    write_byte(0xff00, 0xcf);
-    write_byte(0xff01, 0x00);
-    write_byte(0xff02, 0x7e);
+    write_byte(0xff00, 0xcf, false);
+    write_byte(0xff01, 0x00, false);
+    write_byte(0xff02, 0x7e, false);
     interrupt_flag_if = 0xe1;
-    write_byte(0xff10, 0x80);
-    write_byte(0xff11, 0xbf);
-    write_byte(0xff12, 0xf3);
-    write_byte(0xff13, 0xff);
-    write_byte(0xff14, 0xbf);
-    write_byte(0xff16, 0x3f);
-    write_byte(0xff17, 0x00);
-    write_byte(0xff18, 0xff);
-    write_byte(0xff19, 0xbf);
-    write_byte(0xff1a, 0x7f);
-    write_byte(0xff1b, 0xff);
-    write_byte(0xff1c, 0x9f);
-    write_byte(0xff1d, 0xff);
-    write_byte(0xff1e, 0xbf);
-    write_byte(0xff20, 0xff);
-    write_byte(0xff21, 0x00);
-    write_byte(0xff22, 0x00);
-    write_byte(0xff23, 0xbf);
-    write_byte(0xff24, 0x77);
-    write_byte(0xff25, 0xf3);
-    write_byte(0xff26, 0xf1);
+    write_byte(0xff10, 0x80, false);
+    write_byte(0xff11, 0xbf, false);
+    write_byte(0xff12, 0xf3, false);
+    write_byte(0xff13, 0xff, false);
+    write_byte(0xff14, 0xbf, false);
+    write_byte(0xff16, 0x3f, false);
+    write_byte(0xff17, 0x00, false);
+    write_byte(0xff18, 0xff, false);
+    write_byte(0xff19, 0xbf, false);
+    write_byte(0xff1a, 0x7f, false);
+    write_byte(0xff1b, 0xff, false);
+    write_byte(0xff1c, 0x9f, false);
+    write_byte(0xff1d, 0xff, false);
+    write_byte(0xff1e, 0xbf, false);
+    write_byte(0xff20, 0xff, false);
+    write_byte(0xff21, 0x00, false);
+    write_byte(0xff22, 0x00, false);
+    write_byte(0xff23, 0xbf, false);
+    write_byte(0xff24, 0x77, false);
+    write_byte(0xff25, 0xf3, false);
+    write_byte(0xff26, 0xf1, false);
     interrupt_enable_ie = 0x00;
 }
 
@@ -126,7 +126,7 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
     return was_file_load_successful;
 }
 
-uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
+uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam_dma) const
 {
     if (bootrom_status == 0 && address < BOOTROM_SIZE)
     {
@@ -151,7 +151,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
     }
     else if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
     {
-        return pixel_processing_unit.read_byte_video_ram(address);
+        return pixel_processing_unit.read_byte_video_ram(address, is_access_for_oam_dma);
     }
     else if (address >= EXTERNAL_RAM_START && address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
     {
@@ -231,7 +231,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address) const
         return interrupt_enable_ie;
 }
 
-void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
+void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_access_for_oam_dma)
 {
     if (address >= ROM_BANK_00_START && address < ROM_BANK_00_START + ROM_BANK_SIZE)
     {
@@ -308,6 +308,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
                 return;
             case 0xff46:
                 pixel_processing_unit.object_attribute_memory_direct_memory_access_dma = value;
+                is_oam_dma_starting = true;
                 return;
             case 0xff47:
                 pixel_processing_unit.background_palette_bgp = value;
@@ -333,13 +334,39 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value)
                 return;
         }
     }
-    else if (address >= HIGH_RAM_START && address < HIGH_RAM_START + HIGH_RAM_SIZE)
+    else if (HIGH_RAM_START && address < HIGH_RAM_START + HIGH_RAM_SIZE)
     {
         const uint16_t local_address = address - HIGH_RAM_START;
         high_ram[local_address] = value;
     }
     else
         interrupt_enable_ie = value;
+}
+
+void MemoryManagementUnit::step_single_machine_cycle()
+{
+    if (pixel_processing_unit.is_oam_dma_in_progress)
+    {
+        const uint16_t destination_address = OBJECT_ATTRIBUTE_MEMORY_START + oam_dma_machine_cycles_elapsed;
+        const uint16_t source_address = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
+        const uint8_t byte_to_copy = read_byte(source_address, true);
+        write_byte(destination_address, byte_to_copy, true);
+
+        if (++oam_dma_machine_cycles_elapsed == OAM_DMA_MACHINE_CYCLE_DURATION)
+            pixel_processing_unit.is_oam_dma_in_progress = false;
+    }
+
+    if (is_oam_dma_starting)
+    {
+        oam_dma_source_address_base = pixel_processing_unit.object_attribute_memory_direct_memory_access_dma << 8;
+        if (oam_dma_source_address_base >= 0xfe00)
+        {
+            oam_dma_source_address_base -= 0x2000;
+        }
+        oam_dma_machine_cycles_elapsed = 0;
+        is_oam_dma_starting = false;
+        pixel_processing_unit.is_oam_dma_in_progress = true;
+    }
 }
 
 void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask)

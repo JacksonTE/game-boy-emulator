@@ -28,7 +28,7 @@ inline void print_bytes_in_range(MemoryManagementUnit &memory_management_unit, u
                 std::cout << "   ";
         }
 
-        std::cout << std::setw(2) << static_cast<int>(memory_management_unit.read_byte(address)) << " ";
+        std::cout << std::setw(2) << static_cast<int>(memory_management_unit.read_byte(address, false)) << " ";
 
         if ((address + 1) % 0x10 == 0)
             std::cout << "\n";

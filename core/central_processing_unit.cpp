@@ -46,24 +46,8 @@ bool MachineCycleOperation::operator==(const MachineCycleOperation &other) const
 
 CentralProcessingUnit::CentralProcessingUnit(std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference)
     : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
-      memory_interface{memory_management_unit_reference}
+      memory_management_unit{memory_management_unit_reference}
 {
-}
-
-RegisterFile<std::endian::native> CentralProcessingUnit::get_register_file() const
-{
-    return register_file;
-}
-
-void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endian::native> &new_register_values)
-{
-    register_file.a = new_register_values.a;
-    register_file.flags = new_register_values.flags & 0xf0; // Lower nibble of flags must always be zeroed
-    register_file.bc = new_register_values.bc;
-    register_file.de = new_register_values.de;
-    register_file.hl = new_register_values.hl;
-    register_file.program_counter = new_register_values.program_counter;
-    register_file.stack_pointer = new_register_values.stack_pointer;
 }
 
 void CentralProcessingUnit::reset_state()
@@ -85,7 +69,7 @@ void CentralProcessingUnit::set_post_boot_state()
     uint8_t header_checksum = 0;
     for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
     {
-        header_checksum -= memory_interface.read_byte(BOOTROM_SIZE + address) - 1;
+        header_checksum -= memory_management_unit.read_byte(BOOTROM_SIZE + address, false) - 1;
     }
     update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, header_checksum != 0);
     update_flag(register_file.flags, FLAG_CARRY_MASK, header_checksum != 0);
@@ -97,6 +81,22 @@ void CentralProcessingUnit::set_post_boot_state()
     register_file.l = 0x4d;
     register_file.program_counter = 0x100;
     register_file.stack_pointer = 0xfffe;
+}
+
+RegisterFile<std::endian::native> CentralProcessingUnit::get_register_file() const
+{
+    return register_file;
+}
+
+void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endian::native> &new_register_values)
+{
+    register_file.a = new_register_values.a;
+    register_file.flags = new_register_values.flags & 0xf0; // Lower nibble of flags must always be zeroed
+    register_file.bc = new_register_values.bc;
+    register_file.de = new_register_values.de;
+    register_file.hl = new_register_values.hl;
+    register_file.program_counter = new_register_values.program_counter;
+    register_file.stack_pointer = new_register_values.stack_pointer;
 }
 
 void CentralProcessingUnit::step_single_instruction()
@@ -129,7 +129,7 @@ void CentralProcessingUnit::fetch_next_instruction()
 
 void CentralProcessingUnit::service_interrupt()
 {
-    bool is_interrupt_pending = (memory_interface.get_pending_interrupt_mask() != 0);
+    bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
     if (is_interrupt_pending && is_halted)
         is_halted = false;
 
@@ -139,10 +139,10 @@ void CentralProcessingUnit::service_interrupt()
     decrement_and_step_emulator_components(register_file.program_counter);
     decrement_and_step_emulator_components(register_file.stack_pointer);
     write_byte_and_step_emulator_components(register_file.stack_pointer--, register_file.program_counter >> 8);
-    uint8_t interrupt_flag_mask = memory_interface.get_pending_interrupt_mask();
+    uint8_t interrupt_flag_mask = memory_management_unit.get_pending_interrupt_mask();
     write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xff);
 
-    memory_interface.clear_interrupt_flag_bit(interrupt_flag_mask);
+    memory_management_unit.clear_interrupt_flag_bit(interrupt_flag_mask);
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
     register_file.program_counter = (interrupt_flag_mask == 0x00)
         ? 0x00
@@ -154,13 +154,13 @@ void CentralProcessingUnit::service_interrupt()
 uint8_t CentralProcessingUnit::read_byte_and_step_emulator_components(uint16_t address)
 {
     emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Read, address});
-    return memory_interface.read_byte(address);
+    return memory_management_unit.read_byte(address, false);
 }
 
 void CentralProcessingUnit::write_byte_and_step_emulator_components(uint16_t address, uint8_t value)
 {
     emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::Write, address, value});
-    memory_interface.write_byte(address, value);
+    memory_management_unit.write_byte(address, value, false);
 }
 
 uint8_t CentralProcessingUnit::fetch_immediate8_and_step_emulator_components()

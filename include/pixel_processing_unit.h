@@ -170,7 +170,12 @@ public:
     uint8_t window_y_position_wy{};
     uint8_t window_x_position_plus_7_wx{};
 
+    bool is_oam_dma_in_progress{};
+
     PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt);
+
+    void reset_state();
+    void set_post_boot_state();
 
     uint8_t read_lcd_control_lcdc() const;
     void write_lcd_control_lcdc(uint8_t value);
@@ -180,14 +185,12 @@ public:
 
     uint8_t read_lcd_y_coordinate_ly() const;
 
-    uint8_t read_byte_video_ram(uint16_t memory_address) const;
+    uint8_t read_byte_video_ram(uint16_t memory_address, bool is_access_for_oam_dma) const;
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
 
     uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
     void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value);
 
-    void reset_state();
-    void set_post_boot_state();
     void step_single_machine_cycle();
 
 private:
@@ -242,6 +245,8 @@ private:
 
     void step_object_fetcher_single_dot();
     uint8_t get_object_fetcher_tile_row_byte(uint8_t offset);
+
+    uint8_t read_byte_object_attribute_memory_internally(uint16_t memory_address) const;
 
     ObjectAttributes get_current_object() const;
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;

@@ -39,6 +39,51 @@ PixelProcessingUnit::PixelProcessingUnit(std::function<void(uint8_t)> request_in
     background_fetcher.reset_state();
 }
 
+void PixelProcessingUnit::reset_state()
+{
+    std::fill_n(video_ram.get(), VIDEO_RAM_SIZE, 0);
+    std::fill_n(video_ram.get(), OBJECT_ATTRIBUTE_MEMORY_SIZE, 0);
+
+    lcd_control_lcdc = 0;
+    lcd_status_stat = 0b10000000;
+    lcd_y_coordinate_ly = 0;
+    lcd_internal_x_coordinate_lx = 0;
+    window_internal_line_counter_wly = 0;
+
+    previous_mode = PixelProcessingUnitMode::HorizontalBlank;
+    current_mode = PixelProcessingUnitMode::HorizontalBlank;
+    current_scanline_dot_number = 0;
+    is_in_first_scanline_after_enable = false;
+    is_in_first_dot_of_current_step = true;
+    is_window_enabled_for_scanline = false;
+
+    stat_value_after_spurious_interrupt = 0;
+    did_spurious_stat_interrupt_occur = false;
+    are_stat_interrupts_blocked = false;
+    did_line_end_during_this_machine_cycle = false;
+
+    scanline_selected_objects.clear();
+    current_object_index = 0;
+
+    scanline_pixels_to_discard_from_dummy_fetch_count = 8;
+    scanline_pixels_to_discard_from_scrolling_count = -1;
+
+    background_fetcher.reset_state();
+    object_fetcher.reset_state();
+
+    background_pixel_shift_registers.clear();
+    object_pixel_shift_registers.clear();
+}
+
+void PixelProcessingUnit::set_post_boot_state()
+{
+    reset_state();
+    lcd_control_lcdc = 0x91;
+    lcd_status_stat = 0x85;
+    object_attribute_memory_direct_memory_access_dma = 0xff;
+    background_palette_bgp = 0xfc;
+}
+
 uint8_t PixelProcessingUnit::read_lcd_control_lcdc() const
 {
     return lcd_control_lcdc;
@@ -90,9 +135,10 @@ uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const
     return lcd_y_coordinate_ly;
 }
 
-uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
+uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address, bool is_access_for_oam_dma) const
 {
-    if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+    if (!is_access_for_oam_dma &&
+        previous_mode == PixelProcessingUnitMode::PixelTransfer ||
         (previous_mode != PixelProcessingUnitMode::HorizontalBlank &&
          current_mode == PixelProcessingUnitMode::PixelTransfer))
     {
@@ -113,9 +159,9 @@ void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t 
 
 uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const
 {
-    if ((previous_mode != PixelProcessingUnitMode::HorizontalBlank ||
-         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan) &&
-        current_mode != PixelProcessingUnitMode::VerticalBlank)
+    if ((is_oam_dma_in_progress ||
+         (current_mode != PixelProcessingUnitMode::VerticalBlank &&
+          (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || previous_mode != PixelProcessingUnitMode::HorizontalBlank))))
     {
         return 0xff;
     }
@@ -133,51 +179,6 @@ void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_add
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
     object_attribute_memory[local_address] = value;
-}
-
-void PixelProcessingUnit::reset_state()
-{
-    std::fill_n(video_ram.get(), VIDEO_RAM_SIZE, 0);
-    std::fill_n(video_ram.get(), OBJECT_ATTRIBUTE_MEMORY_SIZE, 0);
-
-    lcd_control_lcdc = 0;
-    lcd_status_stat = 0b10000000;
-    lcd_y_coordinate_ly = 0;
-    lcd_internal_x_coordinate_lx = 0;
-    window_internal_line_counter_wly = 0;
-
-    previous_mode = PixelProcessingUnitMode::HorizontalBlank;
-    current_mode = PixelProcessingUnitMode::HorizontalBlank;
-    current_scanline_dot_number = 0;
-    is_in_first_scanline_after_enable = false;
-    is_in_first_dot_of_current_step = true;
-    is_window_enabled_for_scanline = false;
-
-    stat_value_after_spurious_interrupt = 0;
-    did_spurious_stat_interrupt_occur = false;
-    are_stat_interrupts_blocked = false;
-    did_line_end_during_this_machine_cycle = false;
-
-    scanline_selected_objects.clear();
-    current_object_index = 0;
-
-    scanline_pixels_to_discard_from_dummy_fetch_count = 8;
-    scanline_pixels_to_discard_from_scrolling_count = -1;
-
-    background_fetcher.reset_state();
-    object_fetcher.reset_state();
-
-    background_pixel_shift_registers.clear();
-    object_pixel_shift_registers.clear();
-}
-
-void PixelProcessingUnit::set_post_boot_state()
-{
-    reset_state();
-    lcd_control_lcdc = 0x91;
-    lcd_status_stat = 0x85;
-    object_attribute_memory_direct_memory_access_dma = 0xff;
-    background_palette_bgp = 0xfc;
 }
 
 void PixelProcessingUnit::step_single_machine_cycle()
@@ -205,8 +206,8 @@ void PixelProcessingUnit::step_single_machine_cycle()
                 if (current_mode == PixelProcessingUnitMode::HorizontalBlank && i < DOTS_PER_MACHINE_CYCLE - 1)
                 {
                     trigger_stat_interrupts();
-                    previous_mode = PixelProcessingUnitMode::HorizontalBlank;
                     were_stat_interrupts_handled_early = true;
+                    previous_mode = PixelProcessingUnitMode::HorizontalBlank;
                 }
                 break;
             case PixelProcessingUnitMode::HorizontalBlank:
@@ -238,13 +239,13 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
 
     if (scanline_selected_objects.size() < MAX_OBJECTS_PER_LINE)
     {
-        const uint8_t object_start_index = (2 * current_scanline_dot_number) - 4;
+        const uint8_t object_start_local_address = (2 * current_scanline_dot_number) - 4;
         ObjectAttributes current_object
         {
-            static_cast<int16_t>(object_attribute_memory[object_start_index] - 16),
-            object_attribute_memory[object_start_index + 1],
-            object_attribute_memory[object_start_index + 2],
-            object_attribute_memory[object_start_index + 3],
+            static_cast<int16_t>(read_byte_object_attribute_memory_internally(object_start_local_address) - 16),
+            read_byte_object_attribute_memory_internally(object_start_local_address + 1),
+            read_byte_object_attribute_memory_internally(object_start_local_address + 2),
+            read_byte_object_attribute_memory_internally(object_start_local_address + 3),
         };
 
         const uint8_t object_height = is_bit_set(lcd_control_lcdc, 2) ? 16 : 8;
@@ -286,7 +287,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     else if (current_scanline_dot_number == dot_number_for_dummy_push)
         background_pixel_shift_registers.load_new_tile_row(background_fetcher.tile_row);
 
-    if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode && 
+    if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode &&
         is_window_enabled_for_scanline &&
         static_cast<int8_t>(lcd_internal_x_coordinate_lx) - 8 >= window_x_position_plus_7_wx - 7 &&
         window_x_position_plus_7_wx != 0)
@@ -367,9 +368,7 @@ void PixelProcessingUnit::step_horizontal_blank_single_dot()
     }
     else
     {
-        if (is_in_first_scanline_after_enable)
-            is_in_first_scanline_after_enable = false;
-
+        is_in_first_scanline_after_enable = false;
         scanline_selected_objects.clear();
         current_object_index = 0;
         current_mode = PixelProcessingUnitMode::ObjectAttributeMemoryScan;
@@ -435,7 +434,7 @@ void PixelProcessingUnit::trigger_stat_interrupts()
             break;
     }
     should_stat_interrupt_trigger |= (is_object_attribute_memory_scan_interrupt_select_enabled &&
-                                      lcd_y_coordinate_ly == FIRST_VERTICAL_BLANK_LINE);
+        lcd_y_coordinate_ly == FIRST_VERTICAL_BLANK_LINE);
 
     if (should_stat_interrupt_trigger)
     {
@@ -452,9 +451,9 @@ void PixelProcessingUnit::trigger_stat_interrupts()
 void PixelProcessingUnit::initialize_pixel_transfer()
 {
     lcd_internal_x_coordinate_lx = 0;
-    
+
     is_window_enabled_for_scanline = is_bit_set(lcd_control_lcdc, 5);
-    
+
     scanline_pixels_to_discard_from_dummy_fetch_count = 8;
     scanline_pixels_to_discard_from_scrolling_count = -1;
 
@@ -472,19 +471,18 @@ void PixelProcessingUnit::step_fetchers_single_dot()
     {
         if (!object_fetcher.is_enabled)
         {
-            const bool is_next_object_hit = current_object_index < scanline_selected_objects.size() && 
+            const bool is_next_object_hit = current_object_index < scanline_selected_objects.size() &&
                                             get_current_object().x_position == lcd_internal_x_coordinate_lx;
-            if (is_next_object_hit)
-                object_fetcher.is_enabled = true;
+            object_fetcher.is_enabled = is_next_object_hit;
         }
-        else if (background_fetcher.is_enabled && 
+        else if (background_fetcher.is_enabled &&
                  background_fetcher.current_step == PixelSliceFetcherStep::PushPixels &&
                  !background_pixel_shift_registers.is_empty())
         {
             background_fetcher.is_enabled = false;
         }
     }
-        
+
     if (background_fetcher.is_enabled)
         step_background_fetcher_single_dot();
     else
@@ -567,9 +565,9 @@ uint8_t PixelProcessingUnit::get_background_fetcher_tile_row_byte(uint8_t offset
     {
         tile_row_address |= (1 << 12);
     }
-    tile_row_address |= (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode)
-        ? ((lcd_y_coordinate_ly + viewport_y_position_scy) % 8) << 1
-        : (window_internal_line_counter_wly % 8) << 1;
+    tile_row_address |= ((background_fetcher.fetcher_mode == FetcherMode::BackgroundMode
+        ? lcd_y_coordinate_ly + viewport_y_position_scy
+        : window_internal_line_counter_wly) << 1) & 0b1110;
 
     const uint16_t local_address = tile_row_address - VIDEO_RAM_START;
     return video_ram[local_address];
@@ -635,12 +633,12 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
 uint8_t PixelProcessingUnit::get_object_fetcher_tile_row_byte(uint8_t offset)
 {
     const bool is_flipped_vertically = is_bit_set(get_current_object().flags, 6);
-    const uint8_t tile_row_address_bits_1_to_3 = (lcd_y_coordinate_ly - get_current_object().y_position) % 8;
+    const uint8_t tile_row_address_bits_1_to_3 = lcd_y_coordinate_ly - get_current_object().y_position;
 
     uint16_t tile_row_address = static_cast<uint16_t>((1 << 15) | (object_fetcher.tile_id << 4) | offset);
-    tile_row_address |= is_flipped_vertically
-        ? ~tile_row_address_bits_1_to_3 << 1
-        : tile_row_address_bits_1_to_3 << 1;
+    tile_row_address |= ((is_flipped_vertically
+        ? ~tile_row_address_bits_1_to_3
+        : tile_row_address_bits_1_to_3) << 1) & 0b1110;
 
     const uint16_t local_address = tile_row_address - VIDEO_RAM_START;
     const uint8_t tile_row_byte = video_ram[local_address];
@@ -648,6 +646,14 @@ uint8_t PixelProcessingUnit::get_object_fetcher_tile_row_byte(uint8_t offset)
     return is_bit_set(get_current_object().flags, 5)
         ? get_byte_horizontally_flipped(tile_row_byte)
         : tile_row_byte;
+}
+
+uint8_t PixelProcessingUnit::read_byte_object_attribute_memory_internally(uint16_t local_address) const
+{
+    if (is_oam_dma_in_progress)
+        return 0xff;
+
+    return object_attribute_memory[local_address];
 }
 
 ObjectAttributes PixelProcessingUnit::get_current_object() const
