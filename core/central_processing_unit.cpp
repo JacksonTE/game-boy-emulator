@@ -110,7 +110,7 @@ void CentralProcessingUnit::step_single_instruction()
             decode_current_unprefixed_opcode_and_execute();
         else
             decode_current_prefixed_opcode_and_execute();
-
+        
         fetch_next_instruction();
     }
     service_interrupt();
@@ -123,6 +123,18 @@ void CentralProcessingUnit::fetch_next_instruction()
 {
     const uint8_t immediate8 = fetch_immediate8_and_step_emulator_components();
     is_current_instruction_prefixed = (immediate8 == INSTRUCTION_PREFIX_BYTE);
+
+    // Produces the halt bug
+    if (is_halted)
+    {
+        bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
+
+        if (is_interrupt_pending && interrupt_master_enable_ime != InterruptMasterEnableState::Enabled)
+        {
+            register_file.program_counter--;
+            is_halted = false;
+        }
+    }
     instruction_register_ir = is_current_instruction_prefixed
         ? fetch_immediate8_and_step_emulator_components()
         : immediate8;
@@ -166,11 +178,7 @@ void CentralProcessingUnit::write_byte_and_step_emulator_components(uint16_t add
 
 uint8_t CentralProcessingUnit::fetch_immediate8_and_step_emulator_components()
 {
-    uint8_t immediate8 = read_byte_and_step_emulator_components(register_file.program_counter);
-    if (!is_halted)
-    {
-        register_file.program_counter++;
-    }
+    uint8_t immediate8 = read_byte_and_step_emulator_components(register_file.program_counter++);
     return immediate8;
 }
 

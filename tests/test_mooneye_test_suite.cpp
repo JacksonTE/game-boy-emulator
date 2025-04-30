@@ -35,7 +35,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
              entry.path().filename() == "ei_sequence.gb" ||
              entry.path().filename() == "ei_timing.gb" ||
              entry.path().filename() == "halt_ime0_ei.gb" ||
-             //entry.path().filename() == "halt_ime0_nointr_timing.gb" ||
+             entry.path().filename() == "halt_ime0_nointr_timing.gb" ||
              entry.path().filename() == "halt_ime1_timing.gb" ||
              entry.path().filename() == "halt_ime1_timing2-GS.gb" ||
              entry.path().filename() == "if_ie_registers.gb" ||
