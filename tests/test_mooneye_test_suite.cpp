@@ -53,7 +53,7 @@ protected:
     }
 };
 
-static TEST_P(MooneyeTest, TestRom)
+TEST_P(MooneyeTest, TestRom)
 {
     const std::filesystem::path test_rom_path = GetParam();
     SCOPED_TRACE("Test ROM: " + test_rom_path.string());

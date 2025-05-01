@@ -225,7 +225,7 @@ protected:
     }
 };
 
-static TEST_P(SingleInstructionTest, JsonTestCasesFile)
+TEST_P(SingleInstructionTest, JsonTestCasesFile)
 {
     const std::filesystem::path single_instruction_json_test_file_path = GetParam();
 
