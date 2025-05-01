@@ -98,26 +98,26 @@ struct BackgroundFetcher : PixelSliceFetcher
     void reset_state() override;
 };
 
-template <typename T>
-class PixelPisoShiftRegisters
+template <typename T, uint8_t total_capacity>
+class ParallelInSerialOutShiftRegister
 {
 public:
-    PixelPisoShiftRegisters(bool should_track_size)
-        : is_tracking_size{should_track_size}
+    ParallelInSerialOutShiftRegister(bool should_track_current_size)
+        : is_tracking_current_size{should_track_current_size}
     {
     }
 
-    void load_new_tile_row(std::array<T, PIXELS_PER_TILE_ROW> new_entries)
+    void load_new_tile_row(std::array<T, total_capacity> new_entries)
     {
-        if (is_tracking_size)
-            current_size = PIXELS_PER_TILE_ROW;
+        if (is_tracking_current_size)
+            current_size = total_capacity;
 
         entries = new_entries;
     }
 
     T shift_out()
     {
-        if (is_tracking_size)
+        if (is_tracking_current_size)
         {
             if (current_size == 0)
                 std::cout << "Warning: attempted to shift out of an empty PISO shift register while tracking its size.\n";
@@ -126,16 +126,16 @@ public:
         }
 
         T head = entries[0];
-        for (uint8_t i = 0; i < PIXELS_PER_TILE_ROW - 1; i++)
+        for (uint8_t i = 0; i < total_capacity - 1; i++)
         {
             entries[i] = entries[i + 1];
         }
-        entries[PIXELS_PER_TILE_ROW - 1] = T{};
+        entries[total_capacity - 1] = T{};
         return head;
     }
 
     void clear() {
-        if (is_tracking_size)
+        if (is_tracking_current_size)
             current_size = 0;
 
         entries.fill(T{});
@@ -148,13 +148,13 @@ public:
 
     bool is_empty()
     {
-        return is_tracking_size && current_size == 0;
+        return is_tracking_current_size && current_size == 0;
     }
 
 private:
-    bool is_tracking_size{};
+    bool is_tracking_current_size{};
     uint8_t current_size{};
-    std::array<T, PIXELS_PER_TILE_ROW> entries{};
+    std::array<T, total_capacity> entries{};
 };
 
 class PixelProcessingUnit
@@ -227,8 +227,8 @@ private:
     BackgroundFetcher background_fetcher{};
     PixelSliceFetcher object_fetcher{};
     
-    PixelPisoShiftRegisters<BackgroundPixel> background_pixel_shift_registers{true};
-    PixelPisoShiftRegisters<ObjectPixel> object_pixel_shift_registers{false};
+    ParallelInSerialOutShiftRegister<BackgroundPixel, PIXELS_PER_TILE_ROW> background_pixel_shift_register{true};
+    ParallelInSerialOutShiftRegister<ObjectPixel, PIXELS_PER_TILE_ROW> object_pixel_shift_register{false};
 
     void step_object_attribute_memory_scan_single_dot();
     void step_pixel_transfer_single_dot();

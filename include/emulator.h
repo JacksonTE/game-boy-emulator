@@ -16,7 +16,7 @@ class Emulator
 public:
     Emulator();
 
-    void reset_state();
+    void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
     bool try_load_bootrom(std::filesystem::path bootrom_path);
 
@@ -35,7 +35,7 @@ private:
     std::unique_ptr<MemoryManagementUnit> memory_management_unit;
     CentralProcessingUnit central_processing_unit;
 
-    void step_components_single_machine_cycle();
+    void step_components_single_machine_cycle_to_sync_with_central_processing_unit();
     void request_interrupt(uint8_t interrupt_flag_mask);
 };
 

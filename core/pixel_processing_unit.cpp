@@ -71,8 +71,8 @@ void PixelProcessingUnit::reset_state()
     background_fetcher.reset_state();
     object_fetcher.reset_state();
 
-    background_pixel_shift_registers.clear();
-    object_pixel_shift_registers.clear();
+    background_pixel_shift_register.clear();
+    object_pixel_shift_register.clear();
 }
 
 void PixelProcessingUnit::set_post_boot_state()
@@ -285,21 +285,21 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     if (current_scanline_dot_number < dot_number_for_dummy_push)
         return;
     else if (current_scanline_dot_number == dot_number_for_dummy_push)
-        background_pixel_shift_registers.load_new_tile_row(background_fetcher.tile_row);
+        background_pixel_shift_register.load_new_tile_row(background_fetcher.tile_row);
 
     if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode &&
         is_window_enabled_for_scanline &&
         static_cast<int8_t>(lcd_internal_x_coordinate_lx) - 8 >= window_x_position_plus_7_wx - 7 &&
         window_x_position_plus_7_wx != 0)
     {
-        background_pixel_shift_registers.clear();
+        background_pixel_shift_register.clear();
         background_fetcher.reset_state();
         background_fetcher.fetcher_mode = FetcherMode::WindowMode;
     }
 
     step_fetchers_single_dot();
 
-    const bool should_draw_or_discard_pixels = !object_fetcher.is_enabled && !background_pixel_shift_registers.is_empty();
+    const bool should_draw_or_discard_pixels = !object_fetcher.is_enabled && !background_pixel_shift_register.is_empty();
     if (should_draw_or_discard_pixels)
     {
         if (scanline_pixels_to_discard_from_scrolling_count == -1)
@@ -312,14 +312,14 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
             {
                 for (uint8_t _ = 0; _ < (window_x_position_plus_7_wx < 7 ? (7 - window_x_position_plus_7_wx - 1) : 0); _++)
                 {
-                    background_pixel_shift_registers.shift_out();
+                    background_pixel_shift_register.shift_out();
                 }
                 scanline_pixels_to_discard_from_scrolling_count = 0;
             }
         }
 
-        const BackgroundPixel next_background_pixel = background_pixel_shift_registers.shift_out();
-        const ObjectPixel next_object_pixel = object_pixel_shift_registers.shift_out();
+        const BackgroundPixel next_background_pixel = background_pixel_shift_register.shift_out();
+        const ObjectPixel next_object_pixel = object_pixel_shift_register.shift_out();
 
         if (scanline_pixels_to_discard_from_dummy_fetch_count > 0)
         {
@@ -460,8 +460,8 @@ void PixelProcessingUnit::initialize_pixel_transfer()
     background_fetcher.reset_state();
     object_fetcher.reset_state();
 
-    background_pixel_shift_registers.clear();
-    object_pixel_shift_registers.clear();
+    background_pixel_shift_register.clear();
+    object_pixel_shift_register.clear();
 }
 
 void PixelProcessingUnit::step_fetchers_single_dot()
@@ -477,7 +477,7 @@ void PixelProcessingUnit::step_fetchers_single_dot()
         }
         else if (background_fetcher.is_enabled &&
                  background_fetcher.current_step == PixelSliceFetcherStep::PushPixels &&
-                 !background_pixel_shift_registers.is_empty())
+                 !background_pixel_shift_register.is_empty())
         {
             background_fetcher.is_enabled = false;
         }
@@ -524,9 +524,9 @@ void PixelProcessingUnit::step_background_fetcher_single_dot()
             break;
     }
 
-    if (background_fetcher.current_step == PixelSliceFetcherStep::PushPixels && background_pixel_shift_registers.is_empty())
+    if (background_fetcher.current_step == PixelSliceFetcherStep::PushPixels && background_pixel_shift_register.is_empty())
     {
-        background_pixel_shift_registers.load_new_tile_row(background_fetcher.tile_row);
+        background_pixel_shift_register.load_new_tile_row(background_fetcher.tile_row);
         background_fetcher.current_step = PixelSliceFetcherStep::GetTileId;
         step_background_fetcher_single_dot();
     }
@@ -609,11 +609,11 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
     {
         for (uint8_t i = 0; i < PIXELS_PER_TILE_ROW; i++)
         {
-            if (object_pixel_shift_registers[i].colour_index == 0b00)
+            if (object_pixel_shift_register[i].colour_index == 0b00)
             {
-                object_pixel_shift_registers[i].colour_index = get_pixel_colour_id(object_fetcher, PIXELS_PER_TILE_ROW - 1 - i);
-                object_pixel_shift_registers[i].is_priority_bit_set = is_bit_set(lcd_control_lcdc, 7);
-                object_pixel_shift_registers[i].is_palette_bit_set = is_bit_set(lcd_control_lcdc, 4);
+                object_pixel_shift_register[i].colour_index = get_pixel_colour_id(object_fetcher, PIXELS_PER_TILE_ROW - 1 - i);
+                object_pixel_shift_register[i].is_priority_bit_set = is_bit_set(lcd_control_lcdc, 7);
+                object_pixel_shift_register[i].is_palette_bit_set = is_bit_set(lcd_control_lcdc, 4);
             }
         }
         current_object_index++;

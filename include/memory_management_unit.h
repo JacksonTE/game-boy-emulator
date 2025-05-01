@@ -36,6 +36,13 @@ constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
 constexpr uint8_t INTERRUPT_FLAG_SERIAL_MASK = 1 << 3;
 constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;
 
+enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
+{
+    NotStarting,
+    RegisterWrittenTo,
+    Starting
+};
+
 class MemoryManagementUnit
 {
 public:
@@ -71,9 +78,9 @@ private:
     uint8_t bootrom_status{};
     uint8_t interrupt_enable_ie{};
 
+    ObjectAttributeMemoryDirectMemoryAccessStartupState oam_dma_startup_state{ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting};
     uint16_t oam_dma_source_address_base{};
     uint8_t oam_dma_machine_cycles_elapsed{};
-    bool is_oam_dma_starting{};
 
     void wrote_to_read_only_address(uint16_t address) const;
 };

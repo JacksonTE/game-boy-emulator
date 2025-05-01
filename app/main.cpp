@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     }
 
     std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) /
-        "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "halt_ime0_nointr_timing.gb";
+        "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "oam_dma_start.gb";
     game_boy_emulator.try_load_file_to_memory(2 * GameBoy::ROM_BANK_SIZE, test_rom_path, false);
 
     /*if (bootrom_path.empty())

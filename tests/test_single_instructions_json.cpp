@@ -215,7 +215,7 @@ protected:
     {
         machine_cycle_operations.clear();
         memory_management_unit->reset_state();
-        game_boy_central_processing_unit.reset_state();
+        game_boy_central_processing_unit.reset_state(false);
 
         for (const std::pair<uint16_t, uint8_t> &pair : test_case.initial_ram_address_value_pairs)
         {

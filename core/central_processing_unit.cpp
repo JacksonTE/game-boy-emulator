@@ -51,18 +51,21 @@ CentralProcessingUnit::CentralProcessingUnit(std::function<void(MachineCycleOper
     emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
 }
 
-void CentralProcessingUnit::reset_state()
+void CentralProcessingUnit::reset_state(bool should_add_startup_machine_cycle)
 {
     set_register_file_state(RegisterFile<std::endian::native>{});
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
     instruction_register_ir = 0x00;
     is_current_instruction_prefixed = false;
     is_halted = false;
+
+    if (should_add_startup_machine_cycle)
+        emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
 }
 
 void CentralProcessingUnit::set_post_boot_state()
 {
-    reset_state();
+    reset_state(false);
     register_file.a = 0x01;
     update_flag(register_file.flags, FLAG_ZERO_MASK, true);
     update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
@@ -192,13 +195,22 @@ uint8_t &CentralProcessingUnit::get_register_by_index(uint8_t index)
 {
     switch (index)
     {
-        case 0: return register_file.b;
-        case 1: return register_file.c;
-        case 2: return register_file.d;
-        case 3: return register_file.e;
-        case 4: return register_file.h;
-        case 5: return register_file.l;
-        case 7: return register_file.a;
+        case 0:
+            return register_file.b;
+        case 1:
+            return register_file.c;
+        case 2:
+            return register_file.d;
+        case 3:
+            return register_file.e;
+        case 4:
+            return register_file.h;
+        case 5:
+            return register_file.l;
+        case 7:
+            return register_file.a;
+        default:
+            throw std::runtime_error{ "Error: invalid register index provided to get_register_by_index(uint8_t index)." };
     }
 }
 

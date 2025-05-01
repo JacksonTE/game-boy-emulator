@@ -39,6 +39,14 @@ void MemoryManagementUnit::reset_state()
     std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
     std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
     std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
+
+    interrupt_flag_if = 0b11100000;
+    bootrom_status = 0;
+    interrupt_enable_ie = 0;
+
+    oam_dma_source_address_base = 0;
+    oam_dma_machine_cycles_elapsed = 0;
+    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
 }
 
 void MemoryManagementUnit::set_post_boot_state()
@@ -308,7 +316,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 return;
             case 0xff46:
                 pixel_processing_unit.object_attribute_memory_direct_memory_access_dma = value;
-                is_oam_dma_starting = true;
+                oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo;
                 return;
             case 0xff47:
                 pixel_processing_unit.background_palette_bgp = value;
@@ -356,7 +364,11 @@ void MemoryManagementUnit::step_single_machine_cycle()
             pixel_processing_unit.is_oam_dma_in_progress = false;
     }
 
-    if (is_oam_dma_starting)
+    if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo)
+    {
+        oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting;
+    }
+    else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
     {
         oam_dma_source_address_base = pixel_processing_unit.object_attribute_memory_direct_memory_access_dma << 8;
         if (oam_dma_source_address_base >= 0xfe00)
@@ -364,8 +376,8 @@ void MemoryManagementUnit::step_single_machine_cycle()
             oam_dma_source_address_base -= 0x2000;
         }
         oam_dma_machine_cycles_elapsed = 0;
-        is_oam_dma_starting = false;
         pixel_processing_unit.is_oam_dma_in_progress = true;
+        oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
     }
 }
 

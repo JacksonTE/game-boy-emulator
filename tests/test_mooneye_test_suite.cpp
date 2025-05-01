@@ -43,9 +43,9 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
              //entry.path().filename() == "jp_cc_timing.gb" ||
              //entry.path().filename() == "jp_timing.gb" ||
              //entry.path().filename() == "ld_hl_sp_e_timing.gb" ||
-             //entry.path().filename() == "oam_dma_restart.gb" ||
-             //entry.path().filename() == "oam_dma_start.gb" ||
-             //entry.path().filename() == "oam_dma_timing.gb" ||
+             entry.path().filename() == "oam_dma_restart.gb" ||
+             entry.path().filename() == "oam_dma_start.gb" ||
+             entry.path().filename() == "oam_dma_timing.gb" ||
              entry.path().filename() == "pop_timing.gb" ||
              //entry.path().filename() == "push_timing.gb" ||
              entry.path().filename() == "rapid_di_ei.gb"
@@ -71,7 +71,6 @@ protected:
     void SetUp() override
     {
         ASSERT_TRUE(std::filesystem::exists(GetParam())) << "ROM file not found: " << GetParam();
-        game_boy_emulator.reset_state();
         game_boy_emulator.try_load_file_to_memory(32768, GetParam(), false);
         game_boy_emulator.set_post_boot_state();
     }

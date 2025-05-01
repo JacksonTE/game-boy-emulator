@@ -13,16 +13,16 @@ Emulator::Emulator()
     : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       memory_management_unit{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
-      central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle(); }, *memory_management_unit}
+      central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
 {
 }
 
-void Emulator::reset_state()
+void Emulator::reset_state(bool should_add_startup_machine_cycle)
 {
     timer.reset_state();
     pixel_processing_unit.reset_state();
     memory_management_unit->reset_state();
-    central_processing_unit.reset_state();
+    central_processing_unit.reset_state(should_add_startup_machine_cycle);
 }
 
 void Emulator::set_post_boot_state()
@@ -73,7 +73,7 @@ void Emulator::step_cpu_single_instruction()
     central_processing_unit.step_single_instruction();
 }
 
-void Emulator::step_components_single_machine_cycle()
+void Emulator::step_components_single_machine_cycle_to_sync_with_central_processing_unit()
 {
     timer.step_single_machine_cycle();
     pixel_processing_unit.step_single_machine_cycle();

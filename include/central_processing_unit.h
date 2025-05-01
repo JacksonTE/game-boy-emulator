@@ -140,7 +140,7 @@ class CentralProcessingUnit
 public:
     CentralProcessingUnit(std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference);
 
-    void reset_state();
+    void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
 
     RegisterFile<std::endian::native> get_register_file() const;
