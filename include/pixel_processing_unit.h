@@ -189,7 +189,7 @@ public:
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
 
     uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
-    void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value);
+    void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma);
 
     void step_single_machine_cycle();
 

@@ -44,9 +44,9 @@ void MemoryManagementUnit::reset_state()
     bootrom_status = 0;
     interrupt_enable_ie = 0;
 
+    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
     oam_dma_source_address_base = 0;
     oam_dma_machine_cycles_elapsed = 0;
-    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
 }
 
 void MemoryManagementUnit::set_post_boot_state()
@@ -78,6 +78,10 @@ void MemoryManagementUnit::set_post_boot_state()
     write_byte(0xff25, 0xf3, false);
     write_byte(0xff26, 0xf1, false);
     interrupt_enable_ie = 0x00;
+
+    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+    oam_dma_source_address_base = 0;
+    oam_dma_machine_cycles_elapsed = 0;
 }
 
 bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const std::filesystem::path &file_path, bool is_bootrom_file)
@@ -136,6 +140,12 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
 
 uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam_dma) const
 {
+    if (pixel_processing_unit.is_oam_dma_in_progress && !is_access_for_oam_dma && are_addresses_on_same_bus(address, oam_dma_source_address_base))
+    {
+        const uint16_t oam_dma_byte_to_transfer_address = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
+        address = oam_dma_byte_to_transfer_address;
+    }
+
     if (bootrom_status == 0 && address < BOOTROM_SIZE)
     {
         if (bootrom == nullptr)
@@ -270,7 +280,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
     else if (address >= OBJECT_ATTRIBUTE_MEMORY_START && address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
     {
-        pixel_processing_unit.write_byte_object_attribute_memory(address, value);
+        pixel_processing_unit.write_byte_object_attribute_memory(address, value, is_access_for_oam_dma);
     }
     else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
@@ -403,6 +413,35 @@ uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
             return interrupt_flag_mask;
     }
     return 0x00;
+}
+
+bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const
+{
+    static constexpr std::array<std::pair<uint16_t, uint16_t>, 6> memory_buses
+    {
+        {
+            {ROM_BANK_00_START, ROM_BANK_SIZE},
+            {ROM_BANK_01_START, ROM_BANK_SIZE},
+            {VIDEO_RAM_START, VIDEO_RAM_SIZE},
+            {EXTERNAL_RAM_START, EXTERNAL_RAM_SIZE},
+            {WORK_RAM_START, WORK_RAM_SIZE},
+            {ECHO_RAM_START, ECHO_RAM_SIZE},
+        }
+    };
+
+    auto in_range = [](uint16_t address, uint16_t range_start, uint16_t range_size)
+    {
+        return address >= range_start && address < range_start + range_size;
+    };
+
+    for (auto &[range_start, range_size] : memory_buses)
+    {
+        if (in_range(first_address, range_start, range_size) && in_range(second_address, range_start, range_size))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const

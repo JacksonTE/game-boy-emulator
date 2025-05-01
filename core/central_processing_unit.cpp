@@ -1470,8 +1470,8 @@ void CentralProcessingUnit::return_0xc9()
 
 void CentralProcessingUnit::return_from_interrupt_0xd9()
 {
-    interrupt_master_enable_ime = InterruptMasterEnableState::WillEnable;
     return_0xc9();
+    interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
 }
 
 void CentralProcessingUnit::add_stack_pointer_signed_immediate8_0xe8()

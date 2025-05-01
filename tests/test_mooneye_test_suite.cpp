@@ -19,42 +19,19 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
 
     for (const auto &entry : std::filesystem::directory_iterator(directory))
     {
+        // Skip tests that are specific to other Game Boy models than DMG
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
-            entry.path().filename() != "unused_hwio-GS.gb" &&
-            (directory.filename() != "acceptance" ||
-             //entry.path().filename() == "add_sp_e_timing.gb" ||
-             entry.path().filename() == "boot_div-dmgABCmgb.gb" ||
-             //entry.path().filename() == "boot_hwio-dmgABCmgb.gb" ||
-             entry.path().filename() == "boot_regs-dmgABC.gb" ||
-             //entry.path().filename() == "call_cc_timing.gb" ||
-             //entry.path().filename() == "call_cc_timing2.gb" ||
-             //entry.path().filename() == "call_timing.gb" ||
-             //entry.path().filename() == "call_timing2.gb" ||
-             entry.path().filename() == "di_timing-GS.gb" ||
-             entry.path().filename() == "div_timing.gb" ||
-             entry.path().filename() == "ei_sequence.gb" ||
-             entry.path().filename() == "ei_timing.gb" ||
-             entry.path().filename() == "halt_ime0_ei.gb" ||
-             entry.path().filename() == "halt_ime0_nointr_timing.gb" ||
-             entry.path().filename() == "halt_ime1_timing.gb" ||
-             entry.path().filename() == "halt_ime1_timing2-GS.gb" ||
-             entry.path().filename() == "if_ie_registers.gb" ||
-             entry.path().filename() == "intr_timing.gb" ||
-             //entry.path().filename() == "jp_cc_timing.gb" ||
-             //entry.path().filename() == "jp_timing.gb" ||
-             //entry.path().filename() == "ld_hl_sp_e_timing.gb" ||
-             entry.path().filename() == "oam_dma_restart.gb" ||
-             entry.path().filename() == "oam_dma_start.gb" ||
-             entry.path().filename() == "oam_dma_timing.gb" ||
-             entry.path().filename() == "pop_timing.gb" ||
-             //entry.path().filename() == "push_timing.gb" ||
-             entry.path().filename() == "rapid_di_ei.gb"
-             //entry.path().filename() == "ret_cc_timing.gb" ||
-             //entry.path().filename() == "ret_timing.gb" ||
-             //entry.path().filename() == "reti_intr_timing.gb" ||
-             //entry.path().filename() == "reti_timing.gb" ||
-             //entry.path().filename() == "rst_timing.gb"
-             ))
+            entry.path().filename() != "unused_hwio-GS.gb" && // TODO add this test after APU is done
+            entry.path().filename() != "boot_div-dmg0.gb" &&
+            entry.path().filename() != "boot_div-S.gb" &&
+            entry.path().filename() != "boot_div2-S.gb" &&
+            entry.path().filename() != "boot_hwio-dmgABCmgb.gb" && // TODO add this test after APU is done
+            entry.path().filename() != "boot_hwio-dmg0.gb" &&
+            entry.path().filename() != "boot_hwio-S.gb" &&
+            entry.path().filename() != "boot_regs-dmg0.gb" &&
+            entry.path().filename() != "boot_regs-mgb.gb" &&
+            entry.path().filename() != "boot_regs-sgb.gb" &&
+            entry.path().filename() != "boot_regs-sgb2.gb")
         {
             test_rom_paths.push_back(entry.path());
         }
@@ -76,7 +53,7 @@ protected:
     }
 };
 
-TEST_P(MooneyeTest, TestRom)
+static TEST_P(MooneyeTest, TestRom)
 {
     const std::filesystem::path test_rom_path = GetParam();
     SCOPED_TRACE("Test ROM: " + test_rom_path.string());

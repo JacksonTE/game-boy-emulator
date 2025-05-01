@@ -169,9 +169,10 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
     return object_attribute_memory[local_address];
 }
 
-void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value)
+void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma)
 {
-    if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+    if ((is_oam_dma_in_progress && !is_access_for_oam_dma) ||
+        previous_mode == PixelProcessingUnitMode::PixelTransfer ||
         (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan &&
          current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan))
     {

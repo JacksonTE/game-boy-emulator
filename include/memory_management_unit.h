@@ -82,6 +82,7 @@ private:
     uint16_t oam_dma_source_address_base{};
     uint8_t oam_dma_machine_cycles_elapsed{};
 
+    bool are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const;
     void wrote_to_read_only_address(uint16_t address) const;
 };
 
