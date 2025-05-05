@@ -336,18 +336,9 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
         }
         if (scanline_pixels_to_discard_from_scrolling_count == -1)
         {
-            if (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode)
-            {
-                scanline_pixels_to_discard_from_scrolling_count = viewport_x_position_scx % 8;
-            }
-            else
-            {
-                for (uint8_t _ = 0; _ < (window_x_position_plus_7_wx < 7 ? (7 - window_x_position_plus_7_wx - 1) : 0); _++)
-                {
-                    background_pixel_shift_register.shift_out();
-                }
-                scanline_pixels_to_discard_from_scrolling_count = 0;
-            }
+            scanline_pixels_to_discard_from_scrolling_count = (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode || window_x_position_plus_7_wx == 0)
+                ? viewport_x_position_scx % 8
+                : 0;
         }
         if (scanline_pixels_to_discard_from_scrolling_count > 0)
         {

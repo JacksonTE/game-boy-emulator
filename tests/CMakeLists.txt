@@ -16,9 +16,9 @@ FetchContent_MakeAvailable(
 )
 
 add_executable(emulate-game-boy-tests
+    "test_gbmicrotest.cpp"
     "test_mooneye_test_suite.cpp"
     "test_single_instructions_json.cpp"
-    "test_gbmicrotest.cpp"
 )
 
 target_link_libraries(emulate-game-boy-tests PRIVATE

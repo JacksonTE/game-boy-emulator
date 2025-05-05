@@ -172,9 +172,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
             entry.path().filename() != "vblank2_int_if_c.gb" &&
             entry.path().filename() != "vblank2_int_inc_sled.gb" &&
             entry.path().filename() != "vblank2_int_nops_b.gb" &&
-            entry.path().filename() != "wave_write_to_0xC003.gb" &&
-            entry.path().filename() != "win0_a.gb" &&
-            entry.path().filename() != "win0_scx3_a.gb")
+            entry.path().filename() != "wave_write_to_0xC003.gb")
         {
             test_rom_paths.push_back(entry.path());
         }
