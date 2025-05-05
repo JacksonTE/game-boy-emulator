@@ -53,14 +53,15 @@ CentralProcessingUnit::CentralProcessingUnit(std::function<void(MachineCycleOper
 
 void CentralProcessingUnit::reset_state(bool should_add_startup_machine_cycle)
 {
+    if (should_add_startup_machine_cycle)
+    {
+        emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
+    }
     set_register_file_state(RegisterFile<std::endian::native>{});
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
     instruction_register_ir = 0x00;
     is_current_instruction_prefixed = false;
     is_halted = false;
-
-    if (should_add_startup_machine_cycle)
-        emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
 }
 
 void CentralProcessingUnit::set_post_boot_state()
@@ -69,7 +70,6 @@ void CentralProcessingUnit::set_post_boot_state()
     register_file.a = 0x01;
     update_flag(register_file.flags, FLAG_ZERO_MASK, true);
     update_flag(register_file.flags, FLAG_SUBTRACT_MASK, false);
-    
     uint8_t header_checksum = 0;
     for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
     {
@@ -109,11 +109,14 @@ void CentralProcessingUnit::step_single_instruction()
         emulator_step_single_machine_cycle_callback(MachineCycleOperation{MemoryInteraction::None});
     else
     {
-        if (!is_current_instruction_prefixed)
-            decode_current_unprefixed_opcode_and_execute();
-        else
+        if (is_current_instruction_prefixed)
+        {
             decode_current_prefixed_opcode_and_execute();
-        
+        }
+        else
+        {
+            decode_current_unprefixed_opcode_and_execute();
+        }
         fetch_next_instruction();
     }
     service_interrupt();
@@ -147,8 +150,9 @@ void CentralProcessingUnit::service_interrupt()
 {
     bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
     if (is_interrupt_pending && is_halted)
+    {
         is_halted = false;
-
+    }
     if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
         return;
 

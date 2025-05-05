@@ -29,35 +29,37 @@ int main(int argc, char *argv[])
     }
 
     std::filesystem::path test_rom_path = std::filesystem::path(PROJECT_ROOT) /
-        "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance" / "push_timing.gb";
+        "tests" / "data" / "gbmicrotest" / "bin" / "win0_scx3_a.gb";
     game_boy_emulator.try_load_file_to_memory(2 * GameBoy::ROM_BANK_SIZE, test_rom_path, false);
 
-    /*if (bootrom_path.empty())
-    {
-        game_boy_emulator.set_post_boot_state();
-    }
-    else
-    {
-        if (!game_boy_emulator.try_load_bootrom(bootrom_path))
-        {
-            std::cerr << "Error: unable to initialize Game Boy with provided bootrom path, exiting.\n";
-            return 1;
-        }
-    }*/
+    //if (bootrom_path.empty())
+    //{
+    //    game_boy_emulator.set_post_boot_state();
+    //}
+    //else
+    //{
+    //    if (!game_boy_emulator.try_load_bootrom(bootrom_path))
+    //    {
+    //        std::cerr << "Error: unable to initialize Game Boy with provided bootrom path, exiting.\n";
+    //        return 1;
+    //    }
+    //}
     game_boy_emulator.set_post_boot_state();
 
     while (true)
     {
-        auto r = game_boy_emulator.get_register_file();
+        const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xff80);
+        const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xff81);
+        const uint8_t test_pass_fail_byte = game_boy_emulator.read_byte_from_memory(0xff82);
 
-        if (r.b == 0x42 && r.c == 0x42 && r.d == 0x42 && r.e == 0x42 && r.h == 0x42 && r.l == 0x42)
+        if (test_pass_fail_byte == 0xff)
         {
-            std::cout << "test failed" << "\n";
+            std::cout << "Test failed with result " << static_cast<int>(test_result_byte) << ". Expected result was " << static_cast<int>(test_expected_result_byte) << "\n";
             break;
         }
-        else if (r.b == 3 && r.c == 5 && r.d == 8 && r.e == 13 && r.h == 21 && r.l == 34)
+        else if (test_pass_fail_byte == 0x01)
         {
-            std::cout << "test passed" << "\n";
+            std::cout << "Test passed with result " << static_cast<int>(test_result_byte) << "\n";
             break;
         }
         game_boy_emulator.step_cpu_single_instruction();

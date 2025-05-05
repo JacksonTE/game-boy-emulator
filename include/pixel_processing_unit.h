@@ -6,8 +6,6 @@
 #include <iostream>
 #include <vector>
 
-#include "timer.h"
-
 namespace GameBoy
 {
 
@@ -25,9 +23,14 @@ constexpr uint8_t PIXELS_PER_TILE_ROW = 8;
 constexpr uint8_t MAX_OBJECTS_PER_LINE = 10;
 
 constexpr uint8_t OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS = 80;
-constexpr uint16_t SCAN_LINE_DURATION_DOTS = 456;
-constexpr uint16_t FIRST_VERTICAL_BLANK_LINE = 144;
-constexpr uint16_t FINAL_FRAME_SCAN_LINE = 153;
+constexpr uint16_t SCANLINE_DURATION_DOTS = 456;
+
+constexpr uint16_t FIRST_SCANLINE_OF_VERTICAL_BLANK = 144;
+constexpr uint16_t FINAL_SCANLINE_OF_FRAME = 153;
+
+constexpr uint8_t FIRST_HORIZONTAL_BLANK_AFTER_LCD_ENABLE_DURATION_DOTS = 76;
+constexpr uint16_t FIRST_SCANLINE_AFTER_LCD_ENABLE_DURATION_DOTS = 452;
+constexpr uint8_t FINAL_SCANLINE_EARLY_LY_RESET_DOT_NUMBER = 4;
 
 enum class PixelProcessingUnitEnableStatus
 {
@@ -110,8 +113,9 @@ public:
     void load_new_tile_row(std::array<T, total_capacity> new_entries)
     {
         if (is_tracking_current_size)
+        {
             current_size = total_capacity;
-
+        }
         entries = new_entries;
     }
 
@@ -134,10 +138,12 @@ public:
         return head;
     }
 
-    void clear() {
+    void clear()
+    {
         if (is_tracking_current_size)
+        {
             current_size = 0;
-
+        }
         entries.fill(T{});
     }
 
@@ -208,7 +214,7 @@ private:
     PixelProcessingUnitMode previous_mode{PixelProcessingUnitMode::HorizontalBlank};
     PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
     uint16_t current_scanline_dot_number{};
-    bool is_in_first_scanline_after_enable{};
+    bool is_in_first_scanline_after_lcd_enable{};
     bool is_in_first_dot_of_current_step{true};
     bool is_window_enabled_for_scanline{};
 
@@ -216,7 +222,8 @@ private:
     bool did_spurious_stat_interrupt_occur{};
     bool were_stat_interrupts_handled_early{};
     bool are_stat_interrupts_blocked{};
-    bool did_line_end_during_this_machine_cycle{};
+    bool did_scan_line_end_during_this_machine_cycle{};
+    bool was_wy_condition_triggered_this_frame{};
 
     std::vector<ObjectAttributes> scanline_selected_objects;
     uint8_t current_object_index{};
@@ -236,7 +243,9 @@ private:
     void step_vertical_blank_single_dot();
     void trigger_stat_interrupts();
 
+    void switch_to_mode(PixelProcessingUnitMode new_mode);
     void initialize_pixel_transfer();
+
     void step_fetchers_single_dot();
 
     void step_background_fetcher_single_dot();
