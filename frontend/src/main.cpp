@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "emulator.h"
+#include "sdl_wrappers.h"
 
 int main(int argc, char *argv[])
 {
