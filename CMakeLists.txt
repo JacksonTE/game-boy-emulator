@@ -17,5 +17,5 @@ add_compile_definitions(PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 enable_testing()
 
 add_subdirectory(core)
-add_subdirectory(app)
+add_subdirectory(frontend)
 add_subdirectory(tests)

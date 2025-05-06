@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <SDL3/SDL.h>
 #include <string_view>
 
 #include "emulator.h"
@@ -32,19 +33,44 @@ int main(int argc, char *argv[])
         "tests" / "data" / "gbmicrotest" / "bin" / "win0_scx3_a.gb";
     game_boy_emulator.try_load_file_to_memory(2 * GameBoy::ROM_BANK_SIZE, test_rom_path, false);
 
-    //if (bootrom_path.empty())
-    //{
-    //    game_boy_emulator.set_post_boot_state();
-    //}
-    //else
-    //{
-    //    if (!game_boy_emulator.try_load_bootrom(bootrom_path))
-    //    {
-    //        std::cerr << "Error: unable to initialize Game Boy with provided bootrom path, exiting.\n";
-    //        return 1;
-    //    }
-    //}
-    game_boy_emulator.set_post_boot_state();
+    if (bootrom_path.empty())
+    {
+        game_boy_emulator.set_post_boot_state();
+    }
+    else
+    {
+        if (!game_boy_emulator.try_load_bootrom(bootrom_path))
+        {
+            std::cerr << "Error: unable to initialize Game Boy with provided bootrom path, exiting.\n";
+            return 1;
+        }
+    }
+
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    {
+        std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow(
+        "Game Boy Emulator",
+        160, 144,
+        0
+    );
+    if (!window) {
+        SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "SDL_CreateWindow Error: %s", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
+    if (!renderer)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateRenderer: %s", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
 
     while (true)
     {
@@ -64,5 +90,8 @@ int main(int argc, char *argv[])
         }
         game_boy_emulator.step_cpu_single_instruction();
     }
+
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 0;
 }
