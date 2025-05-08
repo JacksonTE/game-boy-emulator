@@ -5,14 +5,14 @@
 #include <stdexcept>
 #include <string>
 
-namespace SDLResourceAcquisitionIsInitialization
+namespace SdlResourceAcquisitionIsInitialization
 {
     class Initializer
     {
     public:
         Initializer(uint32_t flags)
         {
-            if (SDL_Init(flags) != 0)
+            if (!SDL_Init(flags))
                 throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
         }
 
@@ -91,7 +91,7 @@ namespace SDLResourceAcquisitionIsInitialization
 
     class Texture {
     public:
-        Texture(Renderer &renderer, uint32_t format, int width, int height, int access)
+        Texture(Renderer &renderer, SDL_PixelFormat format, SDL_TextureAccess access, int width, int height)
             : texture(SDL_CreateTexture(renderer.get(), format, access, width, height))
         {
             if (!texture)

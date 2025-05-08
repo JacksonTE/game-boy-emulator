@@ -5,7 +5,7 @@
 #include "bitwise_utilities.h"
 #include "pixel_processing_unit.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 void PixelSliceFetcher::reset_state()
@@ -713,4 +713,4 @@ uint8_t PixelProcessingUnit::get_pixel_colour_id(PixelSliceFetcher pixel_slice_f
         : (pixel_slice_fetcher.tile_row_high >> (bit_position - 1)) & 0b10);
 }
 
-} // namespace GameBoy
+} // namespace GameBoyCore

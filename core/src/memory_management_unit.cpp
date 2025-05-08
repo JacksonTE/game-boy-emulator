@@ -7,11 +7,11 @@
 #include "bitwise_utilities.h"
 #include "memory_management_unit.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
-MemoryManagementUnit::MemoryManagementUnit(Timer &timer_reference, PixelProcessingUnit &pixel_processing_unit_reference)
-    : timer{timer_reference},
+MemoryManagementUnit::MemoryManagementUnit(InternalTimer & internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference)
+    : internal_timer{internal_timer_reference},
       pixel_processing_unit{pixel_processing_unit_reference}
 {
     bootrom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
@@ -200,13 +200,13 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
         switch (address)
         {
             case 0xff04:
-                return timer.read_div();
+                return  internal_timer.read_div();
             case 0xff05:
-                return timer.read_tima();
+                return internal_timer.read_tima();
             case 0xff06:
-                return timer.read_tma();
+                return internal_timer.read_tma();
             case 0xff07:
-                return timer.read_tac();
+                return internal_timer.read_tac();
             case 0xff0f:
                 return interrupt_flag_if | 0b11100000;
             case 0xff40:
@@ -292,16 +292,16 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
         switch (address)
         {
             case 0xff04:
-                timer.write_div(value);
+                internal_timer.write_div(value);
                 return;
             case 0xff05:
-                timer.write_tima(value);
+                internal_timer.write_tima(value);
                 return;
             case 0xff06:
-                timer.write_tma(value);
+                internal_timer.write_tma(value);
                 return;
             case 0xff07:
-                timer.write_tac(value);
+                internal_timer.write_tac(value);
                 return;
             case 0xff0f:
                 interrupt_flag_if = value | 0b11100000;
@@ -381,6 +381,7 @@ void MemoryManagementUnit::step_single_machine_cycle()
     else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
     {
         oam_dma_source_address_base = pixel_processing_unit.object_attribute_memory_direct_memory_access_dma << 8;
+
         if (oam_dma_source_address_base >= 0xfe00)
         {
             oam_dma_source_address_base -= 0x2000;
@@ -449,4 +450,4 @@ void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const
     std::cout << "Attempted to write to read only address " << address << ". No write will occur.\n";
 }
 
-} //namespace GameBoy
+} // namespace GameBoyCore

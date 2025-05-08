@@ -43,7 +43,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
 class MooneyeTest : public testing::TestWithParam<std::filesystem::path>
 {
 protected:
-    GameBoy::Emulator game_boy_emulator;
+    GameBoyCore::Emulator game_boy_emulator;
 
     void SetUp() override
     {

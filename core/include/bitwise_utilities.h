@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 template<typename T>
@@ -42,4 +42,4 @@ inline uint8_t get_byte_horizontally_flipped(uint8_t byte)
     return byte;
 }
 
-} // namespace GameBoy
+} // namespace GameBoyCore

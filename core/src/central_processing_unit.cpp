@@ -5,7 +5,7 @@
 #include "central_processing_unit.h"
 #include "bitwise_utilities.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 MachineCycleOperation::MachineCycleOperation(MemoryInteraction interaction)
@@ -1535,4 +1535,4 @@ void CentralProcessingUnit::enable_interrupts_0xfb()
         interrupt_master_enable_ime = InterruptMasterEnableState::WillEnable;
 }
 
-} // namespace GameBoy
+} // namespace GameBoyCore

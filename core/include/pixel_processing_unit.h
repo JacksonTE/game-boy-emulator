@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 constexpr uint8_t INTERRUPT_FLAG_STAT_MASK = 1 << 1;
@@ -261,4 +261,4 @@ private:
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
 };
 
-} // namespace GameBoy
+} // namespace GameBoyCore

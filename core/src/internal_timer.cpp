@@ -1,15 +1,15 @@
 #include "memory_management_unit.h"
-#include "timer.h"
+#include "internal_timer.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
-Timer::Timer(std::function<void(uint8_t)> request_interrupt)
+InternalTimer::InternalTimer(std::function<void(uint8_t)> request_interrupt)
     : request_interrupt_callback{request_interrupt}
 {
 }
 
-void Timer::reset_state()
+void InternalTimer::reset_state()
 {
     uint16_t system_counter = 0;
     uint8_t timer_tima = 0;
@@ -20,13 +20,13 @@ void Timer::reset_state()
     bool is_tima_overflow_handled = false;
 }
 
-void Timer::set_post_boot_state()
+void InternalTimer::set_post_boot_state()
 {
     reset_state();
     system_counter = 0xabc8;
 }
 
-void Timer::step_single_machine_cycle()
+void InternalTimer::step_single_machine_cycle()
 {
     system_counter += 4;
 
@@ -39,33 +39,33 @@ void Timer::step_single_machine_cycle()
     did_tima_overflow_occur = update_tima_and_get_overflow_state();
 }
 
-uint8_t Timer::read_div() const
+uint8_t InternalTimer::read_div() const
 {
     return static_cast<uint8_t>(system_counter >> 8);
 }
 
-uint8_t Timer::read_tima() const
+uint8_t InternalTimer::read_tima() const
 {
     return timer_tima;
 }
 
-uint8_t Timer::read_tma() const
+uint8_t InternalTimer::read_tma() const
 {
     return timer_modulo_tma;
 }
 
-uint8_t Timer::read_tac() const
+uint8_t InternalTimer::read_tac() const
 {
     return 0b11111000 | timer_control_tac;
 }
 
-void Timer::write_div(uint8_t value)
+void InternalTimer::write_div(uint8_t value)
 {
     system_counter = 0x0000;
     update_tima_early();
 }
 
-void Timer::write_tima(uint8_t value)
+void InternalTimer::write_tima(uint8_t value)
 {
     if (is_tima_overflow_handled)
         return;
@@ -74,7 +74,7 @@ void Timer::write_tima(uint8_t value)
     did_tima_overflow_occur = false;
 }
 
-void Timer::write_tma(uint8_t value)
+void InternalTimer::write_tma(uint8_t value)
 {
     timer_modulo_tma = value;
 
@@ -84,13 +84,13 @@ void Timer::write_tma(uint8_t value)
     }
 }
 
-void Timer::write_tac(uint8_t value)
+void InternalTimer::write_tac(uint8_t value)
 {
     timer_control_tac = 0b11111000 | value;
     update_tima_early();
 }
 
-void Timer::update_tima_early()
+void InternalTimer::update_tima_early()
 {
     if (update_tima_and_get_overflow_state())
     {
@@ -99,7 +99,7 @@ void Timer::update_tima_early()
     }
 }
 
-bool Timer::update_tima_and_get_overflow_state()
+bool InternalTimer::update_tima_and_get_overflow_state()
 {
     const bool is_tima_enabled = (timer_control_tac & 0b00000100) != 0;
 
@@ -116,4 +116,4 @@ bool Timer::update_tima_and_get_overflow_state()
     return did_overflow_occur;
 }
 
-} // namespace Gameboy
+} // namespace GameBoyCore

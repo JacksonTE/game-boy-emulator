@@ -7,7 +7,7 @@
 #include "central_processing_unit.h"
 #include "memory_management_unit.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 inline void print_bytes_in_range(MemoryManagementUnit &memory_management_unit, uint16_t start_address, uint16_t end_address)
@@ -70,4 +70,4 @@ inline void print_register_file_state(RegisterFile<std::endian::native> register
     std::cout << "=====================================================\n";
 }
 
-} // namespace GameBoy
+} // namespace GameBoyCore

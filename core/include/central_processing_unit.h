@@ -6,7 +6,7 @@
 
 #include "memory_management_unit.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
@@ -234,4 +234,4 @@ private:
     void enable_interrupts_0xfb();
 };
 
-} // namespace GameBoy
+} // namespace GameBoyCore

@@ -12,21 +12,21 @@
 #include "memory_management_unit.h"
 #include "pixel_processing_unit.h"
 
-static std::string memory_interaction_to_string(GameBoy::MemoryInteraction operation)
+static std::string memory_interaction_to_string(GameBoyCore::MemoryInteraction operation)
 {
     switch (operation) {
-        case GameBoy::MemoryInteraction::None:
+        case GameBoyCore::MemoryInteraction::None:
             return "None";
-        case GameBoy::MemoryInteraction::Read:
+        case GameBoyCore::MemoryInteraction::Read:
             return "Read";
-        case GameBoy::MemoryInteraction::Write:
+        case GameBoyCore::MemoryInteraction::Write:
             return "Write";
         default:
             return "Unknown";
     }
 }
 
-static std::ostream &operator<<(std::ostream &output_stream, const GameBoy::MachineCycleOperation &interaction)
+static std::ostream &operator<<(std::ostream &output_stream, const GameBoyCore::MachineCycleOperation &interaction)
 {
     output_stream << "MachineCycleOperation{"
                   << "memory_interaction: " << memory_interaction_to_string(interaction.memory_interaction) << ", "
@@ -40,13 +40,13 @@ struct SingleInstructionTestCase
 {
     std::string test_name;
 
-    GameBoy::RegisterFile<std::endian::native> initial_register_values;
+    GameBoyCore::RegisterFile<std::endian::native> initial_register_values;
     std::vector<std::pair<uint16_t, uint8_t>> initial_ram_address_value_pairs;
 
-    GameBoy::RegisterFile<std::endian::native> expected_register_values;
+    GameBoyCore::RegisterFile<std::endian::native> expected_register_values;
     std::vector<std::pair<uint16_t, uint8_t>> expected_ram_address_value_pairs;
 
-    std::vector<GameBoy::MachineCycleOperation> expected_memory_interactions;
+    std::vector<GameBoyCore::MachineCycleOperation> expected_memory_interactions;
 };
 
 static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
@@ -133,17 +133,17 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
             const auto &expected_operation_performed = expected_cycles_array[2];
 
             if (expected_operation_performed == "---")
-                test_case.expected_memory_interactions.emplace_back(GameBoy::MemoryInteraction::None);
+                test_case.expected_memory_interactions.emplace_back(GameBoyCore::MemoryInteraction::None);
             else
             {
                 const auto &expected_address_accessed = expected_cycles_array[0];
 
                 if (expected_operation_performed == "r-m")
-                    test_case.expected_memory_interactions.emplace_back(GameBoy::MemoryInteraction::Read, expected_address_accessed);
+                    test_case.expected_memory_interactions.emplace_back(GameBoyCore::MemoryInteraction::Read, expected_address_accessed);
                 else
                 {
                     const auto &expected_value_written = expected_cycles_array[1];
-                    test_case.expected_memory_interactions.emplace_back(GameBoy::MemoryInteraction::Write, expected_address_accessed, expected_value_written);
+                    test_case.expected_memory_interactions.emplace_back(GameBoyCore::MemoryInteraction::Write, expected_address_accessed, expected_value_written);
                 }
             }
         }
@@ -153,19 +153,19 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
 }
 
 // The single instruction tests expect the memory to be a 64KB flat array with no internal read/write restrictions
-class SingleInstructionTestMemory : public GameBoy::MemoryManagementUnit
+class SingleInstructionTestMemory : public GameBoyCore::MemoryManagementUnit
 {
 public:
     SingleInstructionTestMemory()
         : MemoryManagementUnit{get_timer(), get_pixel_processing_unit()}
     {
-        flat_memory = std::make_unique<uint8_t[]>(GameBoy::MEMORY_SIZE);
-        std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
+        flat_memory = std::make_unique<uint8_t[]>(GameBoyCore::MEMORY_SIZE);
+        std::fill_n(flat_memory.get(), GameBoyCore::MEMORY_SIZE, 0);
     }
 
     void reset_state() override
     {
-        std::fill_n(flat_memory.get(), GameBoy::MEMORY_SIZE, 0);
+        std::fill_n(flat_memory.get(), GameBoyCore::MEMORY_SIZE, 0);
     }
 
     uint8_t read_byte(uint16_t address, bool _ = false) const override
@@ -181,15 +181,15 @@ public:
 private:
     std::unique_ptr<uint8_t[]> flat_memory;
 
-    static GameBoy::Timer &get_timer()
+    static GameBoyCore::InternalTimer &get_timer()
     {
-        static GameBoy::Timer test_timer{[](uint8_t) {}};
-        return test_timer;
+        static GameBoyCore::InternalTimer test_internal_timer{[](uint8_t) {}};
+        return test_internal_timer;
     }
 
-    static GameBoy::PixelProcessingUnit &get_pixel_processing_unit()
+    static GameBoyCore::PixelProcessingUnit &get_pixel_processing_unit()
     {
-        static GameBoy::PixelProcessingUnit test_pixel_processing_unit{[](uint8_t) {}};
+        static GameBoyCore::PixelProcessingUnit test_pixel_processing_unit{[](uint8_t) {}};
         return test_pixel_processing_unit;
     }
 };
@@ -197,15 +197,15 @@ private:
 class SingleInstructionTest : public testing::TestWithParam<std::filesystem::path>
 {
 protected:
-    std::vector<GameBoy::MachineCycleOperation> machine_cycle_operations;
+    std::vector<GameBoyCore::MachineCycleOperation> machine_cycle_operations;
     std::unique_ptr<SingleInstructionTestMemory> memory_management_unit;
-    GameBoy::CentralProcessingUnit game_boy_central_processing_unit;
+    GameBoyCore::CentralProcessingUnit game_boy_central_processing_unit;
 
     SingleInstructionTest()
         : memory_management_unit{std::make_unique<SingleInstructionTestMemory>()},
           game_boy_central_processing_unit
           {
-              [this](GameBoy::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); },
+              [this](GameBoyCore::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); },
               *memory_management_unit
           }
     { 

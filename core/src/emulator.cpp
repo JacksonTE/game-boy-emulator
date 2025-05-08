@@ -6,20 +6,20 @@
 #include "console_output_utilities.h"
 #include "memory_management_unit.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 Emulator::Emulator()
-    : timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+    : internal_timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-      memory_management_unit{std::make_unique<MemoryManagementUnit>(timer, pixel_processing_unit)},
+      memory_management_unit{std::make_unique<MemoryManagementUnit>(internal_timer, pixel_processing_unit)},
       central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
 {
 }
 
 void Emulator::reset_state(bool should_add_startup_machine_cycle)
 {
-    timer.reset_state();
+    internal_timer.reset_state();
     pixel_processing_unit.reset_state();
     memory_management_unit->reset_state();
     central_processing_unit.reset_state(should_add_startup_machine_cycle);
@@ -27,7 +27,7 @@ void Emulator::reset_state(bool should_add_startup_machine_cycle)
 
 void Emulator::set_post_boot_state()
 {
-    timer.set_post_boot_state();
+    internal_timer.set_post_boot_state();
     pixel_processing_unit.set_post_boot_state();
     memory_management_unit->set_post_boot_state();
     central_processing_unit.set_post_boot_state();
@@ -65,7 +65,7 @@ RegisterFile<std::endian::native> Emulator::get_register_file() const
 
 void Emulator::print_register_file_state() const
 {
-    GameBoy::print_register_file_state(central_processing_unit.get_register_file());
+    GameBoyCore::print_register_file_state(central_processing_unit.get_register_file());
 }
 
 void Emulator::step_cpu_single_instruction()
@@ -75,7 +75,7 @@ void Emulator::step_cpu_single_instruction()
 
 void Emulator::step_components_single_machine_cycle_to_sync_with_central_processing_unit()
 {
-    timer.step_single_machine_cycle();
+    internal_timer.step_single_machine_cycle();
     pixel_processing_unit.step_single_machine_cycle();
     memory_management_unit->step_single_machine_cycle();
 }
@@ -85,4 +85,4 @@ void Emulator::request_interrupt(uint8_t interrupt_flag_mask)
     memory_management_unit->request_interrupt(interrupt_flag_mask);
 }
 
-} // namespace GameBoy
+} // namespace GameBoyCore

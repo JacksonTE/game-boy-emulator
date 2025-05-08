@@ -3,13 +3,13 @@
 #include <cstdint>
 #include <functional>
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
-class Timer
+class InternalTimer
 {
 public:
-    Timer(std::function<void(uint8_t)> request_interrupt);
+    InternalTimer(std::function<void(uint8_t)> request_interrupt);
 
     void reset_state();
     void set_post_boot_state();
@@ -40,4 +40,4 @@ private:
     bool update_tima_and_get_overflow_state();
 };
 
-} // namespace GameBoy
+} // namespace GameBoyCore

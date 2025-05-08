@@ -4,9 +4,9 @@
 #include <filesystem>
 
 #include "pixel_processing_unit.h"
-#include "timer.h"
+#include "internal_timer.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 constexpr uint32_t MEMORY_SIZE = 0x10000;
@@ -46,7 +46,7 @@ enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
 class MemoryManagementUnit
 {
 public:
-    MemoryManagementUnit(Timer &timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
+    MemoryManagementUnit(InternalTimer &internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
     virtual ~MemoryManagementUnit() = default;
 
     virtual void reset_state();
@@ -71,7 +71,7 @@ private:
     std::unique_ptr<uint8_t[]> unmapped_input_output_registers{};
     std::unique_ptr<uint8_t[]> high_ram{};
 
-    Timer &timer;
+    InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 
     uint8_t interrupt_flag_if{0b11100000};
@@ -86,4 +86,4 @@ private:
     void wrote_to_read_only_address(uint16_t address) const;
 };
 
-} // namespace GameBoy
+} // namespace GameBoyCore

@@ -6,9 +6,9 @@
 #include <memory>
 
 #include "central_processing_unit.h"
-#include "timer.h"
+#include "internal_timer.h"
 
-namespace GameBoy
+namespace GameBoyCore
 {
 
 class Emulator
@@ -30,7 +30,7 @@ public:
     void step_cpu_single_instruction();
 
 private:
-    Timer timer;
+    InternalTimer internal_timer;
     PixelProcessingUnit pixel_processing_unit;
     std::unique_ptr<MemoryManagementUnit> memory_management_unit;
     CentralProcessingUnit central_processing_unit;
@@ -39,4 +39,4 @@ private:
     void request_interrupt(uint8_t interrupt_flag_mask);
 };
 
-} // namespace GameBoy
+} // namespace GameBoyCore
