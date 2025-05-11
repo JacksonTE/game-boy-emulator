@@ -204,7 +204,7 @@ TEST_P(GbmicroTest, TestRom)
 
     for (size_t _ = 0; _ < max_instructions_before_timeout; _++)
     {
-        game_boy_emulator.step_cpu_single_instruction();
+        game_boy_emulator.step_central_processing_unit_single_instruction();
 
         const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xff80);
         const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xff81);

@@ -38,9 +38,24 @@ bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
     return try_load_file_to_memory(BOOTROM_SIZE, bootrom_path, true);
 }
 
+bool Emulator::is_frame_ready() const
+{
+    return pixel_processing_unit.is_frame_ready();
+}
+
+void Emulator::clear_frame_ready()
+{
+    pixel_processing_unit.clear_frame_ready();
+}
+
+std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer()
+{
+    return pixel_processing_unit.get_pixel_frame_buffer();
+}
+
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    print_bytes_in_range(*memory_management_unit, start_address, end_address);
+    GameBoyCore::print_bytes_in_range(*memory_management_unit, start_address, end_address);
 }
 
 bool Emulator::try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
@@ -68,7 +83,7 @@ void Emulator::print_register_file_state() const
     GameBoyCore::print_register_file_state(central_processing_unit.get_register_file());
 }
 
-void Emulator::step_cpu_single_instruction()
+void Emulator::step_central_processing_unit_single_instruction()
 {
     central_processing_unit.step_single_instruction();
 }

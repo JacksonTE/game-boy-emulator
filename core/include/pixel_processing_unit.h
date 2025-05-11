@@ -1,9 +1,11 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <vector>
 
 namespace GameBoyCore
@@ -17,6 +19,9 @@ constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 0x00a0;
 
 constexpr uint16_t VIDEO_RAM_START = 0x8000;
 constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xfe00;
+
+constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
+constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
 constexpr uint8_t DOTS_PER_MACHINE_CYCLE = 4;
 constexpr uint8_t PIXELS_PER_TILE_ROW = 8;
@@ -183,6 +188,10 @@ public:
     void reset_state();
     void set_post_boot_state();
 
+    bool is_frame_ready() const;
+    void clear_frame_ready();
+    std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer();
+
     uint8_t read_lcd_control_lcdc() const;
     void write_lcd_control_lcdc(uint8_t value);
 
@@ -201,6 +210,9 @@ public:
 
 private:
     std::function<void(uint8_t)> request_interrupt_callback;
+
+    std::atomic<bool> are_pixels_for_frame_ready{};
+    std::unique_ptr<uint8_t[]> pixel_frame_buffer{};
 
     std::unique_ptr<uint8_t[]> video_ram;
     std::unique_ptr<uint8_t[]> object_attribute_memory;
@@ -244,16 +256,15 @@ private:
     void trigger_stat_interrupts();
 
     void switch_to_mode(PixelProcessingUnitMode new_mode);
-    void initialize_pixel_transfer();
 
     void step_fetchers_single_dot();
 
     void step_background_fetcher_single_dot();
-    uint8_t get_background_fetcher_tile_id();
-    uint8_t get_background_fetcher_tile_row_byte(uint8_t offset);
+    uint8_t get_background_fetcher_tile_id() const;
+    uint8_t get_background_fetcher_tile_row_byte(uint8_t offset) const;
 
     void step_object_fetcher_single_dot();
-    uint8_t get_object_fetcher_tile_row_byte(uint8_t offset);
+    uint8_t get_object_fetcher_tile_row_byte(uint8_t offset) const;
 
     uint8_t read_byte_object_attribute_memory_internally(uint16_t memory_address) const;
 

@@ -63,7 +63,7 @@ TEST_P(MooneyeTest, TestRom)
 
     for (size_t _ = 0; _ < max_instructions_before_timeout; _++)
     {
-        game_boy_emulator.step_cpu_single_instruction();
+        game_boy_emulator.step_central_processing_unit_single_instruction();
         auto r = game_boy_emulator.get_register_file();
 
         if (r.b == 0x42 && r.c == 0x42 && r.d == 0x42 && r.e == 0x42 && r.h == 0x42 && r.l == 0x42)
