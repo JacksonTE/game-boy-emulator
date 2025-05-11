@@ -2,6 +2,7 @@
 #include <bit>
 #include <exception>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <SDL3/SDL.h>
@@ -56,8 +57,8 @@ static constexpr uint32_t pack_abgr(uint8_t a, uint8_t b, uint8_t g, uint8_t r)
 static constexpr uint32_t game_boy_colour_palette[4] =
 {
     pack_abgr(0xff, 0xff, 0xff, 0xff), // white
-    pack_abgr(0xff, 0xc0, 0xc0, 0xc0), // light gray
-    pack_abgr(0xff, 0x60, 0x60, 0x60), // dark gray
+    pack_abgr(0xff, 0xaa, 0xaa, 0xaa), // light gray
+    pack_abgr(0xff, 0x55, 0x55, 0x55), // dark gray
     pack_abgr(0xff, 0x00, 0x00, 0x00)  // black
 };
 
@@ -113,6 +114,9 @@ int main()
         std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
 
         bool stop_emulating = false;
+
+        uint64_t fps_last_update_time = SDL_GetPerformanceCounter();
+        int frames_since_last_update = 0;
         
         while (!stop_emulating)
         {
@@ -138,7 +142,7 @@ int main()
 
                 auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer();
 
-                for (int i = 0; i < 160 * 144; i++)
+                for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                 {
                     abgr_pixel_buffer[i] = game_boy_colour_palette[pixel_frame_buffer[i]];
                 }
@@ -148,19 +152,29 @@ int main()
                     sdl_texture.get(),
                     nullptr,
                     abgr_pixel_buffer.get(),
-                    160 * sizeof(uint32_t)
+                    DISPLAY_WIDTH_PIXELS * sizeof(uint32_t)
                 );
 
                 SDL_RenderClear(sdl_renderer.get());
                 SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, nullptr);
                 SDL_RenderPresent(sdl_renderer.get());
 
-                SDL_Delay(15);
-                const uint64_t time_now = SDL_GetPerformanceCounter();
-                const uint64_t elapsed_ns = (time_now - frame_start_time) * 1'000'000'000ull / performance_counter_frequency;
-                if (elapsed_ns < frame_duration_nanoseconds)
+                uint64_t time_after_rendering = SDL_GetPerformanceCounter();
+                const uint64_t elapsed_nanoseconds = (time_after_rendering - frame_start_time) * 1'000'000'000 / performance_counter_frequency;
+                if (elapsed_nanoseconds < frame_duration_nanoseconds)
                 {
-                    SDL_DelayPrecise(frame_duration_nanoseconds - elapsed_ns);
+                    SDL_DelayPrecise(frame_duration_nanoseconds - elapsed_nanoseconds);
+                }
+
+                frames_since_last_update++;
+                const uint64_t time_after_frame_delay = SDL_GetPerformanceCounter();
+                if (time_after_frame_delay - fps_last_update_time >= performance_counter_frequency)
+                {
+                    double fps = frames_since_last_update * (double)performance_counter_frequency / double(time_after_frame_delay - fps_last_update_time);
+
+                    std::cout << "FPS: " << std::fixed << std::setprecision(2) << fps << "\n";
+                    frames_since_last_update = 0;
+                    fps_last_update_time = time_after_frame_delay;
                 }
             }
         }

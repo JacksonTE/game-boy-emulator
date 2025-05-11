@@ -89,7 +89,7 @@ struct ObjectPixel
 struct PixelSliceFetcher
 {
     PixelSliceFetcherStep current_step{PixelSliceFetcherStep::GetTileId};
-    uint8_t tile_id{};
+    uint8_t tile_index{};
     uint8_t tile_row_low{};
     uint8_t tile_row_high{};
     bool is_in_first_dot_of_current_step{true};
@@ -264,11 +264,11 @@ private:
     uint8_t get_background_fetcher_tile_row_byte(uint8_t offset) const;
 
     void step_object_fetcher_single_dot();
-    uint8_t get_object_fetcher_tile_row_byte(uint8_t offset) const;
+    uint8_t get_object_fetcher_tile_row_byte(uint8_t offset);
 
     uint8_t read_byte_object_attribute_memory_internally(uint16_t memory_address) const;
 
-    ObjectAttributes get_current_object() const;
+    ObjectAttributes &get_current_object();
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
 };
 
