@@ -98,9 +98,10 @@ struct PixelSliceFetcher
     virtual void reset_state();
 };
 
-struct BackgroundFetcher : PixelSliceFetcher
+struct BackgroundPixelSliceFetcher : PixelSliceFetcher
 {
     FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
+    uint8_t fetcher_x{};
     std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
     void reset_state() override;
@@ -220,12 +221,13 @@ private:
     uint8_t lcd_control_lcdc{};
     uint8_t lcd_status_stat{0b10000000};
     uint8_t lcd_y_coordinate_ly{};
-    uint8_t lcd_internal_x_coordinate_lx{};
-    uint8_t window_internal_line_counter_wly{};
+    uint8_t internal_lcd_x_coordinate_plus_8_lx{};
+    uint8_t internal_window_line_counter_wlc{};
 
     PixelProcessingUnitMode previous_mode{PixelProcessingUnitMode::HorizontalBlank};
     PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
     uint16_t current_scanline_dot_number{};
+    bool is_in_frame_after_lcd_enable{};
     bool is_in_first_scanline_after_lcd_enable{};
     bool is_in_first_dot_of_current_step{true};
     bool is_window_enabled_for_scanline{};
@@ -243,7 +245,7 @@ private:
     uint8_t scanline_pixels_to_discard_from_dummy_fetch_count{8};
     int scanline_pixels_to_discard_from_scrolling_count{-1};
 
-    BackgroundFetcher background_fetcher{};
+    BackgroundPixelSliceFetcher background_fetcher{};
     PixelSliceFetcher object_fetcher{};
     
     ParallelInSerialOutShiftRegister<BackgroundPixel, PIXELS_PER_TILE_ROW> background_pixel_shift_register{true};

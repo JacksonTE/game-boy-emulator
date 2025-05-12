@@ -18,11 +18,12 @@ void PixelSliceFetcher::reset_state()
     is_enabled = false;
 }
 
-void BackgroundFetcher::reset_state()
+void BackgroundPixelSliceFetcher::reset_state()
 {
     PixelSliceFetcher::reset_state();
     is_enabled = true;
     fetcher_mode = FetcherMode::BackgroundMode;
+    fetcher_x = 0;
     tile_row.fill(BackgroundPixel{});
 }
 
@@ -63,8 +64,8 @@ void PixelProcessingUnit::reset_state()
     lcd_control_lcdc = 0;
     lcd_status_stat = 0b10000000;
     lcd_y_coordinate_ly = 0;
-    lcd_internal_x_coordinate_lx = 0;
-    window_internal_line_counter_wly = 0;
+    internal_lcd_x_coordinate_plus_8_lx = 0;
+    internal_window_line_counter_wlc = 0;
 
     previous_mode = PixelProcessingUnitMode::HorizontalBlank;
     current_mode = PixelProcessingUnitMode::HorizontalBlank;
@@ -128,20 +129,21 @@ uint8_t PixelProcessingUnit::read_lcd_control_lcdc() const
 
 void PixelProcessingUnit::write_lcd_control_lcdc(uint8_t value)
 {
-    const bool is_lcd_enable_bit_previously_set = is_bit_set(lcd_control_lcdc, 7);
+    const bool was_lcd_enable_bit_previously_set = is_bit_set(lcd_control_lcdc, 7);
     const bool will_lcd_enable_bit_be_set = is_bit_set(value, 7);
 
-    if (will_lcd_enable_bit_be_set && !is_lcd_enable_bit_previously_set)
+    if (will_lcd_enable_bit_be_set && !was_lcd_enable_bit_previously_set)
     {
+        is_in_frame_after_lcd_enable = true;
         is_in_first_scanline_after_lcd_enable = true;
         is_in_first_dot_of_current_step = true;
         current_scanline_dot_number = 0;
         trigger_stat_interrupts();
     }
-    else if (!will_lcd_enable_bit_be_set && is_lcd_enable_bit_previously_set)
+    else if (!will_lcd_enable_bit_be_set && was_lcd_enable_bit_previously_set)
     {
         lcd_y_coordinate_ly = 0;
-        window_internal_line_counter_wly = 0;
+        internal_window_line_counter_wlc = 0;
         switch_to_mode(PixelProcessingUnitMode::HorizontalBlank);
     }
     lcd_control_lcdc = value;
@@ -328,11 +330,17 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     if (background_fetcher.is_enabled &&
         background_fetcher.fetcher_mode == FetcherMode::BackgroundMode &&
         is_window_enabled_for_scanline && was_wy_condition_triggered_this_frame &&
-        static_cast<int8_t>(lcd_internal_x_coordinate_lx) - 1 == window_x_position_plus_7_wx)
+        static_cast<int8_t>(internal_lcd_x_coordinate_plus_8_lx) - 1 == window_x_position_plus_7_wx)
     {
         background_pixel_shift_register.clear();
         background_fetcher.reset_state();
         background_fetcher.fetcher_mode = FetcherMode::WindowMode;
+    }
+    if (background_fetcher.is_enabled &&
+        background_fetcher.fetcher_mode == FetcherMode::WindowMode &&
+        background_fetcher.fetcher_x <= 7)
+    {
+        background_fetcher.fetcher_x++;
     }
 
     const bool should_draw_or_discard_pixels = !object_fetcher.is_enabled && !background_pixel_shift_register.is_empty();
@@ -343,7 +351,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
 
         if (scanline_pixels_to_discard_from_dummy_fetch_count > 0)
         {
-            lcd_internal_x_coordinate_lx++;
+            internal_lcd_x_coordinate_plus_8_lx++;
             scanline_pixels_to_discard_from_dummy_fetch_count--;
             return;
         }
@@ -379,10 +387,11 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
                 : object_palette_0_obp0;
             pixel_with_palette_applied = (palette & (0b11 << palette_colour_position)) >> palette_colour_position;
         }
-        const uint16_t pixel_address = static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * lcd_y_coordinate_ly) + (lcd_internal_x_coordinate_lx - 8);
+        const uint16_t pixel_address = static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * lcd_y_coordinate_ly) + (internal_lcd_x_coordinate_plus_8_lx - 8);
         pixel_frame_buffer[pixel_address] = pixel_with_palette_applied;
 
-        if (++lcd_internal_x_coordinate_lx == 168)
+        background_fetcher.fetcher_x++;
+        if (++internal_lcd_x_coordinate_plus_8_lx == 168)
         {
             switch_to_mode(PixelProcessingUnitMode::HorizontalBlank);
         }
@@ -404,7 +413,7 @@ void PixelProcessingUnit::step_horizontal_blank_single_dot()
 
     if (background_fetcher.fetcher_mode == FetcherMode::WindowMode)
     {
-        window_internal_line_counter_wly++;
+        internal_window_line_counter_wlc++;
     }
     lcd_y_coordinate_ly++;
     current_scanline_dot_number = 0;
@@ -426,7 +435,7 @@ void PixelProcessingUnit::step_vertical_blank_single_dot()
     if (lcd_y_coordinate_ly == FINAL_SCANLINE_OF_FRAME && current_scanline_dot_number == FINAL_SCANLINE_EARLY_LY_RESET_DOT_NUMBER)
     {
         lcd_y_coordinate_ly = 0;
-        window_internal_line_counter_wly = 0;
+        internal_window_line_counter_wlc = 0;
         did_scan_line_end_during_this_machine_cycle = true;
     }
     if (current_scanline_dot_number < SCANLINE_DURATION_DOTS)
@@ -502,8 +511,6 @@ void PixelProcessingUnit::switch_to_mode(PixelProcessingUnitMode new_mode)
             current_object_index = 0;
             break;
         case PixelProcessingUnitMode::PixelTransfer:
-            lcd_internal_x_coordinate_lx = 0;
-
             if (!was_wy_condition_triggered_this_frame)
             {
                 was_wy_condition_triggered_this_frame = (window_y_position_wy == lcd_y_coordinate_ly);
@@ -513,6 +520,7 @@ void PixelProcessingUnit::switch_to_mode(PixelProcessingUnitMode new_mode)
             scanline_pixels_to_discard_from_dummy_fetch_count = 8;
             scanline_pixels_to_discard_from_scrolling_count = -1;
 
+            internal_lcd_x_coordinate_plus_8_lx = 0;
             background_fetcher.reset_state();
             object_fetcher.reset_state();
             background_pixel_shift_register.clear();
@@ -521,6 +529,11 @@ void PixelProcessingUnit::switch_to_mode(PixelProcessingUnitMode new_mode)
         case PixelProcessingUnitMode::HorizontalBlank:
             break;
         case PixelProcessingUnitMode::VerticalBlank:
+            if (is_in_frame_after_lcd_enable)
+            {
+                std::fill_n(pixel_frame_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
+                is_in_frame_after_lcd_enable = false;
+            }
             are_pixels_for_frame_ready.store(true, std::memory_order_release);
             request_interrupt_callback(INTERRUPT_FLAG_VERTICAL_BLANK_MASK);
             break;
@@ -541,7 +554,7 @@ void PixelProcessingUnit::step_fetchers_single_dot()
         if (!object_fetcher.is_enabled)
         {
             const bool is_next_object_hit = current_object_index < scanline_selected_objects.size() &&
-                                            get_current_object().x_position == lcd_internal_x_coordinate_lx;
+                                            get_current_object().x_position == internal_lcd_x_coordinate_plus_8_lx;
             object_fetcher.is_enabled = is_next_object_hit;
         }
         if (object_fetcher.is_enabled &&
@@ -606,12 +619,12 @@ uint8_t PixelProcessingUnit::get_background_fetcher_tile_id() const
         case FetcherMode::BackgroundMode:
             tile_map_area_bit = is_bit_set(lcd_control_lcdc, 3) ? (1 << 10) : 0;
             tile_id_address |= (static_cast<uint8_t>(lcd_y_coordinate_ly + viewport_y_position_scy) >> 3) << 5;
-            tile_id_address |= static_cast<uint8_t>(lcd_internal_x_coordinate_lx + viewport_x_position_scx) >> 3;
+            tile_id_address |= static_cast<uint8_t>(internal_lcd_x_coordinate_plus_8_lx + viewport_x_position_scx) >> 3;
             break;
         case FetcherMode::WindowMode:
             tile_map_area_bit = is_bit_set(lcd_control_lcdc, 6) ? (1 << 10) : 0;
-            tile_id_address |= (window_internal_line_counter_wly >> 3) << 5;
-            tile_id_address |= lcd_internal_x_coordinate_lx >> 3;
+            tile_id_address |= (internal_window_line_counter_wlc >> 3) << 5;
+            tile_id_address |= (background_fetcher.fetcher_x >> 3);
             break;
     }
     tile_id_address |= tile_map_area_bit;
@@ -621,7 +634,6 @@ uint8_t PixelProcessingUnit::get_background_fetcher_tile_id() const
 
 uint8_t PixelProcessingUnit::get_background_fetcher_tile_row_byte(uint8_t offset) const
 {
-    const bool is_object_height_16 = is_bit_set(lcd_control_lcdc, 2);
     uint16_t tile_row_address = static_cast<uint16_t>((1 << 15) | (background_fetcher.tile_index << 4) | offset);
 
     if (!is_bit_set(lcd_control_lcdc, 4) && !is_bit_set(background_fetcher.tile_index, 7))
@@ -629,8 +641,8 @@ uint8_t PixelProcessingUnit::get_background_fetcher_tile_row_byte(uint8_t offset
         tile_row_address |= (1 << 12);
     }
     tile_row_address |= ((background_fetcher.fetcher_mode == FetcherMode::BackgroundMode
-        ? lcd_y_coordinate_ly + viewport_y_position_scy
-        : window_internal_line_counter_wly) << 1) & 0b1110;
+        ? (lcd_y_coordinate_ly + viewport_y_position_scy)
+        : internal_window_line_counter_wlc) << 1) & 0b1110;
 
     const uint16_t local_address = tile_row_address - VIDEO_RAM_START;
     return video_ram[local_address];
@@ -690,7 +702,7 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
 
         const bool is_object_display_enabled = is_bit_set(lcd_control_lcdc, 1);
         const bool is_next_object_hit = current_object_index < scanline_selected_objects.size() &&
-                                        get_current_object().x_position == lcd_internal_x_coordinate_lx;
+                                        get_current_object().x_position == internal_lcd_x_coordinate_plus_8_lx;
         if (!(is_object_display_enabled && is_next_object_hit))
         {
             background_fetcher.is_enabled = true;

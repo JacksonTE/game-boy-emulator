@@ -76,7 +76,7 @@ public:
             SDL_DestroyRenderer(renderer);
     }
 
-    SDL_Renderer* get() const
+    SDL_Renderer *get() const
     {
         return renderer;
     }
