@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 
@@ -62,6 +63,9 @@ public:
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
     uint8_t get_pending_interrupt_mask() const;
 
+    void update_joypad_button_states_thread_safe(uint8_t bit_position_to_update, bool new_value);
+    void update_direction_pad_states_thread_safe(uint8_t bit_position_to_update, bool new_value);
+
 private:
     std::unique_ptr<uint8_t[]> bootrom{};
     std::unique_ptr<uint8_t[]> rom_bank_00{};
@@ -74,6 +78,9 @@ private:
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 
+    std::atomic<uint8_t> joypad_button_states{0b11111111};
+    std::atomic<uint8_t> joypad_direction_pad_states{0b11111111};
+    uint8_t joypad_p1_joyp{0b11111111};
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};
     uint8_t interrupt_enable_ie{};

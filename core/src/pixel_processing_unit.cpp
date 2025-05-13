@@ -48,7 +48,7 @@ void PixelProcessingUnit::reset_state()
     std::fill_n(video_ram.get(), VIDEO_RAM_SIZE, 0);
     std::fill_n(object_attribute_memory.get(), OBJECT_ATTRIBUTE_MEMORY_SIZE, 0);
     std::fill_n(pixel_frame_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
-    clear_frame_ready();
+    clear_frame_ready_thread_safe();
 
     viewport_y_position_scy = 0;
     viewport_x_position_scx = 0;
@@ -107,12 +107,12 @@ void PixelProcessingUnit::set_post_boot_state()
     background_palette_bgp = 0xfc;
 }
 
-bool PixelProcessingUnit::is_frame_ready() const
+bool PixelProcessingUnit::is_frame_ready_thread_safe() const
 {
     return are_pixels_for_frame_ready.load(std::memory_order_acquire);
 }
 
-void PixelProcessingUnit::clear_frame_ready()
+void PixelProcessingUnit::clear_frame_ready_thread_safe()
 {
     are_pixels_for_frame_ready.store(false, std::memory_order_release);
 }
@@ -444,7 +444,7 @@ void PixelProcessingUnit::step_vertical_blank_single_dot()
     if (lcd_y_coordinate_ly == 0)
     {
         was_wy_condition_triggered_this_frame = false;
-        clear_frame_ready();
+        clear_frame_ready_thread_safe();
         switch_to_mode(PixelProcessingUnitMode::ObjectAttributeMemoryScan);
     }
     else

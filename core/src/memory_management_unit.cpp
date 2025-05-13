@@ -199,6 +199,28 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     {
         switch (address)
         {
+            case 0xff00:
+            {
+                const bool is_select_buttons_set = is_bit_set(joypad_p1_joyp, 5);
+                const bool is_select_directional_pad_set = is_bit_set(joypad_p1_joyp, 4);
+                uint8_t buttons_lower_byte = 0x00;
+                uint8_t direction_pad_lower_byte = 0x00;
+
+                if (!is_select_buttons_set)
+                {
+                    buttons_lower_byte |= (joypad_button_states.load(std::memory_order_acquire) & 0x0f);
+                }
+                if (!is_select_directional_pad_set)
+                {
+                    direction_pad_lower_byte |= (joypad_direction_pad_states.load(std::memory_order_acquire) & 0x0f);
+                }
+
+                if (is_select_buttons_set && is_select_directional_pad_set)
+                    return joypad_p1_joyp | 0x0f | 0b11000000;
+                else
+                    return (joypad_p1_joyp & 0xf0) | (0x0f & (buttons_lower_byte | direction_pad_lower_byte));
+            }
+            break; // TODO refactor into function and simplify logic
             case 0xff04:
                 return  internal_timer.read_div();
             case 0xff05:
@@ -291,6 +313,9 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     {
         switch (address)
         {
+            case 0xff00:
+                joypad_p1_joyp = value | 0b11001111;
+                return;
             case 0xff04:
                 internal_timer.write_div(value);
                 return;
@@ -414,6 +439,30 @@ uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
             return interrupt_flag_mask;
     }
     return 0x00;
+}
+
+void MemoryManagementUnit::update_joypad_button_states_thread_safe(uint8_t bit_position_to_update, bool new_value)
+{
+    uint8_t previous_joypad_button_states = joypad_button_states.load(std::memory_order_acquire);
+    uint8_t updated_joypad_button_states = previous_joypad_button_states;
+    update_flag(updated_joypad_button_states, static_cast<uint8_t>(1 << bit_position_to_update), new_value);
+
+    if (updated_joypad_button_states != previous_joypad_button_states)
+    {
+        joypad_button_states.store(updated_joypad_button_states, std::memory_order_release);
+    }
+}
+
+void MemoryManagementUnit::update_direction_pad_states_thread_safe(uint8_t bit_position_to_update, bool new_value)
+{
+    uint8_t previous_joypad_direction_pad_states = joypad_direction_pad_states.load(std::memory_order_acquire);
+    uint8_t updated_joypad_direction_pad_states = previous_joypad_direction_pad_states;
+    update_flag(updated_joypad_direction_pad_states, static_cast<uint8_t>(1 << bit_position_to_update), new_value);
+
+    if (updated_joypad_direction_pad_states != previous_joypad_direction_pad_states)
+    {
+        joypad_direction_pad_states.store(updated_joypad_direction_pad_states, std::memory_order_release);
+    }
 }
 
 bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const

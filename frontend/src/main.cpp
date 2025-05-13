@@ -23,7 +23,7 @@ static void run_emulator_core(std::stop_token stop_token, GameBoyCore::Emulator 
     {
         while (!stop_token.stop_requested())
         {
-            if (!game_boy_emulator.is_frame_ready())
+            if (!game_boy_emulator.is_frame_ready_thread_safe())
             {
                 game_boy_emulator.step_central_processing_unit_single_instruction();
             }
@@ -86,7 +86,7 @@ int main()
         GameBoyCore::Emulator game_boy_emulator{};
 
         auto bootrom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg_boot.bin";
-        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg-acid2.gb";
+        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
 
         if (!game_boy_emulator.try_load_bootrom(bootrom_path))
         {
@@ -117,7 +117,7 @@ int main()
 
         uint64_t fps_last_update_time = SDL_GetPerformanceCounter();
         int frames_since_last_update = 0;
-        
+
         while (!stop_emulating)
         {
             if (did_emulator_core_exception_occur.load(std::memory_order_acquire))
@@ -133,10 +133,76 @@ int main()
                     case SDL_EVENT_QUIT:
                         stop_emulating = true;
                         break;
+                    case SDL_EVENT_KEY_DOWN:
+                    {
+                        switch (sdl_event.key.key)
+                        {
+                            case SDLK_RIGHT:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(0, false);
+                                break;
+                            case SDLK_LEFT:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(1, false);
+                                break;
+                            case SDLK_UP:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(2, false);
+                                break;
+                            case SDLK_DOWN:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(3, false);
+                                break;
+                            case SDLK_D: // A
+                                game_boy_emulator.update_joypad_button_states_thread_safe(0, false);
+                                break;
+                            case SDLK_S: // B
+                                game_boy_emulator.update_joypad_button_states_thread_safe(1, false);
+                                break;
+                            case SDLK_RSHIFT: // Select
+                                game_boy_emulator.update_joypad_button_states_thread_safe(2, false);
+                                break;
+                            case SDLK_RETURN:
+                            case SDLK_KP_ENTER: // Start
+                                game_boy_emulator.update_joypad_button_states_thread_safe(3, false);
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                    case SDL_EVENT_KEY_UP:
+                        switch (sdl_event.key.key)
+                        {
+                            case SDLK_RIGHT:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(0, true);
+                                break;
+                            case SDLK_LEFT:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(1, true);
+                                break;
+                            case SDLK_UP:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(2, true);
+                                break;
+                            case SDLK_DOWN:
+                                game_boy_emulator.update_direction_pad_states_thread_safe(3, true);
+                                break;
+                            case SDLK_D: // A
+                                game_boy_emulator.update_joypad_button_states_thread_safe(0, true);
+                                break;
+                            case SDLK_S: // B
+                                game_boy_emulator.update_joypad_button_states_thread_safe(1, true);
+                                break;
+                            case SDLK_RSHIFT: // Select
+                                game_boy_emulator.update_joypad_button_states_thread_safe(2, true);
+                                break;
+                            case SDLK_RETURN:
+                            case SDLK_KP_ENTER: // Start
+                                game_boy_emulator.update_joypad_button_states_thread_safe(3, true);
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
                 }
             }
 
-            if (game_boy_emulator.is_frame_ready())
+            if (game_boy_emulator.is_frame_ready_thread_safe())
             {
                 uint64_t frame_start_time = SDL_GetPerformanceCounter();
 
@@ -146,7 +212,7 @@ int main()
                 {
                     abgr_pixel_buffer[i] = game_boy_colour_palette[pixel_frame_buffer[i]];
                 }
-                game_boy_emulator.clear_frame_ready();
+                game_boy_emulator.clear_frame_ready_thread_safe();
 
                 SDL_UpdateTexture(
                     sdl_texture.get(),

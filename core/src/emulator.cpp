@@ -38,19 +38,29 @@ bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
     return try_load_file_to_memory(BOOTROM_SIZE, bootrom_path, true);
 }
 
-bool Emulator::is_frame_ready() const
+bool Emulator::is_frame_ready_thread_safe() const
 {
-    return pixel_processing_unit.is_frame_ready();
+    return pixel_processing_unit.is_frame_ready_thread_safe();
 }
 
-void Emulator::clear_frame_ready()
+void Emulator::clear_frame_ready_thread_safe()
 {
-    pixel_processing_unit.clear_frame_ready();
+    pixel_processing_unit.clear_frame_ready_thread_safe();
 }
 
 std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer()
 {
     return pixel_processing_unit.get_pixel_frame_buffer();
+}
+
+void Emulator::update_joypad_button_states_thread_safe(uint8_t bit_position_to_update, bool new_value)
+{
+    memory_management_unit->update_joypad_button_states_thread_safe(bit_position_to_update, new_value);
+}
+
+void Emulator::update_direction_pad_states_thread_safe(uint8_t bit_position_to_update, bool new_value)
+{
+    memory_management_unit->update_direction_pad_states_thread_safe(bit_position_to_update, new_value);
 }
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const

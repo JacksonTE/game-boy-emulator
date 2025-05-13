@@ -189,8 +189,8 @@ public:
     void reset_state();
     void set_post_boot_state();
 
-    bool is_frame_ready() const;
-    void clear_frame_ready();
+    bool is_frame_ready_thread_safe() const;
+    void clear_frame_ready_thread_safe();
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer();
 
     uint8_t read_lcd_control_lcdc() const;
