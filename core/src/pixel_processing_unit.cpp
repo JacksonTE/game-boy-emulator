@@ -142,6 +142,9 @@ void PixelProcessingUnit::write_lcd_control_lcdc(uint8_t value)
     }
     else if (!will_lcd_enable_bit_be_set && was_lcd_enable_bit_previously_set)
     {
+        std::fill_n(pixel_frame_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
+        are_pixels_for_frame_ready.store(true, std::memory_order_release);
+
         lcd_y_coordinate_ly = 0;
         internal_window_line_counter_wlc = 0;
         switch_to_mode(PixelProcessingUnitMode::HorizontalBlank);
@@ -174,12 +177,14 @@ uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const
     return lcd_y_coordinate_ly;
 }
 
-uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address, bool is_access_for_oam_dma) const
+uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
 {
-    if (!is_access_for_oam_dma &&
-        previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-        (previous_mode != PixelProcessingUnitMode::HorizontalBlank &&
-         current_mode == PixelProcessingUnitMode::PixelTransfer))
+    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+
+    if (is_lcd_enable_bit_set &&
+        (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+         (previous_mode != PixelProcessingUnitMode::HorizontalBlank &&
+          current_mode == PixelProcessingUnitMode::PixelTransfer)))
     {
         return 0xff;
     }
@@ -189,7 +194,9 @@ uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address, bool i
 
 void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
 {
-    if (previous_mode == PixelProcessingUnitMode::PixelTransfer)
+    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+
+    if (is_lcd_enable_bit_set && previous_mode == PixelProcessingUnitMode::PixelTransfer)
     {
         return;
     }
@@ -199,9 +206,12 @@ void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t 
 
 uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const
 {
-    if ((is_oam_dma_in_progress ||
-         (current_mode != PixelProcessingUnitMode::VerticalBlank &&
-          (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || previous_mode != PixelProcessingUnitMode::HorizontalBlank))))
+    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+
+    if (is_lcd_enable_bit_set &&
+        (is_oam_dma_in_progress ||
+        (current_mode != PixelProcessingUnitMode::VerticalBlank &&
+        (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || previous_mode != PixelProcessingUnitMode::HorizontalBlank))))
     {
         return 0xff;
     }
@@ -211,10 +221,12 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
 
 void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma)
 {
-    if ((is_oam_dma_in_progress && !is_access_for_oam_dma) ||
+    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+
+    if (is_lcd_enable_bit_set && ((is_oam_dma_in_progress && !is_access_for_oam_dma) ||
         previous_mode == PixelProcessingUnitMode::PixelTransfer ||
         (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan &&
-         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan))
+         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan)))
     {
         return;
     }

@@ -201,7 +201,7 @@ public:
 
     uint8_t read_lcd_y_coordinate_ly() const;
 
-    uint8_t read_byte_video_ram(uint16_t memory_address, bool is_access_for_oam_dma) const;
+    uint8_t read_byte_video_ram(uint16_t memory_address) const;
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
 
     uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;

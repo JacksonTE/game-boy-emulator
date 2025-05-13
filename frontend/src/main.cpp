@@ -26,6 +26,19 @@ static void run_emulator_core(std::stop_token stop_token, GameBoyCore::Emulator 
             if (!game_boy_emulator.is_frame_ready_thread_safe())
             {
                 game_boy_emulator.step_central_processing_unit_single_instruction();
+
+                const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xff80);
+                const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xff81);
+                const uint8_t test_pass_fail_byte = game_boy_emulator.read_byte_from_memory(0xff82);
+
+                if (test_pass_fail_byte == 0xff)
+                {
+                    std::cout << "Test failed with result " << static_cast<int>(test_result_byte) << ". Expected result was " << static_cast<int>(test_expected_result_byte) << "\n";
+                }
+                else if (test_pass_fail_byte == 0x01)
+                {
+                    std::cout << "Test Succeeded\n";
+                }
             }
         }
     }
@@ -86,7 +99,9 @@ int main()
         GameBoyCore::Emulator game_boy_emulator{};
 
         auto bootrom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg_boot.bin";
-        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
+        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
+        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Tetris (JUE) (V1.1) [!].gb";
+        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "gbmicrotest" / "bin" / "000-write_to_x8000.gb";
 
         if (!game_boy_emulator.try_load_bootrom(bootrom_path))
         {
@@ -96,6 +111,7 @@ int main()
         {
             throw std::runtime_error("Error: unable to initialize Game Boy with provided rom path, exiting.");
         }
+        //game_boy_emulator.set_post_boot_state();
 
         std::exception_ptr emulator_core_exception_pointer{};
         std::atomic<bool> did_emulator_core_exception_occur{};

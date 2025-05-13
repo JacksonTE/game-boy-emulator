@@ -169,7 +169,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     }
     else if (address >= VIDEO_RAM_START && address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
     {
-        return pixel_processing_unit.read_byte_video_ram(address, is_access_for_oam_dma);
+        return pixel_processing_unit.read_byte_video_ram(address);
     }
     else if (address >= EXTERNAL_RAM_START && address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
     {
@@ -216,9 +216,13 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
                 }
 
                 if (is_select_buttons_set && is_select_directional_pad_set)
+                {
                     return joypad_p1_joyp | 0x0f | 0b11000000;
+                }
                 else
+                {
                     return (joypad_p1_joyp & 0xf0) | (0x0f & (buttons_lower_byte | direction_pad_lower_byte));
+                }
             }
             break; // TODO refactor into function and simplify logic
             case 0xff04:
