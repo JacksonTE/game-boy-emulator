@@ -87,6 +87,12 @@ int main()
             SDL_WINDOW_RESIZABLE
         };
         SdlResourceAcquisitionIsInitialization::Renderer sdl_renderer{sdl_window};
+        SDL_SetRenderLogicalPresentation(
+            sdl_renderer.get(),
+            DISPLAY_WIDTH_PIXELS,
+            DISPLAY_HEIGHT_PIXELS,
+            SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
+        );
         SdlResourceAcquisitionIsInitialization::Texture sdl_texture
         {
             sdl_renderer,
@@ -95,13 +101,15 @@ int main()
             DISPLAY_WIDTH_PIXELS,
             DISPLAY_HEIGHT_PIXELS,
         };
+        SDL_SetTextureScaleMode(sdl_texture.get(), SDL_SCALEMODE_NEAREST);
+
 
         GameBoyCore::Emulator game_boy_emulator{};
 
         auto bootrom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg_boot.bin";
-        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
+        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
         //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Tetris (JUE) (V1.1) [!].gb";
-        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "gbmicrotest" / "bin" / "000-write_to_x8000.gb";
+        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "gbmicrotest" / "bin" / "000-write_to_x8000.gb";
 
         if (!game_boy_emulator.try_load_bootrom(bootrom_path))
         {
