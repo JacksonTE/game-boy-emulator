@@ -118,7 +118,7 @@ void PixelProcessingUnit::clear_frame_ready_thread_safe()
     are_pixels_for_frame_ready.store(false, std::memory_order_release);
 }
 
-std::unique_ptr<uint8_t[]>& PixelProcessingUnit::get_pixel_frame_buffer()
+std::unique_ptr<uint8_t[]> &PixelProcessingUnit::get_pixel_frame_buffer()
 {
     return pixel_frame_buffer;
 }
@@ -139,7 +139,6 @@ void PixelProcessingUnit::write_lcd_control_lcdc(uint8_t value)
         is_in_first_scanline_after_lcd_enable = true;
         is_in_first_dot_of_current_step = true;
         current_scanline_dot_number = 0;
-        trigger_stat_interrupts();
     }
     else if (!will_lcd_enable_bit_be_set && was_lcd_enable_bit_previously_set)
     {
@@ -184,8 +183,7 @@ uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
 
     if (is_lcd_enable_bit_set &&
         (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-         (previous_mode != PixelProcessingUnitMode::HorizontalBlank &&
-          current_mode == PixelProcessingUnitMode::PixelTransfer)))
+         (previous_mode != PixelProcessingUnitMode::HorizontalBlank && current_mode == PixelProcessingUnitMode::PixelTransfer)))
     {
         return 0xff;
     }
@@ -224,10 +222,10 @@ void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_add
 {
     const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
 
-    if (is_lcd_enable_bit_set && ((is_oam_dma_in_progress && !is_access_for_oam_dma) ||
-        previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-        (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan &&
-         current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan)))
+    if (is_lcd_enable_bit_set &&
+        ((is_oam_dma_in_progress && !is_access_for_oam_dma) ||
+         previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+         (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan)))
     {
         return;
     }
@@ -296,6 +294,7 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
         const uint8_t object_start_local_address = (2 * current_scanline_dot_number) - 4;
         ObjectAttributes current_object
         {
+            object_start_local_address,
             read_byte_object_attribute_memory_internally(object_start_local_address),
             read_byte_object_attribute_memory_internally(object_start_local_address + 1),
             read_byte_object_attribute_memory_internally(object_start_local_address + 2),
@@ -670,12 +669,16 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
             {
                 const bool is_object_double_height = is_bit_set(lcd_control_lcdc, 2);
 
+                const uint8_t object_starting_index = scanline_selected_objects[current_object_index].object_attribute_memory_starting_index;
+                scanline_selected_objects[current_object_index].tile_index = read_byte_object_attribute_memory_internally(object_starting_index + 2);
+                scanline_selected_objects[current_object_index].flags = read_byte_object_attribute_memory_internally(object_starting_index + 3);
+
                 if (is_object_double_height)
                 {
                     const bool is_flipped_vertically = is_bit_set(get_current_object().flags, 6);
 
                     set_bit(scanline_selected_objects[current_object_index].tile_index, 0, 
-                        lcd_y_coordinate_ly < get_current_object().y_position - 8 == is_flipped_vertically);
+                            lcd_y_coordinate_ly < get_current_object().y_position - 8 == is_flipped_vertically);
                 }
                 object_fetcher.tile_index = get_current_object().tile_index;
                 object_fetcher.current_step = PixelSliceFetcherStep::GetTileRowLow;

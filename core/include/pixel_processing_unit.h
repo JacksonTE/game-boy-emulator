@@ -68,6 +68,7 @@ enum class PixelSliceFetcherStep
 
 struct ObjectAttributes
 {
+    uint8_t object_attribute_memory_starting_index{};
     int16_t y_position{};
     uint16_t x_position{};
     uint8_t tile_index{};

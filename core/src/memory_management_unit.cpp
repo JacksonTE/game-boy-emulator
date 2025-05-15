@@ -203,21 +203,27 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
             {
                 const bool is_select_buttons_enabled = !is_bit_set(joypad_p1_joyp, 5);
                 const bool is_select_directional_pad_enabled = !is_bit_set(joypad_p1_joyp, 4);
+                uint8_t res;
 
                 if (is_select_buttons_enabled && !is_select_directional_pad_enabled)
                 {
-                    return (joypad_p1_joyp & 0xf0) | (joypad_button_states.load(std::memory_order_acquire) & 0x0f);
+                    res = (joypad_p1_joyp & 0xf0) | (joypad_button_states.load(std::memory_order_relaxed) & 0x0f);
                 }
                 else if (!is_select_buttons_enabled && is_select_directional_pad_enabled)
                 {
-                    return (joypad_p1_joyp & 0xf0) | (joypad_direction_pad_states.load(std::memory_order_acquire) & 0x0f);
+                    res = (joypad_p1_joyp & 0xf0) | (joypad_direction_pad_states.load(std::memory_order_relaxed) & 0x0f);
                 }
                 else if (is_select_buttons_enabled && is_select_directional_pad_enabled)
                 {
-                    return (joypad_p1_joyp & 0xf0) | ((joypad_button_states.load(std::memory_order_acquire) | joypad_direction_pad_states.load(std::memory_order_acquire)) & 0x0f);
+                    res = (joypad_p1_joyp & 0xf0) | ((joypad_button_states.load(std::memory_order_relaxed) | joypad_direction_pad_states.load(std::memory_order_relaxed)) & 0x0f);
                 }
                 else
-                    return (joypad_p1_joyp & 0xf0) | 0x0f;
+                    res = (joypad_p1_joyp & 0xf0) | 0x0;
+
+                if ((res & 0x0f) == 0)
+                    auto x = 2;
+
+                return res;
             }
             break; // TODO refactor into function and simplify logic
             case 0xff04:
@@ -306,7 +312,8 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
         // TODO check if OAM corruption is relevant here
-        std::cout << "Attempted to write to unusable address " << address << ". No write will occur.\n";
+        std::cout << std::hex << std::setfill('0');
+        std::cout << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
     }
     else if (address >= INPUT_OUTPUT_REGISTERS_START && address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
     {
@@ -487,7 +494,8 @@ bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uin
 
 void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const
 {
-    std::cout << "Attempted to write to read only address " << address << ". No write will occur.\n";
+    std::cout << std::hex << std::setfill('0');
+    std::cout << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
 }
 
 } // namespace GameBoyCore
