@@ -13,6 +13,19 @@
 #include "emulator.h"
 #include "sdl_wrappers.h"
 
+constexpr uint8_t RIGHT_DIRECTION_PAD_FLAG_MASK = 1 << 0;
+constexpr uint8_t LEFT_DIRECTION_PAD_FLAG_MASK = 1 << 1;
+constexpr uint8_t UP_DIRECTION_PAD_FLAG_MASK = 1 << 2;
+constexpr uint8_t DOWN_DIRECTION_PAD_FLAG_MASK = 1 << 3;
+
+constexpr uint8_t A_BUTTON_FLAG_MASK = 1 << 0;
+constexpr uint8_t B_BUTTON_FLAG_MASK = 1 << 1;
+constexpr uint8_t SELECT_BUTTON_FLAG_MASK = 1 << 2;
+constexpr uint8_t START_BUTTON_FLAG_MASK = 1 << 3;
+
+constexpr bool BUTTON_PRESSED = false;
+constexpr bool BUTTON_RELEASED = true;
+
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 constexpr int WINDOW_SCALE = 6;
@@ -161,30 +174,30 @@ int main()
                     {
                         switch (sdl_event.key.key)
                         {
-                            case SDLK_RIGHT:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(0, false);
+                            case SDLK_D:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(A_BUTTON_FLAG_MASK, BUTTON_PRESSED);
                                 break;
-                            case SDLK_LEFT:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(1, false);
+                            case SDLK_S:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(B_BUTTON_FLAG_MASK, BUTTON_PRESSED);
                                 break;
-                            case SDLK_UP:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(2, false);
-                                break;
-                            case SDLK_DOWN:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(3, false);
-                                break;
-                            case SDLK_D: // A
-                                game_boy_emulator.update_joypad_button_states_thread_safe(0, false);
-                                break;
-                            case SDLK_S: // B
-                                game_boy_emulator.update_joypad_button_states_thread_safe(1, false);
-                                break;
-                            case SDLK_RSHIFT: // Select
-                                game_boy_emulator.update_joypad_button_states_thread_safe(2, false);
+                            case SDLK_RSHIFT:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(SELECT_BUTTON_FLAG_MASK, BUTTON_PRESSED);
                                 break;
                             case SDLK_RETURN:
-                            case SDLK_KP_ENTER: // Start
-                                game_boy_emulator.update_joypad_button_states_thread_safe(3, false);
+                            case SDLK_KP_ENTER:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(START_BUTTON_FLAG_MASK, BUTTON_PRESSED);
+                                break;
+                            case SDLK_RIGHT:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(RIGHT_DIRECTION_PAD_FLAG_MASK, BUTTON_PRESSED);
+                                break;
+                            case SDLK_LEFT:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(LEFT_DIRECTION_PAD_FLAG_MASK, BUTTON_PRESSED);
+                                break;
+                            case SDLK_UP:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(UP_DIRECTION_PAD_FLAG_MASK, BUTTON_PRESSED);
+                                break;
+                            case SDLK_DOWN:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(DOWN_DIRECTION_PAD_FLAG_MASK, BUTTON_PRESSED);
                                 break;
                             default:
                                 break;
@@ -194,30 +207,30 @@ int main()
                     case SDL_EVENT_KEY_UP:
                         switch (sdl_event.key.key)
                         {
-                            case SDLK_RIGHT:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(0, true);
+                            case SDLK_D:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(A_BUTTON_FLAG_MASK, BUTTON_RELEASED);
                                 break;
-                            case SDLK_LEFT:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(1, true);
+                            case SDLK_S:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(B_BUTTON_FLAG_MASK, BUTTON_RELEASED);
                                 break;
-                            case SDLK_UP:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(2, true);
-                                break;
-                            case SDLK_DOWN:
-                                game_boy_emulator.update_direction_pad_states_thread_safe(3, true);
-                                break;
-                            case SDLK_D: // A
-                                game_boy_emulator.update_joypad_button_states_thread_safe(0, true);
-                                break;
-                            case SDLK_S: // B
-                                game_boy_emulator.update_joypad_button_states_thread_safe(1, true);
-                                break;
-                            case SDLK_RSHIFT: // Select
-                                game_boy_emulator.update_joypad_button_states_thread_safe(2, true);
+                            case SDLK_RSHIFT:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(SELECT_BUTTON_FLAG_MASK, BUTTON_RELEASED);
                                 break;
                             case SDLK_RETURN:
-                            case SDLK_KP_ENTER: // Start
-                                game_boy_emulator.update_joypad_button_states_thread_safe(3, true);
+                            case SDLK_KP_ENTER:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(START_BUTTON_FLAG_MASK, BUTTON_RELEASED);
+                                break;
+                            case SDLK_RIGHT:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(RIGHT_DIRECTION_PAD_FLAG_MASK, BUTTON_RELEASED);
+                                break;
+                            case SDLK_LEFT:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(LEFT_DIRECTION_PAD_FLAG_MASK, BUTTON_RELEASED);
+                                break;
+                            case SDLK_UP:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(UP_DIRECTION_PAD_FLAG_MASK, BUTTON_RELEASED);
+                                break;
+                            case SDLK_DOWN:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(DOWN_DIRECTION_PAD_FLAG_MASK, BUTTON_RELEASED);
                                 break;
                             default:
                                 break;

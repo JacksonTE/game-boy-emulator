@@ -53,14 +53,14 @@ std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer()
     return pixel_processing_unit.get_pixel_frame_buffer();
 }
 
-void Emulator::update_joypad_button_states_thread_safe(uint8_t bit_position_to_update, bool new_value)
+void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state)
 {
-    memory_management_unit->update_joypad_button_states_thread_safe(bit_position_to_update, new_value);
+    memory_management_unit->update_joypad_button_pressed_state_thread_safe(button_flag_mask, new_button_pressed_state);
 }
 
-void Emulator::update_direction_pad_states_thread_safe(uint8_t bit_position_to_update, bool new_value)
+void Emulator::update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state)
 {
-    memory_management_unit->update_direction_pad_states_thread_safe(bit_position_to_update, new_value);
+    memory_management_unit->update_joypad_direction_pad_pressed_state_thread_safe(direction_flag_mask, new_direction_pressed_state);
 }
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const

@@ -63,8 +63,8 @@ public:
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
     uint8_t get_pending_interrupt_mask() const;
 
-    void update_joypad_button_states_thread_safe(uint8_t bit_position_to_update, bool new_value);
-    void update_direction_pad_states_thread_safe(uint8_t bit_position_to_update, bool new_value);
+    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state);
+    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state);
 
 private:
     std::unique_ptr<uint8_t[]> bootrom{};

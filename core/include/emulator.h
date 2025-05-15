@@ -24,8 +24,8 @@ public:
     void clear_frame_ready_thread_safe();
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer();
 
-    void update_joypad_button_states_thread_safe(uint8_t bit_position_to_update, bool new_value);
-    void update_direction_pad_states_thread_safe(uint8_t bit_position_to_update, bool new_value);
+    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state);
+    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state);
 
     void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
     bool try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
