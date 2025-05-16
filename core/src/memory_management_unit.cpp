@@ -207,18 +207,18 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
 
                 if (is_select_buttons_enabled && !is_select_directional_pad_enabled)
                 {
-                    res = (joypad_p1_joyp & 0xf0) | (joypad_button_states.load(std::memory_order_relaxed) & 0x0f);
+                    res = (joypad_p1_joyp & 0xf0) | (joypad_button_states.load(std::memory_order_acquire) & 0x0f);
                 }
                 else if (!is_select_buttons_enabled && is_select_directional_pad_enabled)
                 {
-                    res = (joypad_p1_joyp & 0xf0) | (joypad_direction_pad_states.load(std::memory_order_relaxed) & 0x0f);
+                    res = (joypad_p1_joyp & 0xf0) | (joypad_direction_pad_states.load(std::memory_order_acquire) & 0x0f);
                 }
                 else if (is_select_buttons_enabled && is_select_directional_pad_enabled)
                 {
-                    res = (joypad_p1_joyp & 0xf0) | ((joypad_button_states.load(std::memory_order_relaxed) | joypad_direction_pad_states.load(std::memory_order_relaxed)) & 0x0f);
+                    res = (joypad_p1_joyp & 0xf0) | ((joypad_button_states.load(std::memory_order_acquire) | joypad_direction_pad_states.load(std::memory_order_acquire)) & 0x0f);
                 }
                 else
-                    res = (joypad_p1_joyp & 0xf0) | 0x0;
+                    res = (joypad_p1_joyp & 0xf0) | 0x0f;
 
                 if ((res & 0x0f) == 0)
                     auto x = 2;
@@ -450,17 +450,17 @@ uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
 void MemoryManagementUnit::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state)
 {
     if (new_button_pressed_state)
-        joypad_button_states.fetch_or(button_flag_mask, std::memory_order_acq_rel);
+        joypad_button_states.fetch_or(button_flag_mask, std::memory_order_release);
     else
-        joypad_button_states.fetch_and(~button_flag_mask, std::memory_order_acq_rel);
+        joypad_button_states.fetch_and(~button_flag_mask, std::memory_order_release);
 }
 
 void MemoryManagementUnit::update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state)
 {
     if (new_direction_pressed_state)
-        joypad_direction_pad_states.fetch_or(direction_flag_mask, std::memory_order_acq_rel);
+        joypad_direction_pad_states.fetch_or(direction_flag_mask, std::memory_order_release);
     else
-        joypad_direction_pad_states.fetch_and(~direction_flag_mask, std::memory_order_acq_rel);
+        joypad_direction_pad_states.fetch_and(~direction_flag_mask, std::memory_order_release);
 }
 
 bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const

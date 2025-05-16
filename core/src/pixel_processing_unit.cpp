@@ -114,7 +114,6 @@ bool PixelProcessingUnit::is_frame_ready_thread_safe() const
 
 void PixelProcessingUnit::clear_frame_ready_thread_safe()
 {
-    std::fill_n(pixel_frame_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
     are_pixels_for_frame_ready.store(false, std::memory_order_release);
 }
 
