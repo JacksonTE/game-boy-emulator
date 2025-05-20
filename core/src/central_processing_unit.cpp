@@ -214,7 +214,7 @@ uint8_t &CentralProcessingUnit::get_register_by_index(uint8_t index)
         case 7:
             return register_file.a;
         default:
-            throw std::runtime_error{ "Error: invalid register index provided to get_register_by_index(uint8_t index)." };
+            throw std::runtime_error{"Error: invalid register index provided to get_register_by_index(uint8_t index)."};
     }
 }
 

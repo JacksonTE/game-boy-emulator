@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <nfd.h>
 #include <SDL3/SDL.h>
 #include <sstream>
 #include <stop_token>
@@ -105,12 +106,15 @@ int main()
     try
     {
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
-        ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window{
+
+        ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window
+        {
             "Emulate Game Boy",
             DISPLAY_WIDTH_PIXELS * WINDOW_SCALE,
             DISPLAY_HEIGHT_PIXELS * WINDOW_SCALE,
             SDL_WINDOW_RESIZABLE
         };
+
         ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer{sdl_window};
         SDL_SetRenderLogicalPresentation(
             sdl_renderer.get(),
@@ -122,6 +126,7 @@ int main()
         {
             std::cerr << "VSync unable to be used: " << SDL_GetError() << "\n";
         }
+
         ResourceAcquisitionIsInitialization::SdlTextureRaii sdl_texture
         {
             sdl_renderer,
@@ -137,8 +142,8 @@ int main()
         GameBoyCore::Emulator game_boy_emulator{};
 
         auto bootrom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg_boot.bin";
-        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
-        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Tetris (JUE) (V1.1) [!].gb";
+        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
+        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Tetris (JUE) (V1.1) [!].gb";
         //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg-acid2.gb";
         //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "gbmicrotest" / "bin" / "400-dma.gb";
 
@@ -194,7 +199,7 @@ int main()
                             case SDLK_D:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(A_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
-                            case SDLK_W:
+                            case SDLK_A:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(B_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
                             case SDLK_RSHIFT:
@@ -240,9 +245,64 @@ int main()
             SDL_RenderClear(sdl_renderer.get());
             SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, nullptr);
             
+            // Workaround for https://github.com/ocornut/imgui/issues/8339
+            int sdl_renderer_logical_width, sdl_renderer_logical_height;
+            SDL_RendererLogicalPresentation sdl_renderer_logical_presentation_mode;
+            SDL_GetRenderLogicalPresentation(sdl_renderer.get(), &sdl_renderer_logical_width, &sdl_renderer_logical_height, &sdl_renderer_logical_presentation_mode);
+            SDL_SetRenderLogicalPresentation(sdl_renderer.get(), sdl_renderer_logical_width, sdl_renderer_logical_height, SDL_LOGICAL_PRESENTATION_DISABLED);
+
+            ImGui_ImplSDLRenderer3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
+
+            if (ImGui::BeginMainMenuBar())
             {
-                // imgui
+                if (ImGui::BeginMenu("File"))
+                {
+                    if (ImGui::MenuItem("Load ROM", "Ctrl+O"))
+                    {
+                        nfdopendialogu8args_t open_dialog_arguments{};
+
+                        nfdu8filteritem_t filters[] =
+                        {
+                            {"Game Boy ROM (*.gb/.bin/.rom)", "gb;bin;rom"}
+                        };
+                        open_dialog_arguments.filterList = filters;
+                        open_dialog_arguments.filterCount = 1;
+
+                        nfdchar_t *rom_path = nullptr;
+                        nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
+
+                        if (result == NFD_OKAY)
+                        {
+                            game_boy_emulator.reset_state(true);
+                            game_boy_emulator.try_load_file_to_memory(2 * GameBoyCore::ROM_BANK_SIZE, rom_path, false);
+                            NFD_FreePathU8(rom_path);
+                        }
+                        else if (result == NFD_ERROR)
+                        {
+                            std::cerr << "NFD error: " << NFD_GetError() << "\n";
+                        }
+                    }
+                    if (ImGui::MenuItem("Load Bootrom", "Ctrl+B"))
+                    {
+
+                    }
+                    ImGui::Separator();
+                    if (ImGui::MenuItem("Quit", "Alt+F4"))
+                    {
+                        stop_emulating = true;
+                    }
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMainMenuBar();
             }
+
+            ImGui::Render();
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdl_renderer.get());
+
+            // Workaround for https://github.com/ocornut/imgui/issues/8339
+            SDL_SetRenderLogicalPresentation(sdl_renderer.get(), sdl_renderer_logical_width, sdl_renderer_logical_height, sdl_renderer_logical_presentation_mode);
 
             SDL_RenderPresent(sdl_renderer.get());
         }

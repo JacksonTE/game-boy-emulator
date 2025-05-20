@@ -28,7 +28,7 @@ void BackgroundPixelSliceFetcher::reset_state()
 }
 
 PixelProcessingUnit::PixelProcessingUnit(std::function<void(uint8_t)> request_interrupt)
-    : request_interrupt_callback{ request_interrupt }
+    : request_interrupt_callback{request_interrupt}
 {
     video_ram = std::make_unique<uint8_t[]>(VIDEO_RAM_SIZE);
     std::fill_n(video_ram.get(), VIDEO_RAM_SIZE, 0);

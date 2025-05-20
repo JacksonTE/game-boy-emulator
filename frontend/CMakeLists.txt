@@ -1,6 +1,18 @@
 include(FetchContent)
 
 FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.91.9b
+)
+
+FetchContent_Declare(
+    nativefiledialog
+    GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+    GIT_TAG v1.2.1
+)
+
+FetchContent_Declare(
     SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
     GIT_TAG release-3.2.12
@@ -10,15 +22,10 @@ set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 
-FetchContent_Declare(
-    imgui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG v1.91.9b
-)
-
 FetchContent_MakeAvailable(
-    SDL3
     imgui
+    nativefiledialog
+    SDL3
 )
 
 add_library(imgui
@@ -54,6 +61,7 @@ PRIVATE
 target_link_libraries(emulate-game-boy-frontend
 PRIVATE
     emulate-game-boy-core-library
-    SDL3::SDL3
     imgui
+    nfd
+    SDL3::SDL3
 )

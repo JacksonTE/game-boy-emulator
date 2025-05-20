@@ -170,31 +170,4 @@ private:
     ImGuiContext *imgui_context{};
 };
 
-class ImGuiFrameRaii
-{
-public:
-    ImGuiFrameRaii(SDL_Renderer *renderer)
-        : sdl_renderer{renderer}
-    {
-        ImGui_ImplSDLRenderer3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-    }
-
-    ~ImGuiFrameRaii()
-    {
-        ImGui::Render();
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdl_renderer);
-    }
-
-    ImGuiFrameRaii(const ImGuiFrameRaii &) = delete;
-    ImGuiFrameRaii &operator=(const ImGuiFrameRaii &) = delete;
-
-    ImGuiFrameRaii(ImGuiFrameRaii &&) = delete;
-    ImGuiFrameRaii &operator=(ImGuiFrameRaii &&) = delete;
-
-private:
-    SDL_Renderer *sdl_renderer{};
-};
-
 } // namespace ResourceAcquisitionIsInitialization
