@@ -35,11 +35,35 @@ static void run_emulator_core(std::stop_token stop_token, GameBoyCore::Emulator 
 {
     try
     {
+        constexpr double frame_duration_seconds = 0.01674;
+        const uint64_t counter_ticks_per_second = SDL_GetPerformanceFrequency();
+        const uint64_t counter_ticks_per_frame_rounded = static_cast<uint64_t>(frame_duration_seconds * counter_ticks_per_second + 0.5);
+
+        uint64_t next_frame_counter_tick = SDL_GetPerformanceCounter();
+        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+
         while (!stop_token.stop_requested())
         {
-            if (!game_boy_emulator.is_frame_ready_thread_safe())
+            game_boy_emulator.step_central_processing_unit_single_instruction();
+
+            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+
+            if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
-                game_boy_emulator.step_central_processing_unit_single_instruction();
+                previously_published_frame_buffer_index = currently_published_frame_buffer_index;
+
+                next_frame_counter_tick += counter_ticks_per_frame_rounded;
+                const uint64_t current_counter_tick = SDL_GetPerformanceCounter();
+
+                if (next_frame_counter_tick > current_counter_tick)
+                {
+                    const uint64_t delay_in_nanoseconds = (next_frame_counter_tick - current_counter_tick) * 1'000'000'000ull / counter_ticks_per_second;
+                    SDL_DelayPrecise(delay_in_nanoseconds);
+                }
+                else
+                {
+                    next_frame_counter_tick = current_counter_tick;
+                }
             }
         }
     }
@@ -94,6 +118,10 @@ int main()
             DISPLAY_HEIGHT_PIXELS,
             SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
         );
+        if (!SDL_SetRenderVSync(sdl_renderer.get(), 1))
+        {
+            std::cerr << "VSync unable to be used: " << SDL_GetError() << "\n";
+        }
         ResourceAcquisitionIsInitialization::SdlTextureRaii sdl_texture
         {
             sdl_renderer,
@@ -104,13 +132,14 @@ int main()
         };
         SDL_SetTextureScaleMode(sdl_texture.get(), SDL_SCALEMODE_NEAREST);
 
-        ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{ sdl_window.get(), sdl_renderer.get() };
+        ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
 
         GameBoyCore::Emulator game_boy_emulator{};
 
         auto bootrom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg_boot.bin";
         auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
         //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Tetris (JUE) (V1.1) [!].gb";
+        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg-acid2.gb";
         //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "gbmicrotest" / "bin" / "400-dma.gb";
 
         if (!game_boy_emulator.try_load_bootrom(bootrom_path))
@@ -122,6 +151,11 @@ int main()
             throw std::runtime_error("Error: unable to initialize Game Boy with provided rom path, exiting.");
         }
 
+        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+
+        std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
+        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
+
         std::exception_ptr emulator_core_exception_pointer{};
         std::atomic<bool> did_emulator_core_exception_occur{};
         std::jthread emulator_thread
@@ -132,17 +166,7 @@ int main()
             std::ref(did_emulator_core_exception_occur)
         };
 
-        std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
-        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
-
-        const uint64_t frame_duration_nanoseconds = 16'740'000ull;
-        const uint64_t performance_counter_frequency = SDL_GetPerformanceFrequency();
-        uint64_t frames_per_second_last_update_time = SDL_GetPerformanceCounter();
-        int frames_since_last_update = 0;
-        double frames_per_second = 0.0;
-
         bool stop_emulating = false;
-
         while (!stop_emulating)
         {
             if (did_emulator_core_exception_occur.load(std::memory_order_acquire))
@@ -150,7 +174,7 @@ int main()
                 std::rethrow_exception(emulator_core_exception_pointer);
             }
 
-            SDL_Event sdl_event{};
+            SDL_Event sdl_event;
             while (SDL_PollEvent(&sdl_event))
             {
                 ImGui_ImplSDL3_ProcessEvent(&sdl_event);
@@ -200,50 +224,27 @@ int main()
                 }
             }
 
-            if (game_boy_emulator.is_frame_ready_thread_safe())
-            {
-                uint64_t frame_start_time = SDL_GetPerformanceCounter();
+            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
 
-                auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer();
+            if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
+            {
+                auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+                previously_published_frame_buffer_index = currently_published_frame_buffer_index;
 
                 for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                 {
                     abgr_pixel_buffer[i] = game_boy_colour_palette[pixel_frame_buffer[i]];
                 }
-                game_boy_emulator.clear_frame_ready_thread_safe();
-
-                SDL_UpdateTexture(
-                    sdl_texture.get(),
-                    nullptr,
-                    abgr_pixel_buffer.get(),
-                    DISPLAY_WIDTH_PIXELS * sizeof(uint32_t)
-                );
-                SDL_RenderClear(sdl_renderer.get());
-                SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, nullptr);
-                SDL_RenderPresent(sdl_renderer.get());
-
-                const uint64_t time_after_rendering = SDL_GetPerformanceCounter();
-                const uint64_t elapsed_nanoseconds = (time_after_rendering - frame_start_time) * 1'000'000'000 / performance_counter_frequency;
-                if (elapsed_nanoseconds < frame_duration_nanoseconds)
-                {
-                    SDL_DelayPrecise(frame_duration_nanoseconds - elapsed_nanoseconds);
-                }
-
-                frames_since_last_update++;
-                const uint64_t time_after_frame_delay = SDL_GetPerformanceCounter();
-                if (time_after_frame_delay - frames_per_second_last_update_time >= performance_counter_frequency)
-                {
-                    frames_per_second = frames_since_last_update * static_cast<double>(performance_counter_frequency) / static_cast<double>(time_after_frame_delay - frames_per_second_last_update_time);
-                    frames_since_last_update = 0;
-                    frames_per_second_last_update_time = time_after_frame_delay;
-
-                    std::ostringstream output_string_stream;
-                    output_string_stream << "Emulate Game Boy - FPS: "
-                                         << std::fixed << std::setprecision(2)
-                                         << frames_per_second;
-                    SDL_SetWindowTitle(sdl_window.get(), output_string_stream.str().c_str());
-                }
+                SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
             }
+            SDL_RenderClear(sdl_renderer.get());
+            SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, nullptr);
+            
+            {
+                // imgui
+            }
+
+            SDL_RenderPresent(sdl_renderer.get());
         }
         return 0;
     }

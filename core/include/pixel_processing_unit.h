@@ -101,9 +101,9 @@ struct PixelSliceFetcher
 
 struct BackgroundPixelSliceFetcher : PixelSliceFetcher
 {
+    std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
     FetcherMode fetcher_mode{FetcherMode::BackgroundMode};
     uint8_t fetcher_x{};
-    std::array<BackgroundPixel, PIXELS_PER_TILE_ROW> tile_row{};
 
     void reset_state() override;
 };
@@ -190,9 +190,8 @@ public:
     void reset_state();
     void set_post_boot_state();
 
-    bool is_frame_ready_thread_safe() const;
-    void clear_frame_ready_thread_safe();
-    std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer();
+    uint8_t get_published_frame_buffer_index() const;
+    std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
 
     uint8_t read_lcd_control_lcdc() const;
     void write_lcd_control_lcdc(uint8_t value);
@@ -213,8 +212,9 @@ public:
 private:
     std::function<void(uint8_t)> request_interrupt_callback;
 
-    std::atomic<bool> are_pixels_for_frame_ready{};
-    std::unique_ptr<uint8_t[]> pixel_frame_buffer{};
+    std::atomic<uint8_t> published_frame_index{};
+    uint8_t in_progress_frame_index{1};
+    std::unique_ptr<uint8_t[]> pixel_frame_buffers[2];
 
     std::unique_ptr<uint8_t[]> video_ram;
     std::unique_ptr<uint8_t[]> object_attribute_memory;
@@ -271,6 +271,10 @@ private:
 
     uint8_t read_byte_object_attribute_memory_internally(uint16_t memory_address) const;
 
+    void publish_new_frame();
+
+    bool is_object_display_enabled() const;
+    bool is_next_object_hit() const;
     ObjectAttributes &get_current_object();
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
 };

@@ -38,19 +38,14 @@ bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
     return try_load_file_to_memory(BOOTROM_SIZE, bootrom_path, true);
 }
 
-bool Emulator::is_frame_ready_thread_safe() const
+uint8_t Emulator::get_published_frame_buffer_index() const
 {
-    return pixel_processing_unit.is_frame_ready_thread_safe();
+    return pixel_processing_unit.get_published_frame_buffer_index();
 }
 
-void Emulator::clear_frame_ready_thread_safe()
+std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
 {
-    pixel_processing_unit.clear_frame_ready_thread_safe();
-}
-
-std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer()
-{
-    return pixel_processing_unit.get_pixel_frame_buffer();
+    return pixel_processing_unit.get_pixel_frame_buffer(index);
 }
 
 void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state)

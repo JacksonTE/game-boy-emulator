@@ -20,9 +20,8 @@ public:
     void set_post_boot_state();
     bool try_load_bootrom(std::filesystem::path bootrom_path);
 
-    bool is_frame_ready_thread_safe() const;
-    void clear_frame_ready_thread_safe();
-    std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer();
+    uint8_t get_published_frame_buffer_index() const;
+    std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
 
     void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state);
     void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state);
