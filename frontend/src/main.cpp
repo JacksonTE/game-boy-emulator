@@ -45,6 +45,12 @@ static void run_emulator_core(std::stop_token stop_token, GameBoyCore::Emulator 
 
         while (!stop_token.stop_requested())
         {
+            if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+            {
+                SDL_Delay(50);
+                continue;
+            }
+
             game_boy_emulator.step_central_processing_unit_single_instruction();
 
             const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
@@ -101,6 +107,45 @@ static constexpr uint32_t game_boy_colour_palette[4] =
     pack_abgr(0xff, 0x00, 0x00, 0x00)  // black
 };
 
+static void load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_emulator, bool is_bootrom_file)
+{
+    nfdopendialogu8args_t open_dialog_arguments{};
+
+    nfdu8filteritem_t filters[] =
+    {
+        {"Game Boy ROMs", "gb,bin,rom"}
+    };
+    open_dialog_arguments.filterList = filters;
+    open_dialog_arguments.filterCount = 1;
+
+    nfdchar_t *rom_path = nullptr;
+    nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
+
+    if (result == NFD_OKAY)
+    {
+        if (is_bootrom_file)
+        {
+            game_boy_emulator.try_load_bootrom(rom_path);
+        }
+        else if (game_boy_emulator.try_load_file_to_memory(2 * GameBoyCore::ROM_BANK_SIZE, rom_path, false))
+        {
+            if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
+            {
+                game_boy_emulator.reset_state(true);
+            }
+            else
+            {
+                game_boy_emulator.set_post_boot_state();
+            }
+        }
+        NFD_FreePathU8(rom_path);
+    }
+    else if (result == NFD_ERROR)
+    {
+        std::cerr << "NFD error: " << NFD_GetError() << "\n";
+    }
+}
+
 int main()
 {
     try
@@ -141,25 +186,11 @@ int main()
 
         GameBoyCore::Emulator game_boy_emulator{};
 
-        auto bootrom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg_boot.bin";
-        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Dr. Mario (JU) (V1.1).gb";
-        auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "Tetris (JUE) (V1.1) [!].gb";
-        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "bootrom" / "dmg-acid2.gb";
-        //auto rom_path = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "gbmicrotest" / "bin" / "400-dma.gb";
-
-        if (!game_boy_emulator.try_load_bootrom(bootrom_path))
-        {
-            throw std::runtime_error("Error: unable to initialize Game Boy with provided bootrom path, exiting.");
-        }
-        if (!game_boy_emulator.try_load_file_to_memory(2 * GameBoyCore::ROM_BANK_SIZE, rom_path, false))
-        {
-            throw std::runtime_error("Error: unable to initialize Game Boy with provided rom path, exiting.");
-        }
-
         uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
 
         std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
-        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0);
+        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
+        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
 
         std::exception_ptr emulator_core_exception_pointer{};
         std::atomic<bool> did_emulator_core_exception_occur{};
@@ -259,34 +290,42 @@ int main()
             {
                 if (ImGui::BeginMenu("File"))
                 {
-                    if (ImGui::MenuItem("Load ROM", "Ctrl+O"))
+                    if (ImGui::MenuItem("Load Game ROM", "Ctrl+O"))
                     {
-                        nfdopendialogu8args_t open_dialog_arguments{};
-
-                        nfdu8filteritem_t filters[] =
-                        {
-                            {"Game Boy ROM (*.gb/.bin/.rom)", "gb;bin;rom"}
-                        };
-                        open_dialog_arguments.filterList = filters;
-                        open_dialog_arguments.filterCount = 1;
-
-                        nfdchar_t *rom_path = nullptr;
-                        nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
-
-                        if (result == NFD_OKAY)
-                        {
-                            game_boy_emulator.reset_state(true);
-                            game_boy_emulator.try_load_file_to_memory(2 * GameBoyCore::ROM_BANK_SIZE, rom_path, false);
-                            NFD_FreePathU8(rom_path);
-                        }
-                        else if (result == NFD_ERROR)
-                        {
-                            std::cerr << "NFD error: " << NFD_GetError() << "\n";
-                        }
+                        load_file_to_memory_with_dialog(game_boy_emulator, false);
                     }
                     if (ImGui::MenuItem("Load Bootrom", "Ctrl+B"))
                     {
+                        load_file_to_memory_with_dialog(game_boy_emulator, true);
+                    }
+                    if (ImGui::MenuItem("Unload Game ROM", "Ctrl+U", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    {
+                        game_boy_emulator.unload_game_rom_from_memory_thread_safe();
+                        game_boy_emulator.reset_state(true);
 
+                        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
+                        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                    }
+                    if (ImGui::MenuItem("Unload Bootrom", "Ctrl+N", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
+                    {
+                        game_boy_emulator.unload_bootrom_from_memory_thread_safe();
+                        game_boy_emulator.set_post_boot_state();
+
+                        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
+                        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                    }
+                    if (ImGui::MenuItem("Reset", "Ctrl+R", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    {
+                        if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
+                        {
+                            game_boy_emulator.reset_state(true);
+                        }
+                        else
+                        {
+                            game_boy_emulator.set_post_boot_state();
+                        }
+                        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS *DISPLAY_HEIGHT_PIXELS), 0xffffffff);
+                        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem("Quit", "Alt+F4"))

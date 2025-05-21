@@ -53,6 +53,10 @@ public:
     virtual void reset_state();
     void set_post_boot_state();
     bool try_load_file(uint16_t number_of_bytes_to_load, const std::filesystem::path &file_path, bool is_bootrom_file);
+    void unload_bootrom_thread_safe();
+    void unload_game_rom_thread_safe();
+    bool is_bootrom_loaded_thread_safe() const;
+    bool is_game_rom_loaded_thread_safe() const;
 
     virtual uint8_t read_byte(uint16_t address, bool is_access_for_oam_dma) const;
     virtual void write_byte(uint16_t address, uint8_t value, bool is_access_for_oam_dma);
@@ -77,6 +81,9 @@ private:
 
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
+
+    std::atomic<bool> is_bootrom_loaded_in_memory{};
+    std::atomic<bool> is_game_rom_loaded_in_memory{};
 
     std::atomic<uint8_t> joypad_button_states{0b11111111};
     std::atomic<uint8_t> joypad_direction_pad_states{0b11111111};

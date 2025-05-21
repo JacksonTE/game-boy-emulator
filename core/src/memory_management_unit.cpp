@@ -33,29 +33,28 @@ MemoryManagementUnit::MemoryManagementUnit(InternalTimer & internal_timer_refere
 
 void MemoryManagementUnit::reset_state()
 {
-    std::fill_n(rom_bank_00.get(), ROM_BANK_SIZE, 0);
-    std::fill_n(rom_bank_01.get(), ROM_BANK_SIZE, 0);
     std::fill_n(external_ram.get(), EXTERNAL_RAM_SIZE, 0);
     std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
     std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
     std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
 
+    joypad_p1_joyp = 0b11111111;
     interrupt_flag_if = 0b11100000;
-    bootrom_status = 0;
-    interrupt_enable_ie = 0;
+    bootrom_status = 0x00;
+    interrupt_enable_ie = 0x00;
 
     oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
-    oam_dma_source_address_base = 0;
+    oam_dma_source_address_base = 0x0000;
     oam_dma_machine_cycles_elapsed = 0;
 }
 
 void MemoryManagementUnit::set_post_boot_state()
 {
-    bootrom_status = 1;
-    write_byte(0xff00, 0xcf, false);
+    bootrom_status = 0x01;
+    joypad_p1_joyp = 0b11001111;
     write_byte(0xff01, 0x00, false);
     write_byte(0xff02, 0x7e, false);
-    interrupt_flag_if = 0xe1;
+    interrupt_flag_if = 0b11100001;
     write_byte(0xff10, 0x80, false);
     write_byte(0xff11, 0xbf, false);
     write_byte(0xff12, 0xf3, false);
@@ -80,7 +79,7 @@ void MemoryManagementUnit::set_post_boot_state()
     interrupt_enable_ie = 0x00;
 
     oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
-    oam_dma_source_address_base = 0;
+    oam_dma_source_address_base = 0x0000;
     oam_dma_machine_cycles_elapsed = 0;
 }
 
@@ -115,6 +114,11 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
     if (is_bootrom_file)
     {
         was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), number_of_bytes_to_load));
+
+        if (was_file_load_successful)
+            is_bootrom_loaded_in_memory.store(true, std::memory_order_release);
+        else
+            std::cerr << "Error: could not read bootrom file " << file_path << ".\n";
     }
     else
     {
@@ -129,13 +133,36 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
         {
             was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(rom_bank_01.get()), second_rom_bank_bytes_count));
         }
-    }
 
-    if (!was_file_load_successful)
-    {
-        std::cerr << "Error: could not read file " << file_path << ".\n";
+        if (was_file_load_successful)
+            is_game_rom_loaded_in_memory.store(true, std::memory_order_release);
+        else
+            std::cerr << "Error: could not read game rom file " << file_path << ".\n";
     }
     return was_file_load_successful;
+}
+
+void MemoryManagementUnit::unload_bootrom_thread_safe()
+{
+    std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
+    is_bootrom_loaded_in_memory.store(false, std::memory_order_release);
+}
+
+void MemoryManagementUnit::unload_game_rom_thread_safe()
+{
+    std::fill_n(rom_bank_00.get(), ROM_BANK_SIZE, 0);
+    std::fill_n(rom_bank_01.get(), ROM_BANK_SIZE, 0);
+    is_game_rom_loaded_in_memory.store(false, std::memory_order_release);
+}
+
+bool MemoryManagementUnit::is_bootrom_loaded_thread_safe() const
+{
+    return is_bootrom_loaded_in_memory.load(std::memory_order_acquire);
+}
+
+bool MemoryManagementUnit::is_game_rom_loaded_thread_safe() const
+{
+    return is_game_rom_loaded_in_memory.load(std::memory_order_acquire);
 }
 
 uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam_dma) const
@@ -221,7 +248,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
                     res = (joypad_p1_joyp & 0xf0) | 0x0f;
 
                 if ((res & 0x0f) == 0)
-                    auto x = 2;
+                    std::cout << "resetting from input\n";
 
                 return res;
             }

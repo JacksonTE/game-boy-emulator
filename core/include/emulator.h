@@ -18,18 +18,22 @@ public:
 
     void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
+    
     bool try_load_bootrom(std::filesystem::path bootrom_path);
+    bool try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
+    bool is_bootrom_loaded_in_memory_thread_safe();
+    bool is_game_rom_loaded_in_memory_thread_safe();
+    void unload_bootrom_from_memory_thread_safe();
+    void unload_game_rom_from_memory_thread_safe();
+    uint8_t read_byte_from_memory(uint16_t address) const;
+    void write_byte_to_memory(uint16_t address, uint8_t value);
+    void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
 
     uint8_t get_published_frame_buffer_index() const;
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
 
     void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state);
     void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state);
-
-    void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
-    bool try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
-    uint8_t read_byte_from_memory(uint16_t address) const;
-    void write_byte_to_memory(uint16_t address, uint8_t value);
 
     RegisterFile<std::endian::native> get_register_file() const;
     void print_register_file_state() const;
