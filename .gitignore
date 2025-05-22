@@ -1,4 +1,1 @@
 build/
-
-bootrom/*
-!bootrom/README.md

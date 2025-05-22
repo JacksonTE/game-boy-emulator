@@ -30,7 +30,7 @@ constexpr bool BUTTON_RELEASED_STATE = true;
 
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
-constexpr int WINDOW_SCALE = 6;
+constexpr int INITIAL_WINDOW_SCALE = 5;
 
 static void run_emulator_core(std::stop_token stop_token, GameBoyCore::Emulator &game_boy_emulator, std::exception_ptr &exception_pointer, std::atomic<bool> &did_exception_occur)
 {
@@ -68,9 +68,7 @@ static void run_emulator_core(std::stop_token stop_token, GameBoyCore::Emulator 
                     SDL_DelayPrecise(delay_in_nanoseconds);
                 }
                 else
-                {
                     next_frame_counter_tick = current_counter_tick;
-                }
             }
         }
     }
@@ -107,7 +105,13 @@ static constexpr uint32_t game_boy_colour_palette[4] =
     pack_abgr(0xff, 0x00, 0x00, 0x00)  // black
 };
 
-static void load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_emulator, bool is_bootrom_file)
+static void set_emulation_screen_blank(uint32_t *abgr_pixel_buffer, SDL_Texture *sdl_texture)
+{
+    std::fill_n(abgr_pixel_buffer, static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
+    SDL_UpdateTexture(sdl_texture, nullptr, abgr_pixel_buffer, DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+}
+
+static bool try_load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_emulator, bool is_bootrom_file, std::string &error_message)
 {
     nfdopendialogu8args_t open_dialog_arguments{};
 
@@ -120,30 +124,33 @@ static void load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_emul
 
     nfdchar_t *rom_path = nullptr;
     nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
+    bool is_operation_successful = true;
 
     if (result == NFD_OKAY)
     {
-        if (is_bootrom_file)
-        {
-            game_boy_emulator.try_load_bootrom(rom_path);
-        }
-        else if (game_boy_emulator.try_load_file_to_memory(2 * GameBoyCore::ROM_BANK_SIZE, rom_path, false))
+        if (game_boy_emulator.try_load_file_to_memory(rom_path, is_bootrom_file))
         {
             if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
             {
                 game_boy_emulator.reset_state(true);
             }
             else
-            {
                 game_boy_emulator.set_post_boot_state();
-            }
+        }
+        else
+        {
+            error_message = "Error: invalid ROM file provided";
+            is_operation_successful = false;
         }
         NFD_FreePathU8(rom_path);
     }
     else if (result == NFD_ERROR)
     {
         std::cerr << "NFD error: " << NFD_GetError() << "\n";
+        error_message = NFD_GetError();
+        is_operation_successful = false;
     }
+    return is_operation_successful;
 }
 
 int main()
@@ -151,17 +158,26 @@ int main()
     try
     {
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
-
         ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window
         {
             "Emulate Game Boy",
-            DISPLAY_WIDTH_PIXELS * WINDOW_SCALE,
-            DISPLAY_HEIGHT_PIXELS * WINDOW_SCALE,
+            DISPLAY_WIDTH_PIXELS * INITIAL_WINDOW_SCALE,
+            DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE,
             SDL_WINDOW_RESIZABLE
         };
-
         ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer{sdl_window};
-        SDL_SetRenderLogicalPresentation(
+        ResourceAcquisitionIsInitialization::SdlTextureRaii sdl_texture
+        {
+            sdl_renderer,
+            SDL_PIXELFORMAT_ABGR8888,
+            SDL_TEXTUREACCESS_STREAMING,
+            DISPLAY_WIDTH_PIXELS,
+            DISPLAY_HEIGHT_PIXELS,
+        };
+        ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
+
+        SDL_SetRenderLogicalPresentation
+        (
             sdl_renderer.get(),
             DISPLAY_WIDTH_PIXELS,
             DISPLAY_HEIGHT_PIXELS,
@@ -171,27 +187,9 @@ int main()
         {
             std::cerr << "VSync unable to be used: " << SDL_GetError() << "\n";
         }
-
-        ResourceAcquisitionIsInitialization::SdlTextureRaii sdl_texture
-        {
-            sdl_renderer,
-            SDL_PIXELFORMAT_ABGR8888,
-            SDL_TEXTUREACCESS_STREAMING,
-            DISPLAY_WIDTH_PIXELS,
-            DISPLAY_HEIGHT_PIXELS,
-        };
         SDL_SetTextureScaleMode(sdl_texture.get(), SDL_SCALEMODE_NEAREST);
 
-        ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
-
         GameBoyCore::Emulator game_boy_emulator{};
-
-        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
-
-        std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
-        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
-        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
-
         std::exception_ptr emulator_core_exception_pointer{};
         std::atomic<bool> did_emulator_core_exception_occur{};
         std::jthread emulator_thread
@@ -202,7 +200,12 @@ int main()
             std::ref(did_emulator_core_exception_occur)
         };
 
+        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+
+        std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
+        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
         bool stop_emulating = false;
+
         while (!stop_emulating)
         {
             if (did_emulator_core_exception_occur.load(std::memory_order_acquire))
@@ -252,8 +255,6 @@ int main()
                             case SDLK_DOWN:
                                 game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(DOWN_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
                                 break;
-                            default:
-                                break;
                         }
                     }
                     break;
@@ -265,17 +266,32 @@ int main()
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
                 auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
-                previously_published_frame_buffer_index = currently_published_frame_buffer_index;
 
                 for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                 {
                     abgr_pixel_buffer[i] = game_boy_colour_palette[pixel_frame_buffer[i]];
                 }
                 SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                previously_published_frame_buffer_index = currently_published_frame_buffer_index;
             }
             SDL_RenderClear(sdl_renderer.get());
-            SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, nullptr);
-            
+
+            int renderer_output_width, renderer_output_height;
+            SDL_GetRenderOutputSize(sdl_renderer.get(), &renderer_output_width, &renderer_output_height);
+            float current_scale_x = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
+            float current_scale_y = static_cast<float>(renderer_output_height) / static_cast<float>(DISPLAY_HEIGHT_PIXELS);
+            int current_integer_scale = std::max(1, std::min(int(current_scale_x), int(current_scale_y)));
+
+            float menu_bar_logical_height = ImGui::GetFrameHeight() / static_cast<float>(current_integer_scale);
+            SDL_FRect emulation_screen_rectangle
+            {
+                0.0f,
+                menu_bar_logical_height,
+                static_cast<float>(DISPLAY_WIDTH_PIXELS),
+                static_cast<float>(DISPLAY_HEIGHT_PIXELS) - menu_bar_logical_height
+            };
+            SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, &emulation_screen_rectangle);
+
             // Workaround for https://github.com/ocornut/imgui/issues/8339
             int sdl_renderer_logical_width, sdl_renderer_logical_height;
             SDL_RendererLogicalPresentation sdl_renderer_logical_presentation_mode;
@@ -286,35 +302,34 @@ int main()
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
+            bool did_error_occur = false;
+            std::string error_message;
+
             if (ImGui::BeginMainMenuBar())
             {
                 if (ImGui::BeginMenu("File"))
                 {
-                    if (ImGui::MenuItem("Load Game ROM", "Ctrl+O"))
+                    if (ImGui::MenuItem("Load Game ROM"))
                     {
-                        load_file_to_memory_with_dialog(game_boy_emulator, false);
+                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, false, error_message);
                     }
-                    if (ImGui::MenuItem("Load Bootrom", "Ctrl+B"))
+                    if (ImGui::MenuItem("Load Boot ROM (Optional)"))
                     {
-                        load_file_to_memory_with_dialog(game_boy_emulator, true);
+                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, true, error_message);
                     }
-                    if (ImGui::MenuItem("Unload Game ROM", "Ctrl+U", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                         game_boy_emulator.reset_state(true);
-
-                        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
-                        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
                     }
-                    if (ImGui::MenuItem("Unload Bootrom", "Ctrl+N", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
+                    if (ImGui::MenuItem("Unload Boot ROM", "", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
                     {
                         game_boy_emulator.unload_bootrom_from_memory_thread_safe();
                         game_boy_emulator.set_post_boot_state();
-
-                        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
-                        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
                     }
-                    if (ImGui::MenuItem("Reset", "Ctrl+R", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    if (ImGui::MenuItem("Reset", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
                         {
@@ -324,17 +339,30 @@ int main()
                         {
                             game_boy_emulator.set_post_boot_state();
                         }
-                        std::fill_n(abgr_pixel_buffer.get(), static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS *DISPLAY_HEIGHT_PIXELS), 0xffffffff);
-                        SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
                     }
                     ImGui::Separator();
-                    if (ImGui::MenuItem("Quit", "Alt+F4"))
+                    if (ImGui::MenuItem("Quit"))
                     {
                         stop_emulating = true;
                     }
                     ImGui::EndMenu();
                 }
                 ImGui::EndMainMenuBar();
+            }
+
+            if (did_error_occur)
+                ImGui::OpenPopup("Error Message");
+
+            if (ImGui::BeginPopupModal("Error Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::TextUnformatted(error_message.c_str());
+                ImGui::Separator();
+                if (ImGui::Button("OK", ImVec2(80, 0)))
+                {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
             }
 
             ImGui::Render();

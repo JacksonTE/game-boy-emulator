@@ -83,7 +83,7 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const std::filesystem::path &file_path, bool is_bootrom_file)
+bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -93,18 +93,11 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
     }
 
     std::streamsize file_length_in_bytes = file.tellg();
-    if (file_length_in_bytes < static_cast<std::streamsize>(number_of_bytes_to_load))
-    {
-        std::cerr << std::hex;
-        std::cerr << "Error: file size (" << file_length_in_bytes << ") is less than requested number of bytes to load (" << number_of_bytes_to_load << ").\n";
-        return false;
-    }
 
-    if (number_of_bytes_to_load > (is_bootrom_file ? BOOTROM_SIZE : 2 * ROM_BANK_SIZE))
+    if (file_length_in_bytes != (is_bootrom_file ? BOOTROM_SIZE : 2 * ROM_BANK_SIZE))
     {
         std::cerr << std::hex << std::setfill('0');
-        std::cerr << "Error: insufficient space from starting address (" << std::setw(4) << 0x0000
-                  << ") to load requested number of bytes (" << number_of_bytes_to_load << ").\n";
+        std::cerr << "Error: file size of (" << file_length_in_bytes << " bytes) is invalid.\n";
         return false;
     }
 
@@ -113,7 +106,7 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
 
     if (is_bootrom_file)
     {
-        was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), number_of_bytes_to_load));
+        was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), file_length_in_bytes));
 
         if (was_file_load_successful)
             is_bootrom_loaded_in_memory.store(true, std::memory_order_release);
@@ -122,8 +115,8 @@ bool MemoryManagementUnit::try_load_file(uint16_t number_of_bytes_to_load, const
     }
     else
     {
-        uint16_t first_rom_bank_bytes_count = std::min(number_of_bytes_to_load, ROM_BANK_SIZE);
-        uint16_t second_rom_bank_bytes_count = number_of_bytes_to_load - first_rom_bank_bytes_count;
+        uint16_t first_rom_bank_bytes_count = std::min(file_length_in_bytes, static_cast<std::streamsize>(ROM_BANK_SIZE));
+        uint16_t second_rom_bank_bytes_count = file_length_in_bytes - first_rom_bank_bytes_count;
         
         if (first_rom_bank_bytes_count > 0)
         {

@@ -19,8 +19,7 @@ public:
     void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
     
-    bool try_load_bootrom(std::filesystem::path bootrom_path);
-    bool try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file);
+    bool try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file);
     bool is_bootrom_loaded_in_memory_thread_safe();
     bool is_game_rom_loaded_in_memory_thread_safe();
     void unload_bootrom_from_memory_thread_safe();

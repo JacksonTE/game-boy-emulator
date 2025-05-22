@@ -52,7 +52,7 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file(uint16_t number_of_bytes_to_load, const std::filesystem::path &file_path, bool is_bootrom_file);
+    bool try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file);
     void unload_bootrom_thread_safe();
     void unload_game_rom_thread_safe();
     bool is_bootrom_loaded_thread_safe() const;

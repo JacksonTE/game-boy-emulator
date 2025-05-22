@@ -33,14 +33,9 @@ void Emulator::set_post_boot_state()
     central_processing_unit.set_post_boot_state();
 }
 
-bool Emulator::try_load_file_to_memory(uint32_t number_of_bytes_to_load, std::filesystem::path file_path, bool is_bootrom_file)
+bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file)
 {
-    return memory_management_unit->try_load_file(number_of_bytes_to_load, file_path, is_bootrom_file);
-}
-
-bool Emulator::try_load_bootrom(std::filesystem::path bootrom_path)
-{
-    return try_load_file_to_memory(BOOTROM_SIZE, bootrom_path, true);
+    return memory_management_unit->try_load_file(file_path, is_bootrom_file);
 }
 
 bool Emulator::is_bootrom_loaded_in_memory_thread_safe()

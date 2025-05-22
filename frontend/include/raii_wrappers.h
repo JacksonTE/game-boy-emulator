@@ -133,8 +133,14 @@ public:
         IMGUI_CHECKVERSION();
 
         ImGuiContext *context = ImGui::CreateContext();
+
         ImGuiIO &io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.FontGlobalScale = 1.7f;
+
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.FramePadding.y += 2.0f;
+
         ImGui::StyleColorsDark();
 
         if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
