@@ -54,9 +54,9 @@ void PixelProcessingUnit::reset_state()
     viewport_x_position_scx = 0;
     lcd_y_coordinate_compare_lyc = 0;
     object_attribute_memory_direct_memory_access_dma = 0;
-    background_palette_bgp = 0;
-    object_palette_0_obp0 = 0;
-    object_palette_1_obp1 = 0;
+    background_palette_bgp = 0x00;
+    object_palette_0_obp0 = 0xff;
+    object_palette_1_obp1 = 0xff;
     window_y_position_wy = 0;
     window_x_position_plus_7_wx = 0;
     is_oam_dma_in_progress = false;
@@ -95,7 +95,6 @@ void PixelProcessingUnit::reset_state()
 void PixelProcessingUnit::set_post_boot_state()
 {
     reset_state();
-    background_palette_bgp = 0xfc;
 
     previous_mode = PixelProcessingUnitMode::VerticalBlank;
     current_mode = PixelProcessingUnitMode::VerticalBlank;

@@ -152,8 +152,6 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
             entry.path().filename() != "oam_int_nops_b.gb" &&
             entry.path().filename() != "oam_sprite_trashing.gb" &&
             entry.path().filename() != "poweron.gb" &&
-            entry.path().filename() != "poweron_obp0_000.gb" &&
-            entry.path().filename() != "poweron_obp1_000.gb" &&
             entry.path().filename() != "poweron_stat_006.gb" &&
             entry.path().filename() != "ppu_scx_vs_bgp.gb" &&
             entry.path().filename() != "ppu_sprite_testbench.gb" &&
@@ -212,7 +210,7 @@ TEST_P(GbmicroTest, TestRom)
 
         if (test_pass_fail_byte == 0xff)
         {
-            FAIL() << "Test failed with result " << static_cast<int>(test_result_byte) << ". Expected result was " << static_cast<int>(test_expected_result_byte) << "\n";
+            FAIL() << "Test failed with result 0x" << std::hex << static_cast<int>(test_result_byte) << ". Expected result was 0x" << static_cast<int>(test_expected_result_byte) << "\n";
         }
         else if (test_pass_fail_byte == 0x01)
         {

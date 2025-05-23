@@ -178,8 +178,8 @@ public:
     uint8_t lcd_y_coordinate_compare_lyc{};
     uint8_t object_attribute_memory_direct_memory_access_dma{};
     uint8_t background_palette_bgp{};
-    uint8_t object_palette_0_obp0{};
-    uint8_t object_palette_1_obp1{};
+    uint8_t object_palette_0_obp0{0xff};
+    uint8_t object_palette_1_obp1{0xff};
     uint8_t window_y_position_wy{};
     uint8_t window_x_position_plus_7_wx{};
 
