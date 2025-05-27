@@ -156,7 +156,8 @@ void CentralProcessingUnit::service_interrupt()
     if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
         return;
 
-    decrement_and_step_emulator_components(register_file.program_counter);
+    emulator_step_single_machine_cycle_callback(MachineCycleOperation{ MemoryInteraction::None });
+    register_file.program_counter -= is_current_instruction_prefixed ? 2 : 1;
     decrement_and_step_emulator_components(register_file.stack_pointer);
     write_byte_and_step_emulator_components(register_file.stack_pointer--, register_file.program_counter >> 8);
     uint8_t interrupt_flag_mask = memory_management_unit.get_pending_interrupt_mask();
