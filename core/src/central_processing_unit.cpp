@@ -133,7 +133,7 @@ void CentralProcessingUnit::fetch_next_instruction()
     // Produces the halt bug
     if (is_halted)
     {
-        bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
+        const bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
 
         if (is_interrupt_pending && interrupt_master_enable_ime != InterruptMasterEnableState::Enabled)
         {

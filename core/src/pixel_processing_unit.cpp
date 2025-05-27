@@ -153,9 +153,9 @@ uint8_t PixelProcessingUnit::read_lcd_status_stat() const
 void PixelProcessingUnit::write_lcd_status_stat(uint8_t value)
 {
     const uint8_t new_stat_value = (value & 0b01111000) | (lcd_status_stat & 0b10000111);
+    const bool is_the_ly_equal_to_lyc_flag_set = is_bit_set(lcd_status_stat, 2);
 
-    const bool is_ly_equal_to_lyc_flag_set = is_bit_set(lcd_status_stat, 2);
-    if (previous_mode != PixelProcessingUnitMode::PixelTransfer || is_ly_equal_to_lyc_flag_set)
+    if (previous_mode != PixelProcessingUnitMode::PixelTransfer || is_the_ly_equal_to_lyc_flag_set)
     {
         stat_value_after_spurious_interrupt = new_stat_value;
         did_spurious_stat_interrupt_occur = true;
@@ -173,12 +173,13 @@ uint8_t PixelProcessingUnit::read_lcd_y_coordinate_ly() const
 uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
 {
     const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
-
-    if (is_lcd_enable_bit_set &&
-        (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-         (previous_mode != PixelProcessingUnitMode::HorizontalBlank && current_mode == PixelProcessingUnitMode::PixelTransfer)))
+    if (is_lcd_enable_bit_set)
     {
-        return 0xff;
+        if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+            current_mode == PixelProcessingUnitMode::PixelTransfer && !is_in_first_scanline_after_lcd_enable)
+        {
+            return 0xff;
+        }
     }
     const uint16_t local_address = memory_address - VIDEO_RAM_START;
     return video_ram[local_address];
@@ -187,10 +188,10 @@ uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
 void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
 {
     const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
-
-    if (is_lcd_enable_bit_set && previous_mode == PixelProcessingUnitMode::PixelTransfer)
+    if (is_lcd_enable_bit_set)
     {
-        return;
+        if (previous_mode == PixelProcessingUnitMode::PixelTransfer)
+            return;
     }
     const uint16_t local_address = memory_address - VIDEO_RAM_START;
     video_ram[local_address] = value;
@@ -198,14 +199,18 @@ void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t 
 
 uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address) const
 {
-    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
-
-    if (is_lcd_enable_bit_set &&
-        (is_oam_dma_in_progress ||
-         (current_mode != PixelProcessingUnitMode::VerticalBlank &&
-         (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || previous_mode != PixelProcessingUnitMode::HorizontalBlank))))
-    {
+    if (is_oam_dma_in_progress)
         return 0xff;
+
+    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+    if (is_lcd_enable_bit_set)
+    {
+        if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
+            previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
+            previous_mode == PixelProcessingUnitMode::PixelTransfer)
+        {
+            return 0xff;
+        }
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
     return object_attribute_memory[local_address];
@@ -213,14 +218,17 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
 
 void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma)
 {
-    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
-
-    if (is_lcd_enable_bit_set &&
-        ((is_oam_dma_in_progress && !is_access_for_oam_dma) ||
-         previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-         (previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan)))
-    {
+    if (is_oam_dma_in_progress && !is_access_for_oam_dma)
         return;
+
+    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+    if (is_lcd_enable_bit_set)
+    {
+        if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+            current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && previous_mode == current_mode)
+        {
+            return;
+        }
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
     object_attribute_memory[local_address] = value;
@@ -270,7 +278,7 @@ void PixelProcessingUnit::step_single_machine_cycle()
     {
         lcd_status_stat = stat_value_after_spurious_interrupt;
         did_spurious_stat_interrupt_occur = false;
-        stat_value_after_spurious_interrupt = 0;
+        stat_value_after_spurious_interrupt = 0x00;
     }
 }
 
@@ -295,12 +303,11 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
         };
 
         const uint8_t object_height = is_bit_set(lcd_control_lcdc, 2) ? 16 : 8;
-        const bool does_object_intersect_with_scanline = lcd_y_coordinate_ly >= (current_object.y_position - 16) &&
-                                                         lcd_y_coordinate_ly < (current_object.y_position - 16) + object_height;
+        const int8_t object_lowest_lcd_y_coordinate = current_object.y_position - 16;
+        const bool does_object_intersect_with_scanline = lcd_y_coordinate_ly >= object_lowest_lcd_y_coordinate &&
+                                                         lcd_y_coordinate_ly < object_lowest_lcd_y_coordinate + object_height;
         if (does_object_intersect_with_scanline)
-        {
             scanline_selected_objects.push_back(current_object);
-        }
     }
     is_in_first_dot_of_current_step = true;
 
@@ -342,7 +349,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     }
     if (background_fetcher.is_enabled &&
         background_fetcher.fetcher_mode == FetcherMode::WindowMode &&
-        background_fetcher.fetcher_x <= 15)
+        background_fetcher.fetcher_x <= 14)
     {
         background_fetcher.fetcher_x++;
     }
