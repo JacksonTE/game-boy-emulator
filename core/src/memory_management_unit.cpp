@@ -115,8 +115,8 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
     }
     else
     {
-        uint16_t first_rom_bank_bytes_count = std::min(file_length_in_bytes, static_cast<std::streamsize>(ROM_BANK_SIZE));
-        uint16_t second_rom_bank_bytes_count = file_length_in_bytes - first_rom_bank_bytes_count;
+        const uint16_t first_rom_bank_bytes_count = std::min(file_length_in_bytes, static_cast<std::streamsize>(ROM_BANK_SIZE));
+        const uint16_t second_rom_bank_bytes_count = file_length_in_bytes - first_rom_bank_bytes_count;
         
         if (first_rom_bank_bytes_count > 0)
         {
@@ -168,19 +168,11 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
 
     if (bootrom_status == 0 && address < BOOTROM_SIZE)
     {
-        if (bootrom == nullptr)
-        {
-            std::cerr << std::hex << std::setfill('0');
-            std::cerr << "Warning: attempted read from bootrom address (" << std::setw(4) << address << ") pointing to an unallocated bootrom. "
-                      << "Returning 0xff as a fallback.\n";
-            return 0xff;
-        }
         return bootrom[address];
     }
     else if (address >= ROM_BANK_00_START && address < ROM_BANK_00_START + ROM_BANK_SIZE)
     {
-        const uint16_t local_address = address - ROM_BANK_00_START;
-        return rom_bank_00[local_address];
+        return rom_bank_00[address];
     }
     else if (address >= ROM_BANK_01_START && address < ROM_BANK_01_START + ROM_BANK_SIZE)
     {
@@ -212,7 +204,6 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     }
     else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
-        // TODO eventually add OAM corruption check
         return 0x00;
     }
     else if (address >= INPUT_OUTPUT_REGISTERS_START && address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
@@ -223,29 +214,22 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
             {
                 const bool is_select_buttons_enabled = !is_bit_set(joypad_p1_joyp, 5);
                 const bool is_select_directional_pad_enabled = !is_bit_set(joypad_p1_joyp, 4);
-                uint8_t res;
 
-                if (is_select_buttons_enabled && !is_select_directional_pad_enabled)
+                if (is_select_buttons_enabled && is_select_directional_pad_enabled)
                 {
-                    res = (joypad_p1_joyp & 0xf0) | (joypad_button_states.load(std::memory_order_acquire) & 0x0f);
+                    return (joypad_p1_joyp & 0xf0) | ((joypad_button_states.load(std::memory_order_acquire) |
+                                                       joypad_direction_pad_states.load(std::memory_order_acquire)) & 0x0f);
                 }
-                else if (!is_select_buttons_enabled && is_select_directional_pad_enabled)
+                if (is_select_buttons_enabled)
                 {
-                    res = (joypad_p1_joyp & 0xf0) | (joypad_direction_pad_states.load(std::memory_order_acquire) & 0x0f);
+                    return (joypad_p1_joyp & 0xf0) | (joypad_button_states.load(std::memory_order_acquire) & 0x0f);
                 }
-                else if (is_select_buttons_enabled && is_select_directional_pad_enabled)
+                else if (is_select_directional_pad_enabled)
                 {
-                    res = (joypad_p1_joyp & 0xf0) | ((joypad_button_states.load(std::memory_order_acquire) | joypad_direction_pad_states.load(std::memory_order_acquire)) & 0x0f);
+                    return (joypad_p1_joyp & 0xf0) | (joypad_direction_pad_states.load(std::memory_order_acquire) & 0x0f);
                 }
-                else
-                    res = (joypad_p1_joyp & 0xf0) | 0x0f;
-
-                if ((res & 0x0f) == 0)
-                    std::cout << "resetting from input\n";
-
-                return res;
+                return joypad_p1_joyp;
             }
-            break; // TODO refactor into function and simplify logic
             case 0xff04:
                 return internal_timer.read_div();
             case 0xff05:
@@ -331,9 +315,8 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
     else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
-        // TODO check if OAM corruption is relevant here
-        std::cout << std::hex << std::setfill('0');
-        std::cout << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
+        std::cout << std::hex << std::setfill('0')
+                  << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
     }
     else if (address >= INPUT_OUTPUT_REGISTERS_START && address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
     {
@@ -416,13 +399,16 @@ void MemoryManagementUnit::step_single_machine_cycle()
 {
     if (pixel_processing_unit.is_oam_dma_in_progress)
     {
-        const uint16_t destination_address = OBJECT_ATTRIBUTE_MEMORY_START + oam_dma_machine_cycles_elapsed;
         const uint16_t source_address = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
         const uint8_t byte_to_copy = read_byte(source_address, true);
+
+        const uint16_t destination_address = OBJECT_ATTRIBUTE_MEMORY_START + oam_dma_machine_cycles_elapsed;
         write_byte(destination_address, byte_to_copy, true);
 
         if (++oam_dma_machine_cycles_elapsed == OAM_DMA_MACHINE_CYCLE_DURATION)
+        {
             pixel_processing_unit.is_oam_dma_in_progress = false;
+        }
     }
 
     if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo)
@@ -431,12 +417,10 @@ void MemoryManagementUnit::step_single_machine_cycle()
     }
     else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
     {
-        oam_dma_source_address_base = pixel_processing_unit.object_attribute_memory_direct_memory_access_dma << 8;
+        oam_dma_source_address_base = ((pixel_processing_unit.object_attribute_memory_direct_memory_access_dma >= 0xfe)
+            ? pixel_processing_unit.object_attribute_memory_direct_memory_access_dma - 0x20
+            : pixel_processing_unit.object_attribute_memory_direct_memory_access_dma) << 8;
 
-        if (oam_dma_source_address_base >= 0xfe00)
-        {
-            oam_dma_source_address_base -= 0x2000;
-        }
         oam_dma_machine_cycles_elapsed = 0;
         pixel_processing_unit.is_oam_dma_in_progress = true;
         oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
@@ -457,7 +441,7 @@ uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
 {
     for (uint8_t i = 0; i < NUMBER_OF_INTERRUPT_TYPES; i++)
     {
-        uint8_t interrupt_flag_mask = 1 << i;
+        const uint8_t interrupt_flag_mask = 1 << i;
         const bool is_interrupt_type_requested = is_flag_set(interrupt_flag_if, interrupt_flag_mask);
         const bool is_interrupt_type_enabled = is_flag_set(interrupt_enable_ie, interrupt_flag_mask);
 

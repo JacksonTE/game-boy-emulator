@@ -327,7 +327,8 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     }
     else if (current_scanline_dot_number == dot_number_for_dummy_push)
     {
-        background_pixel_shift_register.load_new_tile_row(background_fetcher.tile_row);
+        const auto &tile_row_to_discard = background_fetcher.tile_row;
+        background_pixel_shift_register.load_new_tile_row(tile_row_to_discard);
     }
 
     if (background_fetcher.is_enabled &&
@@ -341,7 +342,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     }
     if (background_fetcher.is_enabled &&
         background_fetcher.fetcher_mode == FetcherMode::WindowMode &&
-        background_fetcher.fetcher_x <= 7)
+        background_fetcher.fetcher_x <= 15)
     {
         background_fetcher.fetcher_x++;
     }
