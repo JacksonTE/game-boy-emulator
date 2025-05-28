@@ -68,7 +68,7 @@ enum class PixelSliceFetcherStep
 
 struct ObjectAttributes
 {
-    uint8_t object_attribute_memory_starting_index{};
+    uint16_t object_start_global_address{};
     int16_t y_position{};
     uint16_t x_position{};
     uint8_t tile_index{};
@@ -204,7 +204,7 @@ public:
     uint8_t read_byte_video_ram(uint16_t memory_address) const;
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
 
-    uint8_t read_byte_object_attribute_memory(uint16_t memory_address) const;
+    uint8_t read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_for_central_processing_unit) const;
     void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma);
 
     void step_single_machine_cycle();
@@ -235,7 +235,7 @@ private:
 
     uint8_t stat_value_after_spurious_interrupt{};
     bool did_spurious_stat_interrupt_occur{};
-    bool were_stat_interrupts_handled_early{};
+    bool should_previous_mode_update_early_for_stat_reads{};
     bool are_stat_interrupts_blocked{};
     bool did_scan_line_end_during_this_machine_cycle{};
     bool was_wy_condition_triggered_this_frame{};
@@ -268,8 +268,6 @@ private:
 
     void step_object_fetcher_single_dot();
     uint8_t get_object_fetcher_tile_row_byte(uint8_t offset);
-
-    uint8_t read_byte_object_attribute_memory_internally(uint16_t memory_address) const;
 
     void publish_new_frame();
 

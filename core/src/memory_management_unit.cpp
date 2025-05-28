@@ -200,7 +200,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     }
     else if (address >= OBJECT_ATTRIBUTE_MEMORY_START && address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
     {
-        return pixel_processing_unit.read_byte_object_attribute_memory(address);
+        return pixel_processing_unit.read_byte_object_attribute_memory(address, true);
     }
     else if (address >= UNUSABLE_MEMORY_START && address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {

@@ -136,7 +136,7 @@ public:
 
         ImGuiIO &io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.FontGlobalScale = 1.7f;
+        io.FontGlobalScale = 1.5f;
 
         ImGuiStyle &style = ImGui::GetStyle();
         style.FramePadding.y += 2.0f;
