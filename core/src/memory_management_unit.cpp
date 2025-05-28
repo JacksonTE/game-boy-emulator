@@ -83,7 +83,7 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file)
+bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -128,11 +128,22 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
             return false;
         }
 
+        uint8_t colour_game_boy_required_flag = 0x00;
+        file.seekg(0x143, std::ios::beg);
+        file.read(reinterpret_cast<char*>(&colour_game_boy_required_flag), 1);
+
+        if (colour_game_boy_required_flag == 0xc0)
+        {
+            std::cerr << "Error: Provided game ROM requires Game Boy Color functionality to run.\n";
+            return false;
+        }
+
         uint8_t cartridge_type = 0x00;
         file.seekg(0x147, std::ios::beg);
         file.read(reinterpret_cast<char *>(&cartridge_type), 1);
 
-        if (cartridge_type != 0x00 && cartridge_type != 0x03 && cartridge_type != 0x1b)
+        if ((!TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED && cartridge_type != 0x00) ||
+            (TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED && cartridge_type != 0x00 && cartridge_type != 0x03 && cartridge_type != 0x1b))
         {
             std::cerr << std::hex << std::setfill('0')
                       << "Error: game ROM with cartridge type (0x" << std::setw(2) << static_cast<int>(cartridge_type) << ") is not currently supported.\n";

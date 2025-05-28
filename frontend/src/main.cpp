@@ -116,7 +116,11 @@ static void set_emulation_screen_blank(uint32_t *abgr_pixel_buffer, SDL_Texture 
     SDL_UpdateTexture(sdl_texture, nullptr, abgr_pixel_buffer, DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
 }
 
-static bool try_load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_emulator, bool is_bootrom_file, std::string &error_message)
+static bool try_load_file_to_memory_with_dialog(
+    GameBoyCore::Emulator &game_boy_emulator,
+    bool is_bootrom_file,
+    std::atomic<bool> &is_emulation_paused,
+    std::string &error_message)
 {
     nfdopendialogu8args_t open_dialog_arguments{};
 
@@ -133,6 +137,9 @@ static bool try_load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_
 
     if (result == NFD_OKAY)
     {
+        const bool previous_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+        is_emulation_paused.store(true, std::memory_order_release);
+
         if (game_boy_emulator.try_load_file_to_memory(rom_path, is_bootrom_file))
         {
             if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
@@ -148,6 +155,7 @@ static bool try_load_file_to_memory_with_dialog(GameBoyCore::Emulator &game_boy_
             is_operation_successful = false;
         }
         NFD_FreePathU8(rom_path);
+        is_emulation_paused.store(previous_pause_state, std::memory_order_release);
     }
     else if (result == NFD_ERROR)
     {
@@ -317,11 +325,11 @@ int main()
                 {
                     if (ImGui::MenuItem("Load Game ROM"))
                     {
-                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, false, error_message);
+                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, false, std::ref(is_emulation_paused), error_message);
                     }
                     if (ImGui::MenuItem("Load Boot ROM (Optional)"))
                     {
-                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, true, error_message);
+                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, true, std::ref(is_emulation_paused), error_message);
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem("Quit"))

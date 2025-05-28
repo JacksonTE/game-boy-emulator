@@ -19,7 +19,7 @@ public:
     void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
     
-    bool try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file);
+    bool try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED = false);
     bool is_bootrom_loaded_in_memory_thread_safe();
     bool is_game_rom_loaded_in_memory_thread_safe();
     void unload_bootrom_from_memory_thread_safe();
