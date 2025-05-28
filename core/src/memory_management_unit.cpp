@@ -91,14 +91,53 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
         std::cerr << "Error: file not found at " << file_path << ".\n";
         return false;
     }
-
     std::streamsize file_length_in_bytes = file.tellg();
 
-    if (file_length_in_bytes != (is_bootrom_file ? BOOTROM_SIZE : 2 * ROM_BANK_SIZE))
+    if (is_bootrom_file)
     {
-        std::cerr << std::hex << std::setfill('0');
-        std::cerr << "Error: file size of (" << file_length_in_bytes << " bytes) is invalid.\n";
-        return false;
+        if (file_length_in_bytes != BOOTROM_SIZE)
+        {
+            std::cerr << "Error: boot ROM file size of (" << file_length_in_bytes << " bytes) is invalid.\n";
+            return false;
+        }
+    }
+    else
+    {
+        if (file_length_in_bytes < static_cast<std::streamsize>(2) * ROM_BANK_SIZE)
+        {
+            std::cerr << "Error: game ROM file size of (" << file_length_in_bytes << " bytes) is too small.\n";
+            return false;
+        }
+
+        static constexpr uint8_t expected_logo[48] =
+        {
+            0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b,
+            0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
+            0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e,
+            0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
+            0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc,
+            0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e
+        };
+        std::array<uint8_t, 48> logo_bytes{};
+        file.seekg(0x0104, std::ios::beg);
+        file.read(reinterpret_cast<char*>(logo_bytes.data()), logo_bytes.size());
+
+        if (!std::equal(logo_bytes.begin(), logo_bytes.end(), std::begin(expected_logo)))
+        {
+            std::cerr << "Error: Logo in ROM does not match the expected pattern.\n";
+            return false;
+        }
+
+        uint8_t cartridge_type = 0x00;
+        file.seekg(0x147, std::ios::beg);
+        file.read(reinterpret_cast<char *>(&cartridge_type), 1);
+
+        if (cartridge_type != 0x00 && cartridge_type != 0x03 && cartridge_type != 0x1b)
+        {
+            std::cerr << std::hex << std::setfill('0')
+                      << "Error: game ROM with cartridge type (0x" << std::setw(2) << static_cast<int>(cartridge_type) << ") is not currently supported.\n";
+            return false;
+        }
     }
 
     file.seekg(0, std::ios::beg);

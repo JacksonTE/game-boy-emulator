@@ -332,11 +332,11 @@ int main()
                 }
                 if (ImGui::BeginMenu("Emulation"))
                 {
-                    const bool pause_state = is_emulation_paused.load(std::memory_order_acquire);
+                    const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
 
-                    if (ImGui::MenuItem(pause_state ? "Unpause" : "Pause", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "", false))
                     {
-                        is_emulation_paused.store(!pause_state, std::memory_order_release);
+                        is_emulation_paused.store(!current_pause_state, std::memory_order_release);
                     }
                     if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
