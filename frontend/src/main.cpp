@@ -83,7 +83,7 @@ static void run_emulator_core(
     }
 }
 
-static constexpr uint32_t pack_abgr(uint8_t alpha, uint8_t blue, uint8_t green, uint8_t red)
+static constexpr uint32_t get_abgr_value_for_current_endianness(uint8_t alpha, uint8_t blue, uint8_t green, uint8_t red)
 {
     if constexpr (std::endian::native == std::endian::little)
     {
@@ -101,17 +101,44 @@ static constexpr uint32_t pack_abgr(uint8_t alpha, uint8_t blue, uint8_t green, 
     }
 }
 
-static constexpr uint32_t game_boy_colour_palette[4] =
+static constexpr uint32_t light_green_colour_palette[4] =
 {
-    pack_abgr(0xff, 0xff, 0xff, 0xff), // white
-    pack_abgr(0xff, 0xaa, 0xaa, 0xaa), // light gray
-    pack_abgr(0xff, 0x55, 0x55, 0x55), // dark gray
-    pack_abgr(0xff, 0x00, 0x00, 0x00)  // black
+    get_abgr_value_for_current_endianness(0xff, 0xd0, 0xf8, 0xe0),
+    get_abgr_value_for_current_endianness(0xff, 0x70, 0xc0, 0x88),
+    get_abgr_value_for_current_endianness(0xff, 0x56, 0x68, 0x34),
+    get_abgr_value_for_current_endianness(0xff, 0x20, 0x18, 0x08)
 };
 
-static void set_emulation_screen_blank(uint32_t *abgr_pixel_buffer, SDL_Texture *sdl_texture)
+static constexpr uint32_t original_green_colour_palette[4] =
 {
-    std::fill_n(abgr_pixel_buffer, static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS), 0xffffffff);
+    get_abgr_value_for_current_endianness(0xff, 0x0f, 0xbc, 0x9b),
+    get_abgr_value_for_current_endianness(0xff, 0x0f, 0xac, 0x8b),
+    get_abgr_value_for_current_endianness(0xff, 0x30, 0x62, 0x30),
+    get_abgr_value_for_current_endianness(0xff, 0x0f, 0x38, 0x0f)
+};
+
+static constexpr uint32_t greyscale_colour_palette[4] =
+{
+    get_abgr_value_for_current_endianness(0xff, 0xff, 0xff, 0xff),
+    get_abgr_value_for_current_endianness(0xff, 0xaa, 0xaa, 0xaa),
+    get_abgr_value_for_current_endianness(0xff, 0x55, 0x55, 0x55),
+    get_abgr_value_for_current_endianness(0xff, 0x00, 0x00, 0x00)
+};
+
+static const char *colour_palette_names[] =
+{
+    "Light Green",
+    "Original Green",
+    "Greyscale"
+};
+
+
+static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer,  SDL_Texture *sdl_texture)
+{
+    for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
+    {
+        abgr_pixel_buffer[i] = active_colour_palette[0];
+    }
     SDL_UpdateTexture(sdl_texture, nullptr, abgr_pixel_buffer, DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
 }
 
@@ -216,8 +243,12 @@ int main()
 
         uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
 
+        const uint32_t *active_colour_palette = light_green_colour_palette;
+        int selected_colour_palette_index = 0;
+
         std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
-        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
+        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
+
         std::string error_message;
         bool did_error_occur = false;
         bool stop_emulating = false;
@@ -284,7 +315,7 @@ int main()
 
                 for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                 {
-                    abgr_pixel_buffer[i] = game_boy_colour_palette[pixel_frame_buffer[i]];
+                    abgr_pixel_buffer[i] = active_colour_palette[pixel_frame_buffer[i]];
                 }
                 SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
@@ -336,6 +367,31 @@ int main()
                     }
                     ImGui::EndMenu();
                 }
+                if (ImGui::BeginMenu("Video"))
+                {
+                    ImGui::SeparatorText("Colour Palette");
+
+                    if (ImGui::Combo("##Colour Palette", &selected_colour_palette_index, colour_palette_names, IM_ARRAYSIZE(colour_palette_names)))
+                    {
+                        switch (selected_colour_palette_index)
+                        {
+                            case 0:
+                                active_colour_palette = light_green_colour_palette;
+                                break;
+                            case 1:
+                                active_colour_palette = original_green_colour_palette;
+                                break;
+                            case 2:
+                                active_colour_palette = greyscale_colour_palette;
+                                break;
+                        }
+                        if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                        {
+                            set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
                 if (ImGui::BeginMenu("Emulation"))
                 {
                     const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
@@ -348,7 +404,7 @@ int main()
                     {
                         game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                         game_boy_emulator.reset_state(true);
-                        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
+                        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
                     }
                     if (ImGui::MenuItem("Unload Boot ROM", "", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
                     {
@@ -358,7 +414,7 @@ int main()
                         {
                             game_boy_emulator.set_post_boot_state();
                         }
-                        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
+                        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem("Reset", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
@@ -371,7 +427,7 @@ int main()
                         {
                             game_boy_emulator.set_post_boot_state();
                         }
-                        set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
+                        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
                     }
                     ImGui::EndMenu();
                 }
