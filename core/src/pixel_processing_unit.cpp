@@ -381,7 +381,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
         }
 
         const bool are_background_and_window_enabled = is_bit_set(lcd_control_lcdc, 0);
-        uint8_t pixel_with_palette_applied = 0;
+        uint8_t pixel_with_palette_applied = 0x00;
 
         if (are_background_and_window_enabled &&
             (!is_object_display_enabled() ||
@@ -391,7 +391,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
             const uint8_t palette_colour_position = next_background_pixel.colour_index << 1;
             pixel_with_palette_applied = (background_palette_bgp & (0b11 << palette_colour_position)) >> palette_colour_position;
         }
-        else
+        else if (scanline_selected_objects.size() > 0)
         {
             const uint8_t palette_colour_position = next_object_pixel.colour_index << 1;
             const uint8_t palette = next_object_pixel.is_palette_bit_set

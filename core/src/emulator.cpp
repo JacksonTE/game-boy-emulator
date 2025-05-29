@@ -33,9 +33,9 @@ void Emulator::set_post_boot_state()
     central_processing_unit.set_post_boot_state();
 }
 
-bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED)
+bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED)
 {
-    return memory_management_unit->try_load_file(file_path, is_bootrom_file, TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED);
+    return memory_management_unit->try_load_file(file_path, is_bootrom_file, error_message, TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED);
 }
 
 bool Emulator::is_bootrom_loaded_in_memory_thread_safe()

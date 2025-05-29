@@ -55,7 +55,6 @@ static void run_emulator_core(
             {
                 continue;
             }
-
             game_boy_emulator.step_central_processing_unit_single_instruction();
 
             const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
@@ -122,47 +121,47 @@ static bool try_load_file_to_memory_with_dialog(
     std::atomic<bool> &is_emulation_paused,
     std::string &error_message)
 {
-    nfdopendialogu8args_t open_dialog_arguments{};
+    const bool previous_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+    is_emulation_paused.store(true, std::memory_order_release);
 
+    nfdopendialogu8args_t open_dialog_arguments{};
     nfdu8filteritem_t filters[] =
     {
-        {"Game Boy ROMs", "gb,bin,rom"}
+        {is_bootrom_file ? "Game Boy Boot ROM" : "Game Boy ROMs", "gb,bin,rom"}
     };
     open_dialog_arguments.filterList = filters;
     open_dialog_arguments.filterCount = 1;
 
     nfdchar_t *rom_path = nullptr;
     nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
-    bool is_operation_successful = true;
+    bool is_operation_successful = false;
 
     if (result == NFD_OKAY)
     {
-        const bool previous_pause_state = is_emulation_paused.load(std::memory_order_acquire);
-        is_emulation_paused.store(true, std::memory_order_release);
-
-        if (game_boy_emulator.try_load_file_to_memory(rom_path, is_bootrom_file))
+        if (game_boy_emulator.try_load_file_to_memory(rom_path, is_bootrom_file, error_message))
         {
             if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
             {
                 game_boy_emulator.reset_state(true);
             }
             else
+            {
                 game_boy_emulator.set_post_boot_state();
-        }
-        else
-        {
-            error_message = "Error: invalid ROM file provided";
-            is_operation_successful = false;
+            }
+            is_operation_successful = true;
         }
         NFD_FreePathU8(rom_path);
-        is_emulation_paused.store(previous_pause_state, std::memory_order_release);
+    }
+    else if (result == NFD_CANCEL)
+    {
+        is_operation_successful = true;
     }
     else if (result == NFD_ERROR)
     {
         std::cerr << "NFD error: " << NFD_GetError() << "\n";
         error_message = NFD_GetError();
-        is_operation_successful = false;
     }
+    is_emulation_paused.store(previous_pause_state, std::memory_order_release);
     return is_operation_successful;
 }
 
@@ -219,6 +218,8 @@ int main()
 
         std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
         set_emulation_screen_blank(abgr_pixel_buffer.get(), sdl_texture.get());
+        std::string error_message;
+        bool did_error_occur = false;
         bool stop_emulating = false;
 
         while (!stop_emulating)
@@ -316,9 +317,6 @@ int main()
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            bool did_error_occur = false;
-            std::string error_message;
-
             if (ImGui::BeginMainMenuBar())
             {
                 if (ImGui::BeginMenu("File"))
@@ -380,16 +378,33 @@ int main()
                 ImGui::EndMainMenuBar();
             }
 
-            if (did_error_occur)
-                ImGui::OpenPopup("Error Message");
+            const float error_popup_x_position = ImGui::GetIO().DisplaySize.x * 0.5f;
+            const float error_popup_y_position = ImGui::GetIO().DisplaySize.y * 0.5f;
+            ImGui::SetNextWindowPos(ImVec2(error_popup_x_position, error_popup_y_position), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-            if (ImGui::BeginPopupModal("Error Message", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            const float maximum_error_popup_width = ImGui::GetIO().DisplaySize.x * 0.4f;
+            const float error_message_width = ImGui::CalcTextSize(error_message.c_str()).x;
+            const float window_x_padding = ImGui::GetStyle().WindowPadding.x * 2.0f;
+            const float minimum_error_popup_width = std::min(maximum_error_popup_width, error_message_width + window_x_padding);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(minimum_error_popup_width, 0), ImVec2(maximum_error_popup_width, FLT_MAX));
+
+            if (did_error_occur)
             {
-                ImGui::TextUnformatted(error_message.c_str());
+                is_emulation_paused.store(true, std::memory_order_release);
+                ImGui::OpenPopup("Error");
+            }
+            if (ImGui::BeginPopupModal("Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
+            {
+                ImGui::Dummy(ImVec2(0.0f, 10.0f));
+                ImGui::TextWrapped(error_message.c_str());
+                ImGui::Dummy(ImVec2(0.0f, 10.0f));
                 ImGui::Separator();
-                if (ImGui::Button("OK", ImVec2(80, 0)))
+                if (ImGui::Button("OK", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
                 {
+                    is_emulation_paused.store(false, std::memory_order_release);
                     ImGui::CloseCurrentPopup();
+                    did_error_occur = false;
+                    error_message = "";
                 }
                 ImGui::EndPopup();
             }
