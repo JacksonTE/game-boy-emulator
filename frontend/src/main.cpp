@@ -161,7 +161,7 @@ static bool try_load_file_to_memory_with_dialog(
 
     nfdchar_t *rom_path = nullptr;
     nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
-    bool is_operation_successful = false;
+    bool is_operation_successful = true;
 
     if (result == NFD_OKAY)
     {
@@ -175,18 +175,18 @@ static bool try_load_file_to_memory_with_dialog(
             {
                 game_boy_emulator.set_post_boot_state();
             }
-            is_operation_successful = true;
+        }
+        else
+        {
+            is_operation_successful = false;
         }
         NFD_FreePathU8(rom_path);
-    }
-    else if (result == NFD_CANCEL)
-    {
-        is_operation_successful = true;
     }
     else if (result == NFD_ERROR)
     {
         std::cerr << "NFD error: " << NFD_GetError() << "\n";
         error_message = NFD_GetError();
+        is_operation_successful = false;
     }
     is_emulation_paused.store(previous_pause_state, std::memory_order_release);
     return is_operation_successful;
@@ -385,10 +385,18 @@ int main()
                                 active_colour_palette = greyscale_colour_palette;
                                 break;
                         }
-                        if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                        if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                         {
-                            set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
+                            auto const& pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+
+                            for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
+                            {
+                                abgr_pixel_buffer[i] = active_colour_palette[pixel_frame_buffer[i]];
+                            }
+                            SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
                         }
+                        else
+                            set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
                     }
                     ImGui::EndMenu();
                 }
