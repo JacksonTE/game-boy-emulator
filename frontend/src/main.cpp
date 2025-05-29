@@ -161,7 +161,7 @@ static bool try_load_file_to_memory_with_dialog(
 
     nfdchar_t *rom_path = nullptr;
     nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
-    bool is_operation_successful = true;
+    bool is_operation_successful = false;
 
     if (result == NFD_OKAY)
     {
@@ -175,10 +175,7 @@ static bool try_load_file_to_memory_with_dialog(
             {
                 game_boy_emulator.set_post_boot_state();
             }
-        }
-        else
-        {
-            is_operation_successful = false;
+            is_operation_successful = true;
         }
         NFD_FreePathU8(rom_path);
     }
@@ -186,7 +183,6 @@ static bool try_load_file_to_memory_with_dialog(
     {
         std::cerr << "NFD error: " << NFD_GetError() << "\n";
         error_message = NFD_GetError();
-        is_operation_successful = false;
     }
     is_emulation_paused.store(previous_pause_state, std::memory_order_release);
     return is_operation_successful;
@@ -249,8 +245,9 @@ int main()
         std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
 
-        std::string error_message;
-        bool did_error_occur = false;
+        std::string error_message = "";
+        bool pre_rom_loading_error_pause_state = false;
+        bool did_rom_loading_error_occur = false;
         bool stop_emulating = false;
 
         while (!stop_emulating)
@@ -277,29 +274,29 @@ int main()
 
                         switch (sdl_event.key.key)
                         {
-                            case SDLK_X:
+                            case SDLK_W:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(UP_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                break;
+                            case SDLK_A:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(LEFT_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                break;
+                            case SDLK_S:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(DOWN_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                break;
+                            case SDLK_D:
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(RIGHT_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                break;
+                            case SDLK_APOSTROPHE:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(A_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
-                            case SDLK_Z:
+                            case SDLK_SEMICOLON:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(B_BUTTON_FLAG_MASK, key_pressed_state);
-                                break;
-                            case SDLK_BACKSPACE:
-                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(SELECT_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
                             case SDLK_RETURN:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(START_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
-                            case SDLK_RIGHT:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(RIGHT_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
-                                break;
-                            case SDLK_LEFT:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(LEFT_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
-                                break;
-                            case SDLK_UP:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(UP_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
-                                break;
-                            case SDLK_DOWN:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(DOWN_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                            case SDLK_RSHIFT:
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(SELECT_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
                         }
                     }
@@ -354,11 +351,27 @@ int main()
                 {
                     if (ImGui::MenuItem("Load Game ROM"))
                     {
-                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, false, std::ref(is_emulation_paused), error_message);
+                        if (try_load_file_to_memory_with_dialog(game_boy_emulator, false, std::ref(is_emulation_paused), error_message))
+                        {
+                            is_emulation_paused.store(false, std::memory_order_release);
+                        }
+                        else if (error_message != "")
+                        {
+                            pre_rom_loading_error_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+                            did_rom_loading_error_occur = true;
+                        }
                     }
                     if (ImGui::MenuItem("Load Boot ROM (Optional)"))
                     {
-                        did_error_occur = !try_load_file_to_memory_with_dialog(game_boy_emulator, true, std::ref(is_emulation_paused), error_message);
+                        if (try_load_file_to_memory_with_dialog(game_boy_emulator, true, std::ref(is_emulation_paused), error_message))
+                        {
+                            is_emulation_paused.store(false, std::memory_order_release);
+                        }
+                        else if (error_message != "")
+                        {
+                            pre_rom_loading_error_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+                            did_rom_loading_error_occur = true;
+                        }
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem("Quit"))
@@ -387,7 +400,7 @@ int main()
                         }
                         if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                         {
-                            auto const& pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+                            auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
                             for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                             {
@@ -404,7 +417,7 @@ int main()
                 {
                     const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
 
-                    if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "", false))
+                    if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         is_emulation_paused.store(!current_pause_state, std::memory_order_release);
                     }
@@ -413,6 +426,7 @@ int main()
                         game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                         game_boy_emulator.reset_state(true);
                         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
+                        is_emulation_paused.store(false, std::memory_order_release);
                     }
                     if (ImGui::MenuItem("Unload Boot ROM", "", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
                     {
@@ -423,6 +437,7 @@ int main()
                             game_boy_emulator.set_post_boot_state();
                         }
                         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
+                        is_emulation_paused.store(false, std::memory_order_release);
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem("Reset", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
@@ -435,7 +450,7 @@ int main()
                         {
                             game_boy_emulator.set_post_boot_state();
                         }
-                        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
+                        is_emulation_paused.store(false, std::memory_order_release);
                     }
                     ImGui::EndMenu();
                 }
@@ -452,7 +467,7 @@ int main()
             const float minimum_error_popup_width = std::min(maximum_error_popup_width, error_message_width + window_x_padding);
             ImGui::SetNextWindowSizeConstraints(ImVec2(minimum_error_popup_width, 0), ImVec2(maximum_error_popup_width, FLT_MAX));
 
-            if (did_error_occur)
+            if (did_rom_loading_error_occur)
             {
                 is_emulation_paused.store(true, std::memory_order_release);
                 ImGui::OpenPopup("Error");
@@ -465,9 +480,9 @@ int main()
                 ImGui::Separator();
                 if (ImGui::Button("OK", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
                 {
-                    is_emulation_paused.store(false, std::memory_order_release);
+                    is_emulation_paused.store(pre_rom_loading_error_pause_state, std::memory_order_release);
                     ImGui::CloseCurrentPopup();
-                    did_error_occur = false;
+                    did_rom_loading_error_occur = false;
                     error_message = "";
                 }
                 ImGui::EndPopup();
