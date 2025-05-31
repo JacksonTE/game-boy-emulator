@@ -132,7 +132,6 @@ static const char *colour_palette_names[] =
     "Greyscale"
 };
 
-
 static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer,  SDL_Texture *sdl_texture)
 {
     for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
@@ -289,7 +288,7 @@ int main()
                             case SDLK_APOSTROPHE:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(A_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
-                            case SDLK_SEMICOLON:
+                            case SDLK_PERIOD:
                                 game_boy_emulator.update_joypad_button_pressed_state_thread_safe(B_BUTTON_FLAG_MASK, key_pressed_state);
                                 break;
                             case SDLK_RETURN:

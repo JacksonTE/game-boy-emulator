@@ -5,9 +5,9 @@
 
 #include "emulator.h"
 
-static std::filesystem::path get_acceptance_test_directory_path()
+static std::filesystem::path get_test_directory_path()
 {
-    return std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1" / "acceptance";
+    return std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1";
 }
 
 static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const std::filesystem::path &directory)
@@ -21,6 +21,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
     {
         // Skip tests that are specific to other Game Boy models than DMG
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
+            entry.path().filename() != "sources-GS.gb" && // TODO add this test after MBC5
             entry.path().filename() != "unused_hwio-GS.gb" && // TODO add this test after APU is done
             entry.path().filename() != "boot_div-dmg0.gb" &&
             entry.path().filename() != "boot_div-S.gb" &&
@@ -49,7 +50,7 @@ protected:
     void SetUp() override
     {
         ASSERT_TRUE(std::filesystem::exists(GetParam())) << "ROM file not found: " << GetParam();
-        game_boy_emulator.try_load_file_to_memory(GetParam(), false, error_message, true);
+        game_boy_emulator.try_load_file_to_memory(GetParam(), false, error_message);
         game_boy_emulator.set_post_boot_state();
     }
 };
@@ -84,7 +85,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsBits,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "bits")),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "bits")),
     [](auto info) { return info.param.stem().string(); }
 );
 
@@ -92,7 +93,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsInstructions,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "instr")),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "instr")),
     [](auto info) { return info.param.stem().string(); }
 );
 
@@ -100,7 +101,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsInterrupts,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "interrupts")),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "interrupts")),
     [](auto info) { return info.param.stem().string(); }
 );
 
@@ -108,7 +109,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsObjectAttributeMemoryDirectMemoryAccess,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "oam_dma")),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "oam_dma")),
     [](auto info)
     {
         std::string test_rom_file_name = info.param.stem().string();
@@ -121,7 +122,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsPixelProcessingUnit,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "ppu")),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "ppu")),
     [](auto info) 
     { 
         std::string test_rom_file_name = info.param.stem().string();
@@ -134,7 +135,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsTimer,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path() / "timer")),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "timer")),
     [](auto info) { return info.param.stem().string(); }
 );
 
@@ -142,7 +143,7 @@ INSTANTIATE_TEST_SUITE_P
 (
     MooneyeAcceptanceTestsMiscellaneous,
     MooneyeTest,
-    testing::ValuesIn(get_test_rom_paths_in_directory(get_acceptance_test_directory_path())),
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance")),
     [](auto info)
     {
         std::string test_rom_file_name = info.param.stem().string();
@@ -150,3 +151,11 @@ INSTANTIATE_TEST_SUITE_P
         return test_rom_file_name;
     }
 );
+
+//INSTANTIATE_TEST_SUITE_P
+//(
+//    MooneyeEmulatorOnlyTestsMBC1,
+//    MooneyeTest,
+//    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc1")),
+//    [](auto info) { return info.param.stem().string(); }
+//);

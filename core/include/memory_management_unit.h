@@ -4,8 +4,9 @@
 #include <cstdint>
 #include <filesystem>
 
-#include "pixel_processing_unit.h"
+#include "game_cartridge_slot.h"
 #include "internal_timer.h"
+#include "pixel_processing_unit.h"
 
 namespace GameBoyCore
 {
@@ -21,8 +22,8 @@ constexpr uint16_t UNUSABLE_MEMORY_SIZE = 0x0060;
 constexpr uint16_t INPUT_OUTPUT_REGISTERS_SIZE = 0x0080;
 constexpr uint16_t HIGH_RAM_SIZE = 0x007f;
 
-constexpr uint16_t ROM_BANK_00_START = 0x0000;
-constexpr uint16_t ROM_BANK_01_START = 0x4000;
+constexpr uint16_t ROM_BANK_X0_START = 0x0000;
+constexpr uint16_t ROM_BANK_0X_START = 0x4000;
 constexpr uint16_t EXTERNAL_RAM_START = 0xa000;
 constexpr uint16_t WORK_RAM_START = 0xc000;
 constexpr uint16_t ECHO_RAM_START = 0xe000;
@@ -52,7 +53,7 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED = false);
+    bool try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message);
     void unload_bootrom_thread_safe();
     void unload_game_rom_thread_safe();
     bool is_bootrom_loaded_thread_safe() const;
@@ -72,13 +73,11 @@ public:
 
 private:
     std::unique_ptr<uint8_t[]> bootrom{};
-    std::unique_ptr<uint8_t[]> rom_bank_00{};
-    std::unique_ptr<uint8_t[]> rom_bank_01{};
-    std::unique_ptr<uint8_t[]> external_ram{};
     std::unique_ptr<uint8_t[]> work_ram{};
     std::unique_ptr<uint8_t[]> unmapped_input_output_registers{};
     std::unique_ptr<uint8_t[]> high_ram{};
 
+    GameCartridgeSlot game_cartridge_slot{};
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 

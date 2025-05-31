@@ -52,16 +52,16 @@ PUBLIC
     SDL3::SDL3
 )
 
-add_executable(emulate-game-boy-frontend
+add_executable(emulate-game-boy-app
     "src/main.cpp"
 )
 
-target_include_directories(emulate-game-boy-frontend
+target_include_directories(emulate-game-boy-app
 PRIVATE
-    "${CMAKE_SOURCE_DIR}/frontend/include"
+    "include"
 )
 
-target_link_libraries(emulate-game-boy-frontend
+target_link_libraries(emulate-game-boy-app
 PRIVATE
     emulate-game-boy-core-library
     imgui

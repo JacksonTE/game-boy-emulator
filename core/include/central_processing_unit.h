@@ -203,8 +203,8 @@ private:
     void swap_nibbles(uint8_t &register8);
     void shift_right_logical(uint8_t &register8);
     void test_bit(uint8_t bit_position_to_test, uint8_t &register8);
-    void reset_bit(uint8_t bit_position_to_test, uint8_t &register8);
-    void set_bit(uint8_t bit_position_to_test, uint8_t &register8);
+    void reset_bit(uint8_t bit_position_to_reset, uint8_t &register8);
+    void set_bit(uint8_t bit_position_to_set, uint8_t &register8);
 
     void operate_on_register_hl(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position);
     void operate_on_register_hl_and_write(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position);

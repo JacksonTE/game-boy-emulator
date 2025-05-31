@@ -1340,14 +1340,14 @@ void CentralProcessingUnit::test_bit(uint8_t bit_position_to_test, uint8_t &regi
     update_flag(register_file.flags, FLAG_HALF_CARRY_MASK, true);
 }
 
-void CentralProcessingUnit::reset_bit(uint8_t bit_position_to_test, uint8_t &register8)
+void CentralProcessingUnit::reset_bit(uint8_t bit_position_to_reset, uint8_t &register8)
 {
-    register8 &= ~(1 << bit_position_to_test);
+    register8 &= ~(1 << bit_position_to_reset);
 }
 
-void CentralProcessingUnit::set_bit(uint8_t bit_position_to_test, uint8_t &register8)
+void CentralProcessingUnit::set_bit(uint8_t bit_position_to_set, uint8_t &register8)
 {
-    register8 |= (1 << bit_position_to_test);
+    register8 |= (1 << bit_position_to_set);
 }
 
 void CentralProcessingUnit::operate_on_register_hl(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position)

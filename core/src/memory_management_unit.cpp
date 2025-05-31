@@ -16,17 +16,11 @@ MemoryManagementUnit::MemoryManagementUnit(InternalTimer & internal_timer_refere
       pixel_processing_unit{pixel_processing_unit_reference}
 {
     bootrom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
-    rom_bank_00 = std::make_unique<uint8_t[]>(ROM_BANK_SIZE);
-    rom_bank_01 = std::make_unique<uint8_t[]>(ROM_BANK_SIZE);
-    external_ram = std::make_unique<uint8_t[]>(EXTERNAL_RAM_SIZE);
     work_ram = std::make_unique<uint8_t[]>(WORK_RAM_SIZE);
     unmapped_input_output_registers = std::make_unique<uint8_t[]>(INPUT_OUTPUT_REGISTERS_SIZE);
     high_ram = std::make_unique<uint8_t[]>(HIGH_RAM_SIZE);
 
     std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
-    std::fill_n(rom_bank_00.get(), ROM_BANK_SIZE, 0);
-    std::fill_n(rom_bank_01.get(), ROM_BANK_SIZE, 0);
-    std::fill_n(external_ram.get(), EXTERNAL_RAM_SIZE, 0);
     std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
     std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
     std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
@@ -34,7 +28,7 @@ MemoryManagementUnit::MemoryManagementUnit(InternalTimer & internal_timer_refere
 
 void MemoryManagementUnit::reset_state()
 {
-    std::fill_n(external_ram.get(), EXTERNAL_RAM_SIZE, 0);
+    // TODO should external ram also reset??
     std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
     std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
     std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
@@ -42,7 +36,7 @@ void MemoryManagementUnit::reset_state()
     joypad_p1_joyp = 0b11111111;
     interrupt_flag_if = 0b11100000;
     bootrom_status = 0x00;
-    interrupt_enable_ie = 0x00;
+    interrupt_enable_ie = 0b00000000;
 
     oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
     oam_dma_source_address_base = 0x0000;
@@ -77,14 +71,14 @@ void MemoryManagementUnit::set_post_boot_state()
     write_byte(0xff24, 0x77, false);
     write_byte(0xff25, 0xf3, false);
     write_byte(0xff26, 0xf1, false);
-    interrupt_enable_ie = 0x00;
+    interrupt_enable_ie = 0b00000000;
 
     oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
     oam_dma_source_address_base = 0x0000;
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED)
+bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -94,108 +88,34 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
         return false;
     }
     std::streamsize file_length_in_bytes = file.tellg();
-
-    if (is_bootrom_file)
-    {
-        if (file_length_in_bytes != BOOTROM_SIZE)
-        {
-            std::cerr << "Error: Provided file of size " << file_length_in_bytes << " bytes does not meet the boot ROM size requirement.\n";
-            error_message = "Provided file of size " + std::to_string(file_length_in_bytes) + " bytes does not meet the boot ROM size requirement.";
-            return false;
-        }
-    }
-    else
-    {
-        if (file_length_in_bytes < static_cast<std::streamsize>(2) * ROM_BANK_SIZE)
-        {
-            std::cerr << "Error: Provided file of size " << file_length_in_bytes << " bytes does not meet the game ROM size requirement.\n";
-            error_message = "Provided file of size " + std::to_string(file_length_in_bytes) + " bytes does not meet the game ROM size requirement.";
-            return false;
-        }
-
-        static constexpr uint8_t expected_logo[48] =
-        {
-            0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b,
-            0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
-            0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e,
-            0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
-            0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc,
-            0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e
-        };
-        std::array<uint8_t, 48> logo_bytes{};
-        file.seekg(0x0104, std::ios::beg);
-        file.read(reinterpret_cast<char*>(logo_bytes.data()), logo_bytes.size());
-
-        if (!std::equal(logo_bytes.begin(), logo_bytes.end(), std::begin(expected_logo)))
-        {
-            std::cerr << "Error: Logo in provided ROM does not match the expected pattern.\n";
-            error_message = "Logo in provided ROM does not match the expected pattern.";
-            return false;
-        }
-
-        uint8_t colour_game_boy_required_flag = 0xc0;
-        file.seekg(0x143, std::ios::beg);
-        file.read(reinterpret_cast<char*>(&colour_game_boy_required_flag), 1);
-
-        if (colour_game_boy_required_flag == 0xc0)
-        {
-            std::cerr << "Error: Provided game ROM requires Game Boy Color functionality to run.\n";
-            error_message = "Provided game ROM requires Game Boy Color functionality to run.";
-            return false;
-        }
-
-        uint8_t cartridge_type = 0x00;
-        file.seekg(0x147, std::ios::beg);
-        file.read(reinterpret_cast<char *>(&cartridge_type), 1);
-
-        if ((!TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED && cartridge_type != 0x00) ||
-            (TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED && cartridge_type != 0x00 && cartridge_type != 0x03 && cartridge_type != 0x1b))
-        {
-            std::cerr << std::hex << std::setfill('0')
-                      << "Error: Game ROM with cartridge type 0x" << std::setw(2) << static_cast<int>(cartridge_type) << " is not currently supported.\n";
-
-            std::ostringstream output_string_stream;
-            output_string_stream << std::hex << std::setfill('0')
-                                 << "Game ROM with cartridge type 0x" << std::setw(2) << static_cast<int>(cartridge_type) << " is not currently supported.";
-            error_message = output_string_stream.str();
-            return false;
-        }
-    }
     file.seekg(0, std::ios::beg);
-    bool was_file_load_successful = true;
 
-    if (is_bootrom_file)
+    if (!is_bootrom_file)
     {
-        was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), file_length_in_bytes));
-
-        if (was_file_load_successful)
-            is_bootrom_loaded_in_memory.store(true, std::memory_order_release);
-        else
+        if (game_cartridge_slot.try_load_file(file_path, file, file_length_in_bytes, error_message))
         {
-            std::cerr << "Error: Could not read bootrom file " << file_path << ".\n";
-            error_message = "Could not read bootrom file " + file_path.string();
+            is_game_rom_loaded_in_memory.store(true, std::memory_order_release);
+            return true;
         }
+        return false;
+    }
+
+    if (file_length_in_bytes != BOOTROM_SIZE)
+    {
+        std::cerr << "Error: Provided file of size " << file_length_in_bytes << " bytes does not meet the boot ROM size requirement.\n";
+        error_message = "Provided file of size " + std::to_string(file_length_in_bytes) + " bytes does not meet the boot ROM size requirement.";
+        return false;
+    }
+    const bool was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), file_length_in_bytes));
+
+    if (was_file_load_successful)
+    {
+        is_bootrom_loaded_in_memory.store(true, std::memory_order_release);
     }
     else
     {
-        const uint16_t first_rom_bank_bytes_count = std::min(file_length_in_bytes, static_cast<std::streamsize>(ROM_BANK_SIZE));
-        const uint16_t second_rom_bank_bytes_count = file_length_in_bytes - first_rom_bank_bytes_count;
-        
-        if (first_rom_bank_bytes_count > 0)
-        {
-            was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(rom_bank_00.get()), first_rom_bank_bytes_count));
-        }
-        if (second_rom_bank_bytes_count > 0)
-        {
-            was_file_load_successful &= static_cast<bool>(file.read(reinterpret_cast<char *>(rom_bank_01.get()), second_rom_bank_bytes_count));
-        }
-        if (was_file_load_successful)
-            is_game_rom_loaded_in_memory.store(true, std::memory_order_release);
-        else
-        {
-            std::cerr << "Error: Could not read game rom file " << file_path << ".\n";
-            error_message = "Could not read game rom file " + file_path.string();
-        }
+        std::cerr << "Error: Could not read bootrom file " << file_path << ".\n";
+        error_message = "Could not read bootrom file " + file_path.string();
     }
     return was_file_load_successful;
 }
@@ -208,8 +128,7 @@ void MemoryManagementUnit::unload_bootrom_thread_safe()
 
 void MemoryManagementUnit::unload_game_rom_thread_safe()
 {
-    std::fill_n(rom_bank_00.get(), ROM_BANK_SIZE, 0);
-    std::fill_n(rom_bank_01.get(), ROM_BANK_SIZE, 0);
+    game_cartridge_slot.reset_state();
     is_game_rom_loaded_in_memory.store(false, std::memory_order_release);
 }
 
@@ -235,14 +154,9 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     {
         return bootrom[address];
     }
-    else if (address < ROM_BANK_00_START + ROM_BANK_SIZE)
+    else if (address < ROM_BANK_0X_START + ROM_BANK_SIZE)
     {
-        return rom_bank_00[address];
-    }
-    else if (address < ROM_BANK_01_START + ROM_BANK_SIZE)
-    {
-        const uint16_t local_address = address - ROM_BANK_01_START;
-        return rom_bank_01[local_address];
+        return game_cartridge_slot.read_byte(address);
     }
     else if (address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
     {
@@ -250,8 +164,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     }
     else if (address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
     {
-        const uint16_t local_address = address - EXTERNAL_RAM_START;
-        return external_ram[local_address];
+        return game_cartridge_slot.read_byte(address);
     }
     else if (address < WORK_RAM_START + WORK_RAM_SIZE)
     {
@@ -347,13 +260,9 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_access_for_oam_dma)
 {
-    if (address < ROM_BANK_00_START + ROM_BANK_SIZE)
+    if (address < ROM_BANK_0X_START + ROM_BANK_SIZE)
     {
-        wrote_to_read_only_address(address);
-    }
-    else if (address < ROM_BANK_01_START + ROM_BANK_SIZE)
-    {
-        wrote_to_read_only_address(address);
+        game_cartridge_slot.write_byte(address, value);
     }
     else if (address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
     {
@@ -361,8 +270,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
     else if (address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
     {
-        const uint16_t local_address = address - EXTERNAL_RAM_START;
-        external_ram[local_address] = value;
+        game_cartridge_slot.write_byte(address, value);
     }
     else if (address < WORK_RAM_START + WORK_RAM_SIZE)
     {
@@ -537,8 +445,8 @@ bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uin
     static constexpr std::array<std::pair<uint16_t, uint16_t>, 6> memory_buses
     {
         {
-            {ROM_BANK_00_START, ROM_BANK_SIZE},
-            {ROM_BANK_01_START, ROM_BANK_SIZE},
+            {ROM_BANK_X0_START, ROM_BANK_SIZE},
+            {ROM_BANK_0X_START, ROM_BANK_SIZE},
             {VIDEO_RAM_START, VIDEO_RAM_SIZE},
             {EXTERNAL_RAM_START, EXTERNAL_RAM_SIZE},
             {WORK_RAM_START, WORK_RAM_SIZE},
@@ -563,8 +471,8 @@ bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uin
 
 void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const
 {
-    std::cout << std::hex << std::setfill('0');
-    std::cout << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
+    std::cout << std::hex << std::setfill('0')
+              << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
 }
 
 } // namespace GameBoyCore

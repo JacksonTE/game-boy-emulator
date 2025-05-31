@@ -33,9 +33,24 @@ void Emulator::set_post_boot_state()
     central_processing_unit.set_post_boot_state();
 }
 
-bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message, bool TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED)
+void Emulator::step_central_processing_unit_single_instruction()
 {
-    return memory_management_unit->try_load_file(file_path, is_bootrom_file, error_message, TODO_REMOVE_AFTER_MBC_1_5_IMPLEMENTED);
+    central_processing_unit.step_single_instruction();
+}
+
+RegisterFile<std::endian::native> Emulator::get_register_file() const
+{
+    return central_processing_unit.get_register_file();
+}
+
+void Emulator::print_register_file_state() const
+{
+    GameBoyCore::print_register_file_state(central_processing_unit.get_register_file());
+}
+
+bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message)
+{
+    return memory_management_unit->try_load_file(file_path, is_bootrom_file, error_message);
 }
 
 bool Emulator::is_bootrom_loaded_in_memory_thread_safe()
@@ -73,16 +88,6 @@ void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_
     GameBoyCore::print_bytes_in_range(*memory_management_unit, start_address, end_address);
 }
 
-uint8_t Emulator::get_published_frame_buffer_index() const
-{
-    return pixel_processing_unit.get_published_frame_buffer_index();
-}
-
-std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
-{
-    return pixel_processing_unit.get_pixel_frame_buffer(index);
-}
-
 void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state)
 {
     memory_management_unit->update_joypad_button_pressed_state_thread_safe(button_flag_mask, new_button_pressed_state);
@@ -93,19 +98,14 @@ void Emulator::update_joypad_direction_pad_pressed_state_thread_safe(uint8_t dir
     memory_management_unit->update_joypad_direction_pad_pressed_state_thread_safe(direction_flag_mask, new_direction_pressed_state);
 }
 
-RegisterFile<std::endian::native> Emulator::get_register_file() const
+uint8_t Emulator::get_published_frame_buffer_index() const
 {
-    return central_processing_unit.get_register_file();
+    return pixel_processing_unit.get_published_frame_buffer_index();
 }
 
-void Emulator::print_register_file_state() const
+std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
 {
-    GameBoyCore::print_register_file_state(central_processing_unit.get_register_file());
-}
-
-void Emulator::step_central_processing_unit_single_instruction()
-{
-    central_processing_unit.step_single_instruction();
+    return pixel_processing_unit.get_pixel_frame_buffer(index);
 }
 
 void Emulator::step_components_single_machine_cycle_to_sync_with_central_processing_unit()
