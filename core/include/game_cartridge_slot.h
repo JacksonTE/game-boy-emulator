@@ -12,6 +12,11 @@ constexpr uint8_t MBC1_BYTE = 0x01;
 constexpr uint8_t MBC1_WITH_RAM_BYTE = 0x02;
 constexpr uint8_t MBC1_WITH_RAM_AND_BATTERY_BYTE = 0x03;
 
+constexpr uint16_t ROM_BANK_SIZE = 0x4000;
+
+constexpr uint8_t LOGO_SIZE = 48;
+constexpr uint16_t LOGO_START_POSITION = 0x0104;
+
 class MemoryBankControllerBase
 {
 public:
@@ -30,8 +35,10 @@ protected:
 class MBC1 : public MemoryBankControllerBase
 {
 public:
-    static constexpr uint32_t max_file_size_in_default_configuration_bytes = 0x80000;
-    static constexpr uint32_t max_file_size_bytes = 0x200000;
+    static constexpr uint32_t max_rom_size_in_default_configuration_bytes = 0x80000;
+    static constexpr uint32_t max_rom_size_bytes = 0x200000;
+
+    static constexpr uint32_t max_ram_size_in_large_configuration_bytes = 0x2000;
 
     MBC1(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
 
@@ -40,7 +47,7 @@ public:
 
 protected:
     uint8_t ram_enable{};
-    uint8_t rom_bank_number{0b00000001};
+    uint8_t effective_rom_bank_number{0b00000001};
     uint8_t ram_bank_or_upper_rom_bank_number{};
     uint8_t banking_mode_select{};
 };

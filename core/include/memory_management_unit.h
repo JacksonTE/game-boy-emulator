@@ -14,7 +14,6 @@ namespace GameBoyCore
 constexpr uint32_t MEMORY_SIZE = 0x10000;
 constexpr uint16_t BOOTROM_SIZE = 0x100;
 
-constexpr uint16_t ROM_BANK_SIZE = 0x4000;
 constexpr uint16_t EXTERNAL_RAM_SIZE = 0x2000;
 constexpr uint16_t WORK_RAM_SIZE = 0x2000;
 constexpr uint16_t ECHO_RAM_SIZE = 0x1e00;
