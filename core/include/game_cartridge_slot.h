@@ -37,6 +37,7 @@ class MBC1 : public MemoryBankControllerBase
 public:
     static constexpr uint32_t max_rom_size_in_default_configuration_bytes = 0x80000;
     static constexpr uint32_t max_rom_size_bytes = 0x200000;
+    static constexpr uint32_t mbc1m_multi_game_compilation_cart_size_bytes = 0x100000;
 
     static constexpr uint32_t max_ram_size_in_large_configuration_bytes = 0x2000;
 

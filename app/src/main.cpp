@@ -109,14 +109,6 @@ static constexpr uint32_t light_green_colour_palette[4] =
     get_abgr_value_for_current_endianness(0xff, 0x20, 0x18, 0x08)
 };
 
-static constexpr uint32_t original_green_colour_palette[4] =
-{
-    get_abgr_value_for_current_endianness(0xff, 0x0f, 0xbc, 0x9b),
-    get_abgr_value_for_current_endianness(0xff, 0x0f, 0xac, 0x8b),
-    get_abgr_value_for_current_endianness(0xff, 0x30, 0x62, 0x30),
-    get_abgr_value_for_current_endianness(0xff, 0x0f, 0x38, 0x0f)
-};
-
 static constexpr uint32_t greyscale_colour_palette[4] =
 {
     get_abgr_value_for_current_endianness(0xff, 0xff, 0xff, 0xff),
@@ -125,11 +117,19 @@ static constexpr uint32_t greyscale_colour_palette[4] =
     get_abgr_value_for_current_endianness(0xff, 0x00, 0x00, 0x00)
 };
 
+static constexpr uint32_t original_green_colour_palette[4] =
+{
+    get_abgr_value_for_current_endianness(0xff, 0x0f, 0xbc, 0x9b),
+    get_abgr_value_for_current_endianness(0xff, 0x0f, 0xac, 0x8b),
+    get_abgr_value_for_current_endianness(0xff, 0x30, 0x62, 0x30),
+    get_abgr_value_for_current_endianness(0xff, 0x0f, 0x38, 0x0f)
+};
+
 static const char *colour_palette_names[] =
 {
     "Light Green",
-    "Original Green",
-    "Greyscale"
+    "Greyscale",
+    "Original Green"
 };
 
 static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer,  SDL_Texture *sdl_texture)
@@ -391,10 +391,10 @@ int main()
                                 active_colour_palette = light_green_colour_palette;
                                 break;
                             case 1:
-                                active_colour_palette = original_green_colour_palette;
+                                active_colour_palette = greyscale_colour_palette;
                                 break;
                             case 2:
-                                active_colour_palette = greyscale_colour_palette;
+                                active_colour_palette = original_green_colour_palette;
                                 break;
                         }
                         if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())

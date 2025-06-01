@@ -246,7 +246,6 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
         case MBC1_WITH_RAM_BYTE:
         case MBC1_WITH_RAM_AND_BATTERY_BYTE:
         {
-
             if (file_length_in_bytes > MBC1::max_rom_size_bytes)
             {
                 std::cerr << "Error: Provided file does not meet the size requirement for an MBC1 game.\n";
@@ -265,7 +264,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
             bool is_mbc1m_cartridge = false;
 
-            if (was_file_load_successful && rom.size() > MBC1::max_rom_size_in_default_configuration_bytes)
+            if (was_file_load_successful && rom.size() == MBC1::mbc1m_multi_game_compilation_cart_size_bytes)
             {
                 const uint32_t rom_bank_0x10_offset = 0x10 * ROM_BANK_SIZE;
                 is_mbc1m_cartridge = std::equal(rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION, 
@@ -273,10 +272,27 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                                                 std::begin(expected_logo));
                 if (is_mbc1m_cartridge)
                 {
-                    std::cerr << "Error: Provided game ROM uses the MBC1M variant of MBC1 and is not currently supported.\n";
-                    error_message = "Provided game ROM uses the MBC1M variant of MBC1 and is not currently supported.";
-                    reset_state();
-                    return false;
+                    // Convert into standard MBC1 cartridge so normal indexing can be used to read
+                    rom.resize(rom.size() * 2);
+                    const uint8_t memory_banks_per_sub_rom = 16;
+
+                    for (int sub_rom_number = 3; sub_rom_number >= 0; sub_rom_number--)
+                    {
+                        for (int memory_bank_number = memory_banks_per_sub_rom - 1; memory_bank_number >= 0; memory_bank_number--)
+                        {
+                            int previous_global_memory_bank_number = (sub_rom_number * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t previous_global_memory_bank_offset = static_cast<uint32_t>(previous_global_memory_bank_number) * ROM_BANK_SIZE;
+
+                            int new_global_memory_bank_number_for_first_copy = ((2 * sub_rom_number) * memory_banks_per_sub_rom) + memory_bank_number;
+                            int new_global_memory_bank_number_for_second_copy = ((2 * sub_rom_number + 1) * memory_banks_per_sub_rom) + memory_bank_number;
+
+                            uint32_t new_global_memory_bank_offset_for_first_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_first_copy) * ROM_BANK_SIZE;
+                            uint32_t new_global_memory_bank_offset_for_second_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_second_copy) * ROM_BANK_SIZE;
+
+                            std::memmove(&rom[new_global_memory_bank_offset_for_first_copy], &rom[previous_global_memory_bank_offset], ROM_BANK_SIZE);
+                            std::memmove(&rom[new_global_memory_bank_offset_for_second_copy], &rom[previous_global_memory_bank_offset], ROM_BANK_SIZE);
+                        }
+                    }
                 }
             }
             memory_bank_controller = std::make_unique<MBC1>(rom, ram);

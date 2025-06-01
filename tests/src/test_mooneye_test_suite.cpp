@@ -22,7 +22,6 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
         // Skip tests that are specific to other Game Boy models than DMG
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
             entry.path().filename() != "sources-GS.gb" && // TODO add this test after MBC5
-            entry.path().filename() != "multicart_rom_8Mb.gb" && // TODO add this test after supporting mbc1m
             entry.path().filename() != "unused_hwio-GS.gb" && // TODO add this test after APU is done
             entry.path().filename() != "boot_div-dmg0.gb" &&
             entry.path().filename() != "boot_div-S.gb" &&

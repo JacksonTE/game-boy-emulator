@@ -109,8 +109,8 @@ bool InternalTimer::update_tima_and_get_overflow_state()
     const bool is_selected_system_counter_bit_set = is_tima_enabled && (system_counter & (1 << selected_system_counter_bit)) != 0;
 
     const bool did_overflow_occur = !is_selected_system_counter_bit_set &&
-        is_previously_selected_system_counter_bit_set &&
-        (++timer_tima == 0);
+                                    is_previously_selected_system_counter_bit_set &&
+                                    (++timer_tima == 0);
 
     is_previously_selected_system_counter_bit_set = is_selected_system_counter_bit_set;
     return did_overflow_occur;
