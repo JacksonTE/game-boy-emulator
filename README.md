@@ -11,7 +11,7 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 |---------------------------------|---------------------------------|---------------------------------|
 
 ## Features
-- Completed and accurate Central Processing Unit, Memory Management Unit, Pixel Processing Unit, and Internal Timer (the emulated internals of the original Game Boy).
+- A complete Central Processing Unit, Memory Management Unit, Pixel Processing Unit, and Internal Timer (the emulated internals of the original Game Boy).
 - Interactable user interface for loading ROMs and adjusting emulation options made with ```Dear ImGui```.
 - Rendering frame data produced during GameBoyCore emulation using ```SDL3```.
 - Support for 32KiB ROM-only games and games with original cartridges that used the MBC1 memory bank controller.
