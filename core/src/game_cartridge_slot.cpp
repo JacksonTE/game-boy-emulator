@@ -289,16 +289,12 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                             uint32_t new_global_memory_bank_offset_for_first_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_first_copy) * ROM_BANK_SIZE;
                             uint32_t new_global_memory_bank_offset_for_second_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_second_copy) * ROM_BANK_SIZE;
 
-                            std::copy(
-                                rom.begin() + previous_global_memory_bank_offset,
-                                rom.begin() + previous_global_memory_bank_offset + ROM_BANK_SIZE,
-                                rom.begin() + new_global_memory_bank_offset_for_first_copy
-                            );
-                            std::copy(
-                                rom.begin() + previous_global_memory_bank_offset,
-                                rom.begin() + previous_global_memory_bank_offset + ROM_BANK_SIZE,
-                                rom.begin() + new_global_memory_bank_offset_for_second_copy
-                            );
+                            std::copy(rom.begin() + previous_global_memory_bank_offset,
+                                      rom.begin() + previous_global_memory_bank_offset + ROM_BANK_SIZE,
+                                      rom.begin() + new_global_memory_bank_offset_for_first_copy);
+                            std::copy(rom.begin() + previous_global_memory_bank_offset,
+                                      rom.begin() + previous_global_memory_bank_offset + ROM_BANK_SIZE,
+                                      rom.begin() + new_global_memory_bank_offset_for_second_copy);
                         }
                     }
                 }

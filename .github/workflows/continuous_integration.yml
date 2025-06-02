@@ -23,7 +23,6 @@ jobs:
             pkg-config \
             libgtk-3-dev
 
-
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSDL_UNIX_CONSOLE_BUILD=ON
 

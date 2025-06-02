@@ -362,12 +362,6 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
         const BackgroundPixel next_background_pixel = background_pixel_shift_register.shift_out();
         const ObjectPixel next_object_pixel = object_pixel_shift_register.shift_out();
 
-        if (scanline_pixels_to_discard_from_dummy_fetch_count > 0)
-        {
-            internal_lcd_x_coordinate_plus_8_lx++;
-            scanline_pixels_to_discard_from_dummy_fetch_count--;
-            return;
-        }
         if (scanline_pixels_to_discard_from_scrolling_count == -1)
         {
             scanline_pixels_to_discard_from_scrolling_count = (background_fetcher.fetcher_mode == FetcherMode::BackgroundMode || window_x_position_plus_7_wx == 0)
@@ -377,6 +371,12 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
         if (scanline_pixels_to_discard_from_scrolling_count > 0)
         {
             scanline_pixels_to_discard_from_scrolling_count--;
+            return;
+        }
+        if (scanline_pixels_to_discard_from_dummy_fetch_count > 0)
+        {
+            internal_lcd_x_coordinate_plus_8_lx++;
+            scanline_pixels_to_discard_from_dummy_fetch_count--;
             return;
         }
 
