@@ -132,7 +132,7 @@ static const char *colour_palette_names[] =
     "Original Green"
 };
 
-static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer,  SDL_Texture *sdl_texture)
+static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer, SDL_Texture *sdl_texture)
 {
     for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
     {
@@ -245,7 +245,7 @@ int main()
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
 
         std::string error_message = "";
-        bool pre_rom_loading_error_pause_state = false;
+        bool pre_rom_loading_pause_state = false;
         bool did_rom_loading_error_occur = false;
         bool stop_emulating = false;
 
@@ -356,7 +356,7 @@ int main()
                         }
                         else if (error_message != "")
                         {
-                            pre_rom_loading_error_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+                            pre_rom_loading_pause_state = is_emulation_paused.load(std::memory_order_acquire);
                             did_rom_loading_error_occur = true;
                         }
                     }
@@ -368,7 +368,7 @@ int main()
                         }
                         else if (error_message != "")
                         {
-                            pre_rom_loading_error_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+                            pre_rom_loading_pause_state = is_emulation_paused.load(std::memory_order_acquire);
                             did_rom_loading_error_occur = true;
                         }
                     }
@@ -479,7 +479,7 @@ int main()
                 ImGui::Separator();
                 if (ImGui::Button("OK", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
                 {
-                    is_emulation_paused.store(pre_rom_loading_error_pause_state, std::memory_order_release);
+                    is_emulation_paused.store(pre_rom_loading_pause_state, std::memory_order_release);
                     ImGui::CloseCurrentPopup();
                     did_rom_loading_error_occur = false;
                     error_message = "";
