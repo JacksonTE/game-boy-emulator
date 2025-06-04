@@ -13,7 +13,7 @@ Emulator::Emulator()
     : internal_timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       memory_management_unit{std::make_unique<MemoryManagementUnit>(internal_timer, pixel_processing_unit)},
-      central_processing_unit{[this](MachineCycleOperation) { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
+      central_processing_unit{[this]() { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
 {
 }
 

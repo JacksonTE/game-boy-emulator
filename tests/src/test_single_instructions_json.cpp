@@ -12,21 +12,72 @@
 #include "memory_management_unit.h"
 #include "pixel_processing_unit.h"
 
-static std::string memory_interaction_to_string(GameBoyCore::MemoryInteraction operation)
+enum class MemoryInteraction
+{
+    None,
+    Read,
+    Write
+};
+
+struct MachineCycleOperation
+{
+    MemoryInteraction memory_interaction;
+    uint16_t address_accessed{};
+    uint8_t value_written{};
+
+    MachineCycleOperation(MemoryInteraction interaction)
+        : memory_interaction{interaction}
+    {
+    }
+
+    MachineCycleOperation(MemoryInteraction interaction, uint16_t address)
+        : memory_interaction{interaction},
+          address_accessed{address}
+    {
+    }
+
+    MachineCycleOperation(MemoryInteraction interaction, uint16_t address, uint8_t value)
+        : memory_interaction{interaction},
+          address_accessed{address},
+          value_written{value}
+    {
+    }
+
+    bool operator==(const MachineCycleOperation &other) const
+    {
+        if (memory_interaction != other.memory_interaction)
+            return false;
+
+        switch (memory_interaction)
+        {
+            case MemoryInteraction::None:
+                return true;
+            case MemoryInteraction::Read:
+                return address_accessed == other.address_accessed;
+            case MemoryInteraction::Write:
+                return address_accessed == other.address_accessed && value_written == other.value_written;
+            default:
+                return false;
+        }
+    }
+
+};
+
+static std::string memory_interaction_to_string(MemoryInteraction operation)
 {
     switch (operation) {
-        case GameBoyCore::MemoryInteraction::None:
+        case MemoryInteraction::None:
             return "None";
-        case GameBoyCore::MemoryInteraction::Read:
+        case MemoryInteraction::Read:
             return "Read";
-        case GameBoyCore::MemoryInteraction::Write:
+        case MemoryInteraction::Write:
             return "Write";
         default:
             return "Unknown";
     }
 }
 
-static std::ostream &operator<<(std::ostream &output_stream, const GameBoyCore::MachineCycleOperation &interaction)
+static std::ostream &operator<<(std::ostream &output_stream, const MachineCycleOperation &interaction)
 {
     output_stream << "MachineCycleOperation{"
                   << "memory_interaction: " << memory_interaction_to_string(interaction.memory_interaction) << ", "
@@ -46,7 +97,7 @@ struct SingleInstructionTestCase
     GameBoyCore::RegisterFile<std::endian::native> expected_register_values;
     std::vector<std::pair<uint16_t, uint8_t>> expected_ram_address_value_pairs;
 
-    std::vector<GameBoyCore::MachineCycleOperation> expected_memory_interactions;
+    std::vector<MachineCycleOperation> expected_memory_interactions;
 };
 
 static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
@@ -133,17 +184,17 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
             const auto &expected_operation_performed = expected_cycles_array[2];
 
             if (expected_operation_performed == "---")
-                test_case.expected_memory_interactions.emplace_back(GameBoyCore::MemoryInteraction::None);
+                test_case.expected_memory_interactions.emplace_back(MemoryInteraction::None);
             else
             {
                 const auto &expected_address_accessed = expected_cycles_array[0];
 
                 if (expected_operation_performed == "r-m")
-                    test_case.expected_memory_interactions.emplace_back(GameBoyCore::MemoryInteraction::Read, expected_address_accessed);
+                    test_case.expected_memory_interactions.emplace_back(MemoryInteraction::Read, expected_address_accessed);
                 else
                 {
                     const auto &expected_value_written = expected_cycles_array[1];
-                    test_case.expected_memory_interactions.emplace_back(GameBoyCore::MemoryInteraction::Write, expected_address_accessed, expected_value_written);
+                    test_case.expected_memory_interactions.emplace_back(MemoryInteraction::Write, expected_address_accessed, expected_value_written);
                 }
             }
         }
@@ -194,34 +245,61 @@ private:
     }
 };
 
+class SingleInstructionTestCentralProcessingUnit : public GameBoyCore::CentralProcessingUnit
+{
+public:
+    std::unique_ptr<SingleInstructionTestMemory> memory_management_unit;
+    std::function<void(MachineCycleOperation)> machine_cycle_memory_operation_callback;
+
+    SingleInstructionTestCentralProcessingUnit(std::unique_ptr<SingleInstructionTestMemory> memory, std::function<void()> no_memory_operation_callback, std::function<void(MachineCycleOperation)> memory_operation_callback)
+        : CentralProcessingUnit{no_memory_operation_callback, *memory},
+          memory_management_unit{std::move(memory)},
+          machine_cycle_memory_operation_callback{memory_operation_callback}
+    {
+    }
+
+    uint8_t read_byte_and_step_emulator_components(uint16_t address) override
+    {
+        machine_cycle_memory_operation_callback(MachineCycleOperation{MemoryInteraction::Read, address});
+        return memory_management_unit->read_byte(address);
+    }
+
+    void write_byte_and_step_emulator_components(uint16_t address, uint8_t value) override
+    {
+        machine_cycle_memory_operation_callback(MachineCycleOperation{MemoryInteraction::Write, address, value});
+        memory_management_unit->write_byte(address, value);
+    }
+};
+
 class SingleInstructionTest : public testing::TestWithParam<std::filesystem::path>
 {
 protected:
-    std::vector<GameBoyCore::MachineCycleOperation> machine_cycle_operations;
-    std::unique_ptr<SingleInstructionTestMemory> memory_management_unit;
-    GameBoyCore::CentralProcessingUnit game_boy_central_processing_unit;
+    std::vector<MachineCycleOperation> machine_cycle_operations;
+    std::unique_ptr<SingleInstructionTestCentralProcessingUnit> game_boy_central_processing_unit;
 
     SingleInstructionTest()
-        : memory_management_unit{std::make_unique<SingleInstructionTestMemory>()},
-          game_boy_central_processing_unit
-          {
-              [this](GameBoyCore::MachineCycleOperation interaction) { this->machine_cycle_operations.push_back(interaction); },
-              *memory_management_unit
-          }
-    { 
+    {
+        std::unique_ptr<SingleInstructionTestMemory> memory_management_unit = std::make_unique<SingleInstructionTestMemory>();
+
+        game_boy_central_processing_unit = std::make_unique<SingleInstructionTestCentralProcessingUnit>
+        (
+            std::move(memory_management_unit),
+            [this]() { this->machine_cycle_operations.emplace_back(MemoryInteraction::None); },
+            [this](MachineCycleOperation memory_operation) { this->machine_cycle_operations.push_back(memory_operation); }
+        );
     }
 
     void set_initial_values(const SingleInstructionTestCase &test_case)
     {
         machine_cycle_operations.clear();
-        memory_management_unit->reset_state();
-        game_boy_central_processing_unit.reset_state(false);
+        game_boy_central_processing_unit->memory_management_unit->reset_state();
+        game_boy_central_processing_unit->reset_state(false);
 
         for (const std::pair<uint16_t, uint8_t> &pair : test_case.initial_ram_address_value_pairs)
         {
-            memory_management_unit->write_byte(pair.first, pair.second);
+            game_boy_central_processing_unit->memory_management_unit->write_byte(pair.first, pair.second);
         }
-        game_boy_central_processing_unit.set_register_file_state(test_case.initial_register_values);
+        game_boy_central_processing_unit->set_register_file_state(test_case.initial_register_values);
     }
 };
 
@@ -238,24 +316,24 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
-        game_boy_central_processing_unit.step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
-        game_boy_central_processing_unit.step_single_instruction();
+        game_boy_central_processing_unit->step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
+        game_boy_central_processing_unit->step_single_instruction();
 
-        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().af, test_case.expected_register_values.af);
-        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().bc, test_case.expected_register_values.bc);
-        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().de, test_case.expected_register_values.de);
-        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().hl, test_case.expected_register_values.hl);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().af, test_case.expected_register_values.af);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().bc, test_case.expected_register_values.bc);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().de, test_case.expected_register_values.de);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().hl, test_case.expected_register_values.hl);
 
         // Compare expected program_counter against program_counter-1 since next instruction is 
         // fetched at the end of the current one, advancing the program counter an extra time
-        EXPECT_EQ(static_cast<uint16_t>(game_boy_central_processing_unit.get_register_file().program_counter - 1), 
+        EXPECT_EQ(static_cast<uint16_t>(game_boy_central_processing_unit->get_register_file().program_counter - 1),
                   test_case.expected_register_values.program_counter);
 
-        EXPECT_EQ(game_boy_central_processing_unit.get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
 
         for (const std::pair<uint16_t, uint8_t> &expected_pair : test_case.expected_ram_address_value_pairs)
         {
-            EXPECT_EQ(memory_management_unit->read_byte(expected_pair.first), expected_pair.second);
+            EXPECT_EQ(game_boy_central_processing_unit->memory_management_unit->read_byte(expected_pair.first), expected_pair.second);
         }
 
         // Compare expected_memory_interactions size against machine_cycle_operations.size()-1 since 

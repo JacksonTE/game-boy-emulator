@@ -26,26 +26,6 @@ enum class InterruptMasterEnableState
     Enabled
 };
 
-enum class MemoryInteraction
-{
-    None,
-    Read,
-    Write
-};
-
-struct MachineCycleOperation
-{
-    MemoryInteraction memory_interaction;
-    uint16_t address_accessed{};
-    uint8_t value_written{};
-
-    MachineCycleOperation(MemoryInteraction interaction);
-    MachineCycleOperation(MemoryInteraction interaction, uint16_t address);
-    MachineCycleOperation(MemoryInteraction interaction, uint16_t address, uint8_t value);
-
-    bool operator==(const MachineCycleOperation &other) const;
-};
-
 template <std::endian compiling_device_endianness>
 struct RegisterFile;
 
@@ -138,7 +118,7 @@ struct RegisterFile<std::endian::big>
 class CentralProcessingUnit
 {
 public:
-    CentralProcessingUnit(std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference);
+    CentralProcessingUnit(std::function<void()> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference);
 
     void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
@@ -149,7 +129,7 @@ public:
     void step_single_instruction();
 
 private:
-    std::function<void(MachineCycleOperation)> emulator_step_single_machine_cycle_callback;
+    std::function<void()> emulator_step_single_machine_cycle_callback;
     MemoryManagementUnit &memory_management_unit;
     RegisterFile<std::endian::native> register_file;
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
@@ -160,8 +140,8 @@ private:
     void fetch_next_instruction();
     void service_interrupt();
 
-    uint8_t read_byte_and_step_emulator_components(uint16_t address);
-    void write_byte_and_step_emulator_components(uint16_t address, uint8_t value);
+    virtual uint8_t read_byte_and_step_emulator_components(uint16_t address);
+    virtual void write_byte_and_step_emulator_components(uint16_t address, uint8_t value);
     uint8_t fetch_immediate8_and_step_emulator_components();
     uint16_t fetch_immediate16_and_step_emulator_components();
 
