@@ -218,16 +218,19 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
 
 void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma)
 {
-    if (is_oam_dma_in_progress && !is_access_for_oam_dma)
-        return;
-
-    const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
-    if (is_lcd_enable_bit_set)
+    if (!is_access_for_oam_dma)
     {
-        if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-            current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && previous_mode == current_mode)
-        {
+        if (is_oam_dma_in_progress)
             return;
+
+        const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
+        if (is_lcd_enable_bit_set)
+        {
+            if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
+                current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && previous_mode == current_mode)
+            {
+                return;
+            }
         }
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
