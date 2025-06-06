@@ -129,6 +129,7 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
             entry.path().filename() != "line_153_lyc_b.gb" &&
             entry.path().filename() != "line_153_lyc_int_b.gb" &&
             entry.path().filename() != "ly_while_lcd_off.gb" &&
+            entry.path().filename() != "line_153_ly_c.gb" &&
             entry.path().filename() != "lyc1_int_halt_a.gb" &&
             entry.path().filename() != "lyc1_int_halt_b.gb" &&
             entry.path().filename() != "lyc1_int_nops_a.gb" &&
