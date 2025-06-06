@@ -577,6 +577,8 @@ void PixelProcessingUnit::step_fetchers_single_dot()
             background_fetcher.is_enabled = false;
         }
     }
+    else
+        object_fetcher.is_enabled = false;
 }
 
 void PixelProcessingUnit::step_background_fetcher_single_dot()
