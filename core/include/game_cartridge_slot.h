@@ -11,6 +11,8 @@ constexpr uint8_t ROM_ONLY_BYTE = 0x00;
 constexpr uint8_t MBC1_BYTE = 0x01;
 constexpr uint8_t MBC1_WITH_RAM_BYTE = 0x02;
 constexpr uint8_t MBC1_WITH_RAM_AND_BATTERY_BYTE = 0x03;
+constexpr uint8_t MBC2_BYTE = 0x05;
+constexpr uint8_t MBC2_WITH_BATTERY_BYTE = 0x06;
 
 constexpr uint16_t ROM_BANK_SIZE = 0x4000;
 
@@ -46,11 +48,28 @@ public:
     uint8_t read_byte(uint16_t address) override;
     void write_byte(uint16_t address, uint8_t value) override;
 
-protected:
+private:
     uint8_t ram_enable{};
     uint8_t effective_rom_bank_number{0b00000001};
     uint8_t ram_bank_or_upper_rom_bank_number{};
     uint8_t banking_mode_select{};
+};
+
+class MBC2 : public MemoryBankControllerBase
+{
+public:
+    static constexpr uint32_t max_rom_size_bytes = 0x40000;
+    static constexpr uint8_t max_number_of_rom_banks = 16;
+    static constexpr uint16_t built_in_ram_size_bytes = 0x200;
+
+    MBC2(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
+
+    uint8_t read_byte(uint16_t address) override;
+    void write_byte(uint16_t address, uint8_t value) override;
+
+private:
+    bool does_register_control_rom{};
+    uint8_t ram_enable_or_rom_bank_number{};
 };
 
 class GameCartridgeSlot

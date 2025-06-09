@@ -159,3 +159,12 @@ INSTANTIATE_TEST_SUITE_P
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc1")),
     [](auto info) { return info.param.stem().string(); }
 );
+
+INSTANTIATE_TEST_SUITE_P
+(
+    MooneyeEmulatorOnlyTestsMBC2,
+    MooneyeTest,
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc2")),
+    [](auto info) { return info.param.stem().string(); }
+);
+
