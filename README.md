@@ -14,12 +14,12 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 - A complete Central Processing Unit, Memory Management Unit, Pixel Processing Unit, and Internal Timer (the emulated internals of the original Game Boy).
 - Interactable user interface for loading ROMs and adjusting emulation options made with ```Dear ImGui```.
 - Rendering frame data produced during GameBoyCore emulation using ```SDL3```.
-- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1 memory bank controller.
+- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1 or MBC2 memory bank controllers.
 - Three preset colour palettes including the light green featured in the above screenshots, greyscale black and white, and a darker green similar to the original hardware.
 
 ## Planned Features
 - Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
-- Add support for memory bank controllers MBC2, MBC3, and MBC5 for compatability with most games.
+- Add support for memory bank controllers MBC3 and MBC5 for compatability with most games.
 - Add support for Game Boy Color (CGB) games. 
 
 ## Compilation
@@ -38,9 +38,9 @@ Here are several methods to compile and run the project:
 **Command Line**
 1. Clone the ```emulate-game-boy``` repository.
 2. Navigate into the ```emulate-game-boy``` folder using in the terminal.
-3. Execute ```cmake -S . -B build -DCMAKE_BUILD_TYPE=Release```.
+3. Execute ```cmake -S . -B build```.
 4. Execute ```cmake --build build```.
-5. This will create an ```emulate-game-boy-app.exe``` executable that can be run.
+5. This will create an ```emulate-game-boy-app.exe``` executable in folder ```bin/Debug``` that can be run.
 
 ## Usage Instructions
 1. Acquire a Game Boy game ROM file (not provided with the project).
