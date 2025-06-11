@@ -153,7 +153,7 @@ static bool try_load_file_to_memory_with_dialog(
     nfdopendialogu8args_t open_dialog_arguments{};
     nfdu8filteritem_t filters[] =
     {
-        {is_bootrom_file ? "Game Boy Boot ROM" : "Game Boy ROMs", "gb,bin,rom"}
+        {is_bootrom_file ? "Game Boy Boot ROMs" : "Game Boy ROMs", "gb,gbc,bin,rom"}
     };
     open_dialog_arguments.filterList = filters;
     open_dialog_arguments.filterCount = 1;

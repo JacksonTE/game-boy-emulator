@@ -344,7 +344,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     if (background_fetcher.is_enabled &&
         background_fetcher.fetcher_mode == FetcherMode::BackgroundMode &&
         is_window_enabled_for_scanline && was_wy_condition_triggered_this_frame &&
-        static_cast<int8_t>(internal_lcd_x_coordinate_plus_8_lx) - 1 == window_x_position_plus_7_wx)
+        internal_lcd_x_coordinate_plus_8_lx == window_x_position_plus_7_wx + 1)
     {
         background_pixel_shift_register.clear();
         background_fetcher.reset_state();
