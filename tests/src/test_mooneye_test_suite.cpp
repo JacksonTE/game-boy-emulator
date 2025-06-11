@@ -168,3 +168,10 @@ INSTANTIATE_TEST_SUITE_P
     [](auto info) { return info.param.stem().string(); }
 );
 
+INSTANTIATE_TEST_SUITE_P
+(
+    MooneyeEmulatorOnlyTestsMBC5,
+    MooneyeTest,
+    testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc5")),
+    [](auto info) { return info.param.stem().string(); }
+);

@@ -111,8 +111,8 @@ std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
 void Emulator::step_components_single_machine_cycle_to_sync_with_central_processing_unit()
 {
     internal_timer.step_single_machine_cycle();
-    pixel_processing_unit.step_single_machine_cycle();
     memory_management_unit->step_single_machine_cycle();
+    pixel_processing_unit.step_single_machine_cycle();
 }
 
 void Emulator::request_interrupt(uint8_t interrupt_flag_mask)

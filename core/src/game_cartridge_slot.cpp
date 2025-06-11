@@ -66,7 +66,6 @@ uint8_t MBC1::read_byte(uint16_t address)
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
-        const bool is_ram_enabled = (ram_enable & 0x0f) == 0x0a;
         if (!is_ram_enabled)
         {
             return 0xff;
@@ -88,7 +87,7 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
 {
     if (address < 0x2000)
     {
-        ram_enable = value;
+        is_ram_enabled = ((value & 0x0f) == 0x0a);
     }
     else if (address < 0x4000)
     {
@@ -104,7 +103,6 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
-        const bool is_ram_enabled = (ram_enable & 0x0f) == 0x0a;
         if (!is_ram_enabled)
         {
             return;
@@ -165,7 +163,7 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
     }
     else if (address < 0x8000)
     {
-        std::cerr << "Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM. No operation will occur.\n";
+        std::cout << "Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM. No operation will occur.\n";
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
@@ -176,6 +174,75 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
         }
         const uint16_t address_to_write = address & (MBC2::built_in_ram_size_bytes - 1);
         cartridge_ram[address_to_write] = value | 0xf0;
+    }
+    else
+        throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
+}
+
+MBC5::MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram, bool is_rumble_enabled)
+    : MemoryBankControllerBase{rom, ram},
+      is_rumble_circuitry_used{is_rumble_enabled}
+{
+}
+
+uint8_t MBC5::read_byte(uint16_t address)
+{
+    if (address < 0x4000)
+    {
+        return cartridge_rom[address];
+    }
+    else if (address < 0x8000)
+    {
+        uint32_t address_to_read = (address & 0x3fff) |
+                                   (bits_zero_to_seven_of_rom_bank_number << 14) |
+                                   (bit_eight_of_rom_bank_number << 22);
+        address_to_read &= (cartridge_rom.size() - 1);
+        return cartridge_rom[address_to_read];
+    }
+    else if (address >= 0xa000 && address < 0xc000)
+    {
+        if (!is_ram_enabled)
+        {
+            return 0xff;
+        }
+        uint32_t address_to_read = (address & 0x1fff) | (ram_bank_number << 13);
+        address_to_read &= (cartridge_ram.size() - 1);
+        return cartridge_ram[address_to_read];
+    }
+    throw std::runtime_error("Attemped to read from out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
+}
+
+void MBC5::write_byte(uint16_t address, uint8_t value)
+{
+    if (address < 0x2000)
+    {
+        is_ram_enabled = ((value & 0x0f) == 0x0a);
+    }
+    else if (address < 0x3000)
+    {
+        bits_zero_to_seven_of_rom_bank_number = value;
+    }
+    else if (address < 0x4000)
+    {
+        bit_eight_of_rom_bank_number = value & 1;
+    }
+    else if (address < 0x6000)
+    {
+        ram_bank_number = value;
+    }
+    else if (address < 0x8000)
+    {
+        std::cerr << "Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM. No operation will occur.\n";
+    }
+    else if (address >= 0xa000 && address < 0xc000)
+    {
+        if (!is_ram_enabled)
+        {
+            return;
+        }
+        uint32_t address_to_write = (address & 0x1fff) | (ram_bank_number << 13);
+        address_to_write &= (cartridge_ram.size() - 1);
+        cartridge_ram[address_to_write] = value;
     }
     else
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
@@ -314,7 +381,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                 return false;
             }
             if ((cartridge_type == MBC1_BYTE && cartridge_ram_size != 0) ||
-                (file_length_in_bytes > MBC1::max_rom_size_in_default_configuration_bytes && cartridge_ram_size > 0x2000))
+                (file_length_in_bytes > MBC1::max_rom_size_in_default_configuration_bytes && cartridge_ram_size > MBC1::max_ram_size_in_large_configuration_bytes))
             {
                 std::cerr << "Error: Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.\n";
                 error_message = "Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.";
@@ -323,14 +390,13 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
             ram.resize(cartridge_ram_size);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
-            bool is_mbc1m_cartridge = false;
 
-            if (was_file_load_successful && rom.size() == MBC1::mbc1m_multi_game_compilation_cart_size_bytes)
+            if (was_file_load_successful && rom.size() == MBC1::mbc1m_multi_game_compilation_cart_rom_size_bytes)
             {
                 const uint32_t rom_bank_0x10_offset = 0x10 * ROM_BANK_SIZE;
-                is_mbc1m_cartridge = std::equal(rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION, 
-                                                rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION + LOGO_SIZE,
-                                                std::begin(expected_logo));
+                const bool is_mbc1m_cartridge = std::equal(rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION, 
+                                                           rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION + LOGO_SIZE,
+                                                           std::begin(expected_logo));
                 if (is_mbc1m_cartridge)
                 {
                     // Convert into standard MBC1 cartridge so normal indexing can be used to read
@@ -382,6 +448,33 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
             ram.resize(MBC2::built_in_ram_size_bytes);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
             memory_bank_controller = std::make_unique<MBC2>(rom, ram);
+            break;
+        }
+        case MBC5_BYTE:
+        case MBC5_WITH_RAM_BYTE:
+        case MBC5_WITH_RAM_AND_BATTERY_BYTE:
+        case MBC5_WITH_RUMBLE_AND_RAM:
+        case MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY:
+        {
+            if (file_length_in_bytes > MBC5::max_rom_size_bytes)
+            {
+                std::cerr << "Error: Provided file does not meet the size requirement for an MBC5 game.\n";
+                error_message = "Provided file does not meet the size requirement for an MBC5 game.";
+                return false;
+            }
+            if ((cartridge_type == MBC5_BYTE && cartridge_ram_size != 0) ||
+                cartridge_ram_size > MBC5::max_ram_size_bytes)
+            {
+                std::cerr << "Error: Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.\n";
+                error_message = "Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.";
+                return false;
+            }
+            rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
+            ram.resize(cartridge_ram_size);
+            was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
+
+            const bool is_rumble_enabled = (cartridge_type == MBC5_WITH_RUMBLE_AND_RAM || cartridge_type == MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY);
+            memory_bank_controller = std::make_unique<MBC5>(rom, ram, is_rumble_enabled);
             break;
         }
         default:
