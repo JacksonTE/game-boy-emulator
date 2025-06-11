@@ -14,12 +14,12 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 - A complete Central Processing Unit, Memory Management Unit, Pixel Processing Unit, and Internal Timer (the emulated internals of the original Game Boy).
 - Interactable user interface for loading ROMs and adjusting emulation options made with ```Dear ImGui```.
 - Rendering the frame data produced by the emulated internals using ```SDL3```.
-- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1 or MBC2 memory bank controllers.
+- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1, MBC2, or MBC5 memory bank controllers.
 - Three preset colour palettes including the light green featured in the above screenshots, greyscale black and white, and a darker green similar to the original hardware.
 
 ## Planned Features
 - Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
-- Add support for memory bank controllers MBC3 and MBC5 for compatability with most games.
+- Add support for memory bank controller MBC3 for compatability with most games.
 - Add support for Game Boy Color (CGB) games. 
 
 ## Compilation
