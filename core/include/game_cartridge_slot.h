@@ -85,17 +85,18 @@ public:
     static constexpr uint32_t max_rom_size_bytes = 0x800000;
     static constexpr uint32_t max_ram_size_bytes = 0x20000;
 
-    MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram, bool is_rumble_enabled);
+    static constexpr uint16_t rom_bank_size_bytes = 0x4000;
+    static constexpr uint16_t ram_bank_size_bytes = 0x2000;
+
+    MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
 
     uint8_t read_byte(uint16_t address) override;
     void write_byte(uint16_t address, uint8_t value) override;
 
 private:
-    bool is_rumble_circuitry_used{};
-    uint8_t bits_zero_to_seven_of_rom_bank_number{1};
-    uint8_t bit_eight_of_rom_bank_number{};
     bool is_ram_enabled{};
     uint8_t ram_bank_number{};
+    uint16_t rom_bank_number{1};
 };
 
 class GameCartridgeSlot

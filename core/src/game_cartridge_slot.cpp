@@ -1,5 +1,6 @@
 #include <array>
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <bit>
 #include <iostream>
@@ -135,8 +136,7 @@ uint8_t MBC2::read_byte(uint16_t address)
     else if (address < 0x8000)
     {
         const uint8_t effective_rom_bank_number = does_register_control_rom ? ram_enable_or_rom_bank_number : 1;
-        uint32_t address_to_read = (address & 0x3fff) | (effective_rom_bank_number << 14);
-        address_to_read &= (cartridge_rom.size() - 1);
+        const uint32_t address_to_read = ((address & 0x3fff) | (effective_rom_bank_number << 14)) & static_cast<uint32_t>(cartridge_rom.size() - 1);
         return cartridge_rom[address_to_read];
     }
     else if (address >= 0xa000 && address < 0xc000)
@@ -179,9 +179,8 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
 }
 
-MBC5::MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram, bool is_rumble_enabled)
-    : MemoryBankControllerBase{rom, ram},
-      is_rumble_circuitry_used{is_rumble_enabled}
+MBC5::MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+    : MemoryBankControllerBase{rom, ram}
 {
 }
 
@@ -193,10 +192,9 @@ uint8_t MBC5::read_byte(uint16_t address)
     }
     else if (address < 0x8000)
     {
-        uint32_t address_to_read = (address & 0x3fff) |
-                                   (bits_zero_to_seven_of_rom_bank_number << 14) |
-                                   (bit_eight_of_rom_bank_number << 22);
-        address_to_read &= (cartridge_rom.size() - 1);
+        const uint32_t rom_bank_starting_address = rom_bank_number << std::countr_zero(MBC5::rom_bank_size_bytes);
+        const uint16_t address_within_rom_bank = address & (MBC5::rom_bank_size_bytes - 1);
+        const uint32_t address_to_read = (rom_bank_starting_address | address_within_rom_bank) & static_cast<uint32_t>(cartridge_rom.size() - 1);
         return cartridge_rom[address_to_read];
     }
     else if (address >= 0xa000 && address < 0xc000)
@@ -205,8 +203,9 @@ uint8_t MBC5::read_byte(uint16_t address)
         {
             return 0xff;
         }
-        uint32_t address_to_read = (address & 0x1fff) | (ram_bank_number << 13);
-        address_to_read &= (cartridge_ram.size() - 1);
+        const uint32_t ram_bank_starting_address = ram_bank_number << std::countr_zero(MBC5::ram_bank_size_bytes);
+        const uint16_t address_within_ram_bank = address & (MBC5::ram_bank_size_bytes - 1);
+        const uint32_t address_to_read = (ram_bank_starting_address | address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
         return cartridge_ram[address_to_read];
     }
     throw std::runtime_error("Attemped to read from out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
@@ -220,11 +219,13 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
     }
     else if (address < 0x3000)
     {
-        bits_zero_to_seven_of_rom_bank_number = value;
+        const uint8_t bits_0_to_7_of_rom_bank_number = value;
+        rom_bank_number = (rom_bank_number & 0xff00) | bits_0_to_7_of_rom_bank_number;
     }
     else if (address < 0x4000)
     {
-        bit_eight_of_rom_bank_number = value & 1;
+        const uint16_t bit_8_of_rom_bank_number = (value & 1) << 8;
+        rom_bank_number = (rom_bank_number & 0x00ff) | bit_8_of_rom_bank_number;
     }
     else if (address < 0x6000)
     {
@@ -232,7 +233,7 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
     }
     else if (address < 0x8000)
     {
-        std::cerr << "Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM. No operation will occur.\n";
+        std::cout << "Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM. No operation will occur.\n";
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
@@ -240,8 +241,9 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
         {
             return;
         }
-        uint32_t address_to_write = (address & 0x1fff) | (ram_bank_number << 13);
-        address_to_write &= (cartridge_ram.size() - 1);
+        const uint32_t ram_bank_starting_address = ram_bank_number << std::countr_zero(MBC5::ram_bank_size_bytes);
+        const uint16_t address_within_ram_bank = address & (MBC5::ram_bank_size_bytes - 1);
+        const uint32_t address_to_write = (ram_bank_starting_address | address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
         cartridge_ram[address_to_write] = value;
     }
     else
@@ -472,9 +474,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
             ram.resize(cartridge_ram_size);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
-
-            const bool is_rumble_enabled = (cartridge_type == MBC5_WITH_RUMBLE_AND_RAM || cartridge_type == MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY);
-            memory_bank_controller = std::make_unique<MBC5>(rom, ram, is_rumble_enabled);
+            memory_bank_controller = std::make_unique<MBC5>(rom, ram);
             break;
         }
         default:
