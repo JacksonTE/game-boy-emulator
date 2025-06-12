@@ -1,10 +1,9 @@
-#include <array>
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
-#include <bit>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 #include "bitwise_utilities.h"
 #include "game_cartridge_slot.h"
@@ -38,31 +37,29 @@ void MemoryBankControllerBase::write_byte(uint16_t address, uint8_t value)
 MBC1::MBC1(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
     : MemoryBankControllerBase{rom, ram}
 {
+    number_of_rom_banks = rom.size() >> ROM_BANK_SIZE_POWER_OF_TWO;
+    number_of_ram_banks = ram.size() >> RAM_BANK_SIZE_POWER_OF_TWO;
 }
 
 uint8_t MBC1::read_byte(uint16_t address)
 {
     if (address < 0x4000)
     {
-        const bool does_rom_exceed_default_configuration_max = cartridge_rom.size() > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION;
-        const uint8_t effective_rom_banking_mode_select = does_rom_exceed_default_configuration_max ? banking_mode_select : 0;
-        const uint8_t effective_upper_rom_bank_number = does_rom_exceed_default_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
-
-        uint32_t address_to_read = (effective_rom_banking_mode_select == 1)
-            ? address | (effective_upper_rom_bank_number << 19)
-            : address;
-        address_to_read &= (cartridge_rom.size() - 1);
+        const uint8_t selected_rom_bank_number = (banking_mode == 1) 
+            ? (ram_bank_number_or_upper_two_bits_of_rom_bank_number << 5) & (number_of_rom_banks - 1)
+            : 0;
+        const uint32_t selected_rom_bank_starting_address = selected_rom_bank_number << std::countr_zero(ROM_BANK_SIZE);
+        const uint16_t selected_address_within_rom_bank = address & (ROM_BANK_SIZE - 1);
+        const uint32_t address_to_read = selected_rom_bank_starting_address | selected_address_within_rom_bank;
         return cartridge_rom[address_to_read];
     }
     else if (address < 0x8000)
     {
-        const bool does_rom_exceed_default_configuration_max = cartridge_rom.size() > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION;
-        const uint8_t effective_upper_rom_bank_number = does_rom_exceed_default_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
-
-        uint32_t address_to_read = (address & 0x3fff) |
-                                   (effective_rom_bank_number << 14) |
-                                   (effective_upper_rom_bank_number << 19);
-        address_to_read &= (cartridge_rom.size() - 1);
+        const uint8_t selected_rom_bank_number = (ram_bank_number_or_upper_two_bits_of_rom_bank_number << 5 | lower_five_bits_of_rom_bank_number) &
+                                                 (number_of_rom_banks - 1);
+        const uint32_t selected_rom_bank_starting_address = selected_rom_bank_number << std::countr_zero(ROM_BANK_SIZE);
+        const uint16_t selected_address_within_rom_bank = address & (ROM_BANK_SIZE - 1);
+        const uint32_t address_to_read = selected_rom_bank_starting_address | selected_address_within_rom_bank;
         return cartridge_rom[address_to_read];
     }
     else if (address >= 0xa000 && address < 0xc000)
@@ -71,14 +68,12 @@ uint8_t MBC1::read_byte(uint16_t address)
         {
             return 0xff;
         }
-        const bool does_ram_exceed_large_configuration_max = cartridge_ram.size() > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION;
-
-        const uint8_t effective_ram_bank_number = does_ram_exceed_large_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
-        const uint8_t effective_ram_banking_mode_select = does_ram_exceed_large_configuration_max ? banking_mode_select : 0;
-
-        const uint32_t address_to_read = (effective_ram_banking_mode_select == 1)
-            ? (address & 0x1fff) | (effective_ram_bank_number << 13)
-            : (address & 0x1fff);
+        const uint8_t selected_ram_bank_number = (banking_mode == 1)
+            ? ram_bank_number_or_upper_two_bits_of_rom_bank_number & (number_of_ram_banks - 1)
+            : 0;
+        const uint32_t selected_rom_bank_starting_address = selected_ram_bank_number << std::countr_zero(RAM_BANK_SIZE);
+        const uint16_t selected_address_within_rom_bank = address & (RAM_BANK_SIZE - 1);
+        const uint32_t address_to_read = selected_rom_bank_starting_address | selected_address_within_rom_bank;
         return cartridge_ram[address_to_read];
     }
     throw std::runtime_error("Attemped to read from out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
@@ -92,15 +87,15 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
     }
     else if (address < 0x4000)
     {
-        effective_rom_bank_number = std::max((value & 0b00011111), 1);
+        lower_five_bits_of_rom_bank_number = std::max(static_cast<uint8_t>(value & 0b11111), MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
     }
     else if (address < 0x6000)
     {
-        ram_bank_or_upper_rom_bank_number = value & 0b00000011;
+        ram_bank_number_or_upper_two_bits_of_rom_bank_number = (value & 0b11);
     }
     else if (address < 0x8000)
     {
-        banking_mode_select = value & 0b00000001;
+        banking_mode = (value & 1);
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
@@ -108,14 +103,10 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
         {
             return;
         }
-        const bool does_ram_exceed_large_configuration_max = cartridge_ram.size() > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION;
-
-        const uint8_t effective_ram_bank_number = does_ram_exceed_large_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
-        const uint8_t effective_ram_banking_mode_select = does_ram_exceed_large_configuration_max ? banking_mode_select : 0;
-
-        const uint32_t address_to_write = (effective_ram_banking_mode_select == 1)
-            ? (address & 0x1fff) | (effective_ram_bank_number << 13)
-            : (address & 0x1fff);
+        const uint8_t selected_ram_bank_number = (banking_mode == 1)
+            ? ram_bank_number_or_upper_two_bits_of_rom_bank_number & (number_of_ram_banks - 1)
+            : 0;
+        const uint32_t address_to_write = (address & 0x1fff) | (selected_ram_bank_number << 13);
         cartridge_ram[address_to_write] = value;
     }
     else

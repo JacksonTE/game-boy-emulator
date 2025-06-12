@@ -60,10 +60,13 @@ public:
     void write_byte(uint16_t address, uint8_t value) override;
 
 private:
+    uint8_t number_of_rom_banks;
+    uint8_t number_of_ram_banks;
+
     bool is_ram_enabled{};
-    uint8_t effective_rom_bank_number{MINIMUM_ALLOWABLE_ROM_BANK_NUMBER};
-    uint8_t ram_bank_or_upper_rom_bank_number{};
-    uint8_t banking_mode_select{};
+    uint8_t lower_five_bits_of_rom_bank_number{MINIMUM_ALLOWABLE_ROM_BANK_NUMBER};
+    uint8_t ram_bank_number_or_upper_two_bits_of_rom_bank_number{};
+    uint8_t banking_mode{};
 };
 
 class MBC2 : public MemoryBankControllerBase
