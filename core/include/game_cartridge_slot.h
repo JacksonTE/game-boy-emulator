@@ -22,6 +22,9 @@ constexpr uint8_t MBC5_WITH_RUMBLE_AND_RAM = 0x1d;
 constexpr uint8_t MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY = 0x1e;
 
 constexpr uint16_t ROM_BANK_SIZE = 0x4000;
+constexpr uint8_t ROM_BANK_SIZE_POWER_OF_TWO = 14;
+constexpr uint16_t RAM_BANK_SIZE = 0x2000;
+constexpr uint8_t RAM_BANK_SIZE_POWER_OF_TWO = 13;
 
 constexpr uint8_t LOGO_SIZE = 48;
 constexpr uint16_t LOGO_START_POSITION = 0x0104;
@@ -29,7 +32,7 @@ constexpr uint16_t LOGO_START_POSITION = 0x0104;
 class MemoryBankControllerBase
 {
 public:
-    static constexpr uint16_t no_mbc_file_size_bytes = 0x8000;
+    static constexpr uint16_t ROM_ONLY_WITH_NO_MBC_FILE_SIZE = 0x8000;
 
     MemoryBankControllerBase(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
 
@@ -44,11 +47,12 @@ protected:
 class MBC1 : public MemoryBankControllerBase
 {
 public:
-    static constexpr uint32_t max_rom_size_in_default_configuration_bytes = 0x80000;
-    static constexpr uint32_t max_rom_size_bytes = 0x200000;
-    static constexpr uint32_t mbc1m_multi_game_compilation_cart_rom_size_bytes = 0x100000;
+    static constexpr uint32_t MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION = 0x80000;
+    static constexpr uint32_t MAX_ROM_SIZE = 0x200000;
+    static constexpr uint32_t MBC1M_MULTI_GAME_COMPILATION_CART_ROM_SIZE = 0x100000;
+    static constexpr uint8_t MINIMUM_ALLOWABLE_ROM_BANK_NUMBER = 1;
 
-    static constexpr uint32_t max_ram_size_in_large_configuration_bytes = 0x2000;
+    static constexpr uint32_t MAX_RAM_SIZE_IN_LARGE_CONFIGURATION = 0x2000;
 
     MBC1(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
 
@@ -57,7 +61,7 @@ public:
 
 private:
     bool is_ram_enabled{};
-    uint8_t effective_rom_bank_number{0b00000001};
+    uint8_t effective_rom_bank_number{MINIMUM_ALLOWABLE_ROM_BANK_NUMBER};
     uint8_t ram_bank_or_upper_rom_bank_number{};
     uint8_t banking_mode_select{};
 };
@@ -65,9 +69,10 @@ private:
 class MBC2 : public MemoryBankControllerBase
 {
 public:
-    static constexpr uint32_t max_rom_size_bytes = 0x40000;
-    static constexpr uint8_t max_number_of_rom_banks = 0x10;
-    static constexpr uint16_t built_in_ram_size_bytes = 0x200;
+    static constexpr uint32_t MAX_ROM_SIZE = 0x40000;
+    static constexpr uint32_t MAX_NUMBER_OF_ROM_BANKS = 0x10;
+    static constexpr uint8_t MINIMUM_ALLOWABLE_ROM_BANK_NUMBER = 1;
+    static constexpr uint16_t BUILT_IN_RAM_SIZE = 0x200;
 
     MBC2(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
 
@@ -75,18 +80,15 @@ public:
     void write_byte(uint16_t address, uint8_t value) override;
 
 private:
-    bool does_register_control_rom{};
-    uint8_t ram_enable_or_rom_bank_number{};
+    uint8_t selected_rom_bank_number{MINIMUM_ALLOWABLE_ROM_BANK_NUMBER};
+    bool is_ram_enabled{};
 };
 
 class MBC5 : public MemoryBankControllerBase
 {
 public:
-    static constexpr uint32_t max_rom_size_bytes = 0x800000;
-    static constexpr uint32_t max_ram_size_bytes = 0x20000;
-
-    static constexpr uint16_t rom_bank_size_bytes = 0x4000;
-    static constexpr uint16_t ram_bank_size_bytes = 0x2000;
+    static constexpr uint32_t MAX_ROM_SIZE = 0x800000;
+    static constexpr uint32_t MAX_RAM_SIZE = 0x20000;
 
     MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
 
@@ -94,9 +96,12 @@ public:
     void write_byte(uint16_t address, uint8_t value) override;
 
 private:
+    uint8_t number_of_rom_banks;
+    uint8_t number_of_ram_banks;
+
     bool is_ram_enabled{};
-    uint8_t ram_bank_number{};
-    uint16_t rom_bank_number{1};
+    uint8_t selected_ram_bank_number{};
+    uint16_t selected_rom_bank_number{1};
 };
 
 class GameCartridgeSlot

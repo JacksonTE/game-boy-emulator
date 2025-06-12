@@ -20,7 +20,7 @@ MemoryBankControllerBase::MemoryBankControllerBase(std::vector<uint8_t> &rom, st
 
 uint8_t	MemoryBankControllerBase::read_byte(uint16_t address)
 {
-    if (address >= MemoryBankControllerBase::no_mbc_file_size_bytes)
+    if (address >= MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE)
     {
         std::cout << std::hex << std::setfill('0')
                   << "Attemped to read from non-existent cartridge RAM at address " << std::setw(4) << address << "Returning 0xff as a fallback.";
@@ -44,7 +44,7 @@ uint8_t MBC1::read_byte(uint16_t address)
 {
     if (address < 0x4000)
     {
-        const bool does_rom_exceed_default_configuration_max = cartridge_rom.size() > MBC1::max_rom_size_in_default_configuration_bytes;
+        const bool does_rom_exceed_default_configuration_max = cartridge_rom.size() > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION;
         const uint8_t effective_rom_banking_mode_select = does_rom_exceed_default_configuration_max ? banking_mode_select : 0;
         const uint8_t effective_upper_rom_bank_number = does_rom_exceed_default_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
 
@@ -56,7 +56,7 @@ uint8_t MBC1::read_byte(uint16_t address)
     }
     else if (address < 0x8000)
     {
-        const bool does_rom_exceed_default_configuration_max = cartridge_rom.size() > MBC1::max_rom_size_in_default_configuration_bytes;
+        const bool does_rom_exceed_default_configuration_max = cartridge_rom.size() > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION;
         const uint8_t effective_upper_rom_bank_number = does_rom_exceed_default_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
 
         uint32_t address_to_read = (address & 0x3fff) |
@@ -71,7 +71,7 @@ uint8_t MBC1::read_byte(uint16_t address)
         {
             return 0xff;
         }
-        const bool does_ram_exceed_large_configuration_max = cartridge_ram.size() > MBC1::max_ram_size_in_large_configuration_bytes;
+        const bool does_ram_exceed_large_configuration_max = cartridge_ram.size() > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION;
 
         const uint8_t effective_ram_bank_number = does_ram_exceed_large_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
         const uint8_t effective_ram_banking_mode_select = does_ram_exceed_large_configuration_max ? banking_mode_select : 0;
@@ -108,7 +108,7 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
         {
             return;
         }
-        const bool does_ram_exceed_large_configuration_max = cartridge_ram.size() > MBC1::max_ram_size_in_large_configuration_bytes;
+        const bool does_ram_exceed_large_configuration_max = cartridge_ram.size() > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION;
 
         const uint8_t effective_ram_bank_number = does_ram_exceed_large_configuration_max ? ram_bank_or_upper_rom_bank_number : 0;
         const uint8_t effective_ram_banking_mode_select = does_ram_exceed_large_configuration_max ? banking_mode_select : 0;
@@ -135,19 +135,19 @@ uint8_t MBC2::read_byte(uint16_t address)
     }
     else if (address < 0x8000)
     {
-        const uint8_t effective_rom_bank_number = does_register_control_rom ? ram_enable_or_rom_bank_number : 1;
-        const uint32_t address_to_read = ((address & 0x3fff) | (effective_rom_bank_number << 14)) & static_cast<uint32_t>(cartridge_rom.size() - 1);
+        const uint32_t selected_rom_bank_starting_address = selected_rom_bank_number << std::countr_zero(ROM_BANK_SIZE);
+        const uint16_t selected_address_within_rom_bank = address & (ROM_BANK_SIZE - 1);
+        const uint32_t address_to_read = (selected_rom_bank_starting_address | selected_address_within_rom_bank) & (cartridge_rom.size() - 1);
         return cartridge_rom[address_to_read];
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
-        const bool is_ram_enabled = !does_register_control_rom && (ram_enable_or_rom_bank_number & 0x0f) == 0x0a;
         if (!is_ram_enabled)
         {
             return 0xff;
         }
-        const uint16_t address_to_read = address & (MBC2::built_in_ram_size_bytes - 1);
-        return cartridge_ram[address_to_read] | 0xf0;
+        const uint16_t address_to_read = address & (MBC2::BUILT_IN_RAM_SIZE - 1);
+        return cartridge_ram[address_to_read];
     }
     throw std::runtime_error("Attemped to read from out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
 }
@@ -156,10 +156,18 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
 {
     if (address < 0x4000)
     {
-        does_register_control_rom = is_bit_set(address, static_cast<uint16_t>(8));
-        ram_enable_or_rom_bank_number = does_register_control_rom
-            ? std::max(value & (max_number_of_rom_banks - 1), 1)
-            : value;
+        const bool does_write_control_rom = is_bit_set(address, static_cast<uint16_t>(8));
+        if (does_write_control_rom)
+        {
+            const uint8_t requested_rom_bank_number_with_wrapping = value & (MAX_NUMBER_OF_ROM_BANKS - 1);
+            selected_rom_bank_number = std::max(requested_rom_bank_number_with_wrapping, MBC2::MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
+            is_ram_enabled = false;
+        }
+        else
+        {
+            selected_rom_bank_number = MBC2::MINIMUM_ALLOWABLE_ROM_BANK_NUMBER;
+            is_ram_enabled = ((value & 0x0f) == 0x0a);
+        }
     }
     else if (address < 0x8000)
     {
@@ -167,13 +175,13 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
     }
     else if (address >= 0xa000 && address < 0xc000)
     {
-        const bool is_ram_enabled = !does_register_control_rom && (ram_enable_or_rom_bank_number & 0x0f) == 0x0a;
         if (!is_ram_enabled)
         {
             return;
         }
-        const uint16_t address_to_write = address & (MBC2::built_in_ram_size_bytes - 1);
-        cartridge_ram[address_to_write] = value | 0xf0;
+        const uint16_t address_to_write = address & (MBC2::BUILT_IN_RAM_SIZE - 1);
+        const uint8_t value_with_undefined_upper_nibble = value | 0xf0;
+        cartridge_ram[address_to_write] = value_with_undefined_upper_nibble;
     }
     else
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
@@ -182,6 +190,8 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
 MBC5::MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
     : MemoryBankControllerBase{rom, ram}
 {
+    number_of_rom_banks = rom.size() >> ROM_BANK_SIZE_POWER_OF_TWO;
+    number_of_ram_banks = ram.size() >> RAM_BANK_SIZE_POWER_OF_TWO;
 }
 
 uint8_t MBC5::read_byte(uint16_t address)
@@ -192,9 +202,9 @@ uint8_t MBC5::read_byte(uint16_t address)
     }
     else if (address < 0x8000)
     {
-        const uint32_t rom_bank_starting_address = rom_bank_number << std::countr_zero(MBC5::rom_bank_size_bytes);
-        const uint16_t address_within_rom_bank = address & (MBC5::rom_bank_size_bytes - 1);
-        const uint32_t address_to_read = (rom_bank_starting_address | address_within_rom_bank) & static_cast<uint32_t>(cartridge_rom.size() - 1);
+        const uint32_t selected_rom_bank_starting_address = selected_rom_bank_number << std::countr_zero(ROM_BANK_SIZE);
+        const uint16_t address_within_rom_bank = address & (ROM_BANK_SIZE - 1);
+        const uint32_t address_to_read = selected_rom_bank_starting_address | address_within_rom_bank;
         return cartridge_rom[address_to_read];
     }
     else if (address >= 0xa000 && address < 0xc000)
@@ -203,9 +213,9 @@ uint8_t MBC5::read_byte(uint16_t address)
         {
             return 0xff;
         }
-        const uint32_t ram_bank_starting_address = ram_bank_number << std::countr_zero(MBC5::ram_bank_size_bytes);
-        const uint16_t address_within_ram_bank = address & (MBC5::ram_bank_size_bytes - 1);
-        const uint32_t address_to_read = (ram_bank_starting_address | address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
+        const uint32_t selected_ram_bank_starting_address = selected_ram_bank_number << std::countr_zero(RAM_BANK_SIZE);
+        const uint16_t selected_address_within_ram_bank = address & (RAM_BANK_SIZE - 1);
+        const uint32_t address_to_read = (selected_ram_bank_starting_address | selected_address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
         return cartridge_ram[address_to_read];
     }
     throw std::runtime_error("Attemped to read from out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
@@ -220,16 +230,16 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
     else if (address < 0x3000)
     {
         const uint8_t bits_0_to_7_of_rom_bank_number = value;
-        rom_bank_number = (rom_bank_number & 0xff00) | bits_0_to_7_of_rom_bank_number;
+        selected_rom_bank_number = ((selected_rom_bank_number & 0xff00) | bits_0_to_7_of_rom_bank_number) & (number_of_rom_banks - 1);
     }
     else if (address < 0x4000)
     {
         const uint16_t bit_8_of_rom_bank_number = (value & 1) << 8;
-        rom_bank_number = (rom_bank_number & 0x00ff) | bit_8_of_rom_bank_number;
+        selected_rom_bank_number = ((selected_rom_bank_number & 0x00ff) | bit_8_of_rom_bank_number) & (number_of_rom_banks - 1);
     }
     else if (address < 0x6000)
     {
-        ram_bank_number = value;
+        selected_ram_bank_number = value & (number_of_ram_banks - 1);
     }
     else if (address < 0x8000)
     {
@@ -241,9 +251,9 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
         {
             return;
         }
-        const uint32_t ram_bank_starting_address = ram_bank_number << std::countr_zero(MBC5::ram_bank_size_bytes);
-        const uint16_t address_within_ram_bank = address & (MBC5::ram_bank_size_bytes - 1);
-        const uint32_t address_to_write = (ram_bank_starting_address | address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
+        const uint32_t selected_ram_bank_starting_address = selected_ram_bank_number << std::countr_zero(RAM_BANK_SIZE);
+        const uint16_t selected_address_within_ram_bank = address & (RAM_BANK_SIZE - 1);
+        const uint32_t address_to_write = selected_ram_bank_starting_address | selected_address_within_ram_bank;
         cartridge_ram[address_to_write] = value;
     }
     else
@@ -257,14 +267,14 @@ GameCartridgeSlot::GameCartridgeSlot()
 
 void GameCartridgeSlot::reset_state()
 {
-    rom.resize(MemoryBankControllerBase::no_mbc_file_size_bytes, 0);
+    rom.resize(MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE, 0);
     ram.resize(0);
     memory_bank_controller = std::make_unique<MemoryBankControllerBase>(rom, ram);
 }
 
 bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, std::ifstream &file, std::streamsize file_length_in_bytes, std::string &error_message)
 {
-    if (file_length_in_bytes < MemoryBankControllerBase::no_mbc_file_size_bytes)
+    if (file_length_in_bytes < MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE)
     {
         std::cerr << "Error: Provided file of size " << file_length_in_bytes << " bytes does not meet the game ROM size requirement.\n";
         error_message = "Provided file of size " + std::to_string(file_length_in_bytes) + " bytes does not meet the game ROM size requirement.";
@@ -355,7 +365,8 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
     switch (cartridge_type)
     {
         case ROM_ONLY_BYTE:
-            if (file_length_in_bytes != MemoryBankControllerBase::no_mbc_file_size_bytes)
+        {
+            if (file_length_in_bytes > MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE)
             {
                 std::cerr << "Error: Provided file does not meet the size requirement for a ROM-only game.\n";
                 error_message = "Provided file does not meet the size requirement for a ROM-only game.";
@@ -367,23 +378,24 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                 error_message = "Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.";
                 return false;
             }
-            rom.resize(MemoryBankControllerBase::no_mbc_file_size_bytes, 0);
+            rom.resize(MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE, 0);
             ram.resize(0);
             memory_bank_controller = std::make_unique<MemoryBankControllerBase>(rom, ram);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
             break;
+        }
         case MBC1_BYTE:
         case MBC1_WITH_RAM_BYTE:
         case MBC1_WITH_RAM_AND_BATTERY_BYTE:
         {
-            if (file_length_in_bytes > MBC1::max_rom_size_bytes)
+            if (file_length_in_bytes > MBC1::MAX_ROM_SIZE)
             {
                 std::cerr << "Error: Provided file does not meet the size requirement for an MBC1 game.\n";
                 error_message = "Provided file does not meet the size requirement for an MBC1 game.";
                 return false;
             }
             if ((cartridge_type == MBC1_BYTE && cartridge_ram_size != 0) ||
-                (file_length_in_bytes > MBC1::max_rom_size_in_default_configuration_bytes && cartridge_ram_size > MBC1::max_ram_size_in_large_configuration_bytes))
+                (file_length_in_bytes > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION && cartridge_ram_size > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION))
             {
                 std::cerr << "Error: Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.\n";
                 error_message = "Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.";
@@ -393,7 +405,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
             ram.resize(cartridge_ram_size);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
 
-            if (was_file_load_successful && rom.size() == MBC1::mbc1m_multi_game_compilation_cart_rom_size_bytes)
+            if (was_file_load_successful && rom.size() == MBC1::MBC1M_MULTI_GAME_COMPILATION_CART_ROM_SIZE)
             {
                 const uint32_t rom_bank_0x10_offset = 0x10 * ROM_BANK_SIZE;
                 const bool is_mbc1m_cartridge = std::equal(rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION, 
@@ -402,18 +414,20 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                 if (is_mbc1m_cartridge)
                 {
                     // Convert into standard MBC1 cartridge so normal indexing can be used to read
-                    rom.resize(rom.size() * 2);
-                    const uint8_t memory_banks_per_sub_rom = 16;
+                    rom.resize(rom.size() << 1);
+                    const uint8_t memory_banks_per_sub_rom = 0x10;
 
-                    for (int sub_rom_number = 3; sub_rom_number >= 0; sub_rom_number--)
+                    // ROM contains 4 sub-ROMs taking up 25% of the ROM space
+                    // To convert to normal MBC1-readable format, each sub-ROM needs to be be duplicated once with subsequent sub-ROMs shifted and duplicated accordingly
+                    for (int8_t sub_rom_number = 3; sub_rom_number >= 0; sub_rom_number--)
                     {
-                        for (int memory_bank_number = memory_banks_per_sub_rom - 1; memory_bank_number >= 0; memory_bank_number--)
+                        for (int8_t memory_bank_number = memory_banks_per_sub_rom - 1; memory_bank_number >= 0; memory_bank_number--)
                         {
-                            int previous_global_memory_bank_number = (sub_rom_number * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t previous_global_memory_bank_number = (sub_rom_number * memory_banks_per_sub_rom) + memory_bank_number;
                             uint32_t previous_global_memory_bank_offset = static_cast<uint32_t>(previous_global_memory_bank_number) * ROM_BANK_SIZE;
 
-                            int new_global_memory_bank_number_for_first_copy = ((2 * sub_rom_number) * memory_banks_per_sub_rom) + memory_bank_number;
-                            int new_global_memory_bank_number_for_second_copy = ((2 * sub_rom_number + 1) * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t new_global_memory_bank_number_for_first_copy = ((2 * sub_rom_number) * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t new_global_memory_bank_number_for_second_copy = ((2 * sub_rom_number + 1) * memory_banks_per_sub_rom) + memory_bank_number;
 
                             uint32_t new_global_memory_bank_offset_for_first_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_first_copy) * ROM_BANK_SIZE;
                             uint32_t new_global_memory_bank_offset_for_second_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_second_copy) * ROM_BANK_SIZE;
@@ -434,7 +448,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
         case MBC2_BYTE:
         case MBC2_WITH_BATTERY_BYTE:
         {
-            if (file_length_in_bytes > MBC2::max_rom_size_bytes)
+            if (file_length_in_bytes > MBC2::MAX_ROM_SIZE)
             {
                 std::cerr << "Error: Provided file does not meet the size requirement for an MBC2 game.\n";
                 error_message = "Provided file does not meet the size requirement for an MBC2 game.";
@@ -447,7 +461,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                 return false;
             }
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
-            ram.resize(MBC2::built_in_ram_size_bytes);
+            ram.resize(MBC2::BUILT_IN_RAM_SIZE, 0xf0);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
             memory_bank_controller = std::make_unique<MBC2>(rom, ram);
             break;
@@ -458,14 +472,14 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
         case MBC5_WITH_RUMBLE_AND_RAM:
         case MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY:
         {
-            if (file_length_in_bytes > MBC5::max_rom_size_bytes)
+            if (file_length_in_bytes > MBC5::MAX_ROM_SIZE)
             {
                 std::cerr << "Error: Provided file does not meet the size requirement for an MBC5 game.\n";
                 error_message = "Provided file does not meet the size requirement for an MBC5 game.";
                 return false;
             }
             if ((cartridge_type == MBC5_BYTE && cartridge_ram_size != 0) ||
-                cartridge_ram_size > MBC5::max_ram_size_bytes)
+                cartridge_ram_size > MBC5::MAX_RAM_SIZE)
             {
                 std::cerr << "Error: Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.\n";
                 error_message = "Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.";
