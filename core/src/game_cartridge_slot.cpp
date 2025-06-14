@@ -45,12 +45,11 @@ uint8_t MBC1::read_byte(uint16_t address)
 {
     if (address < 0x4000)
     {
-        const uint8_t selected_rom_bank_number = (banking_mode == 1) 
+        const uint8_t selected_rom_bank_number = (banking_mode == 1)
             ? (ram_bank_number_or_upper_two_bits_of_rom_bank_number << 5) & (number_of_rom_banks - 1)
             : 0;
         const uint32_t selected_rom_bank_starting_address = selected_rom_bank_number << std::countr_zero(ROM_BANK_SIZE);
-        const uint16_t selected_address_within_rom_bank = address & (ROM_BANK_SIZE - 1);
-        const uint32_t address_to_read = selected_rom_bank_starting_address | selected_address_within_rom_bank;
+        const uint32_t address_to_read = selected_rom_bank_starting_address | address;
         return cartridge_rom[address_to_read];
     }
     else if (address < 0x8000)
@@ -87,7 +86,7 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
     }
     else if (address < 0x4000)
     {
-        lower_five_bits_of_rom_bank_number = std::max(static_cast<uint8_t>(value & 0b11111), MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
+        lower_five_bits_of_rom_bank_number = std::max(value & 0b11111, MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
     }
     else if (address < 0x6000)
     {
@@ -150,8 +149,8 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
         const bool does_write_control_rom = is_bit_set(address, static_cast<uint16_t>(8));
         if (does_write_control_rom)
         {
-            const uint8_t requested_rom_bank_number_with_wrapping = value & (MAX_NUMBER_OF_ROM_BANKS - 1);
-            selected_rom_bank_number = std::max(requested_rom_bank_number_with_wrapping, MBC2::MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
+            const int requested_rom_bank_number_with_wrapping = value & (MAX_NUMBER_OF_ROM_BANKS - 1);
+            selected_rom_bank_number = std::max(requested_rom_bank_number_with_wrapping, MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
             is_ram_enabled = false;
         }
         else
@@ -176,6 +175,137 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
     }
     else
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
+}
+
+MBC3::MBC3(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+    : MemoryBankControllerBase{rom, ram}
+{
+    number_of_rom_banks = rom.size() >> ROM_BANK_SIZE_POWER_OF_TWO;
+    number_of_ram_banks = ram.size() >> RAM_BANK_SIZE_POWER_OF_TWO;
+}
+
+uint8_t MBC3::read_byte(uint16_t address)
+{
+    if (address < 0x4000)
+    {
+        return cartridge_rom[address];
+    }
+    else if (address < 0x8000)
+    {
+        const uint32_t selected_rom_bank_starting_address = selected_rom_bank_number << std::countr_zero(ROM_BANK_SIZE);
+        const uint16_t address_within_rom_bank = address & (ROM_BANK_SIZE - 1);
+        const uint32_t address_to_read = selected_rom_bank_starting_address | address_within_rom_bank;
+        return cartridge_rom[address_to_read];
+    }
+    else if (address >= 0xa000 && address < 0xc000)
+    {
+        if (selected_ram_bank_number_or_real_time_clock_register_select < 0x08)
+        {
+            const uint32_t selected_ram_bank_starting_address = selected_ram_bank_number_or_real_time_clock_register_select << std::countr_zero(RAM_BANK_SIZE);
+            const uint16_t selected_address_within_ram_bank = address & (RAM_BANK_SIZE - 1);
+            const uint32_t address_to_read = (selected_ram_bank_starting_address | selected_address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
+            return cartridge_ram[address_to_read];
+        }
+        else
+        {
+            switch (selected_ram_bank_number_or_real_time_clock_register_select)
+            {
+                case 0x08:
+                    return real_time_clock.seconds_counter;
+                case 0x09:
+                    return real_time_clock.minutes_counter;
+                case 0x0a:
+                    return real_time_clock.hours_counter;
+                case 0x0b:
+                    return real_time_clock.days_counter = real_time_clock.days_counter & 0x00ff;
+                case 0x0c:
+                {
+                    uint8_t result = 0;
+
+                    if (is_bit_set(real_time_clock.days_counter, 8))
+                    {
+                        result |= 1;
+                    }
+                    if (real_time_clock.is_halted)
+                    {
+                        result |= (1 << 6);
+                    }
+                    if (real_time_clock.is_day_counter_carry_set)
+                    {
+                        result |= (1 << 7);
+                    }
+                    return result;
+                }
+                default:
+                    return 0xff;
+            }
+        }
+    }
+    throw std::runtime_error("Attemped to read from out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
+}
+
+void MBC3::write_byte(uint16_t address, uint8_t value)
+{
+    if (address < 0x2000)
+    {
+        are_ram_and_real_time_clock_enabled = ((value & 0x0f) == 0x0a);
+    }
+    else if (address < 0x4000)
+    {
+        selected_rom_bank_number = std::max((value & 0b01111111) & (number_of_rom_banks - 1), MINIMUM_ALLOWABLE_ROM_BANK_NUMBER);
+    }
+    else if (address < 0x6000)
+    {
+        selected_ram_bank_number_or_real_time_clock_register_select = value;
+    }
+    else if (address < 0x8000)
+    {
+        if (value == 0x01 && real_time_clock.latch_clock_data == 0x00)
+        {
+            real_time_clock.are_time_counters_latched = !real_time_clock.are_time_counters_latched;
+        }
+        real_time_clock.latch_clock_data = value;
+    }
+    else if (address >= 0xa000 && address < 0xc000)
+    {
+        if (!are_ram_and_real_time_clock_enabled)
+        {
+            return;
+        }
+
+        if (selected_ram_bank_number_or_real_time_clock_register_select < 0x08)
+        {
+            const uint32_t selected_ram_bank_starting_address = (selected_ram_bank_number_or_real_time_clock_register_select & (number_of_ram_banks - 1)) << std::countr_zero(RAM_BANK_SIZE);
+            const uint16_t selected_address_within_ram_bank = address & (RAM_BANK_SIZE - 1);
+            const uint32_t address_to_read = (selected_ram_bank_starting_address | selected_address_within_ram_bank) & static_cast<uint32_t>(cartridge_ram.size() - 1);
+            cartridge_ram[address_to_read] = value;
+        }
+        else
+        {
+            switch (selected_ram_bank_number_or_real_time_clock_register_select)
+            {
+                case 0x08:
+                    real_time_clock.seconds_counter = value % 60;
+                    break;
+                case 0x09:
+                    real_time_clock.minutes_counter = value % 60;
+                    break;
+                case 0x0a:
+                    real_time_clock.hours_counter = value % 24;
+                    break;
+                case 0x0b:
+                    real_time_clock.days_counter = (real_time_clock.days_counter & 0xff00) | value;
+                    break;
+                case 0x0c:
+                    set_bit(real_time_clock.days_counter, 8, is_bit_set(value, 0));
+                    real_time_clock.is_halted = is_bit_set(6, value);
+                    real_time_clock.is_day_counter_carry_set = is_bit_set(7, value);
+                    break;
+            }
+        }
+    }
+    else
+        throw std::runtime_error("Attemped to write to an out of bounds address in the cartridge's ROM or RAM. Exiting.");
 }
 
 MBC5::MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
@@ -455,6 +585,31 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
             ram.resize(MBC2::BUILT_IN_RAM_SIZE, 0xf0);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
             memory_bank_controller = std::make_unique<MBC2>(rom, ram);
+            break;
+        }
+        case MBC3_WITH_TIMER_AND_BATTERY_BYTE:
+        case MBC3_WITH_TIMER_AND_RAM_AND_BATTERY_BYTE:
+        case MBC3_BYTE:
+        case MBC3_WITH_RAM_BYTE:
+        case MBC3_WITH_RAM_AND_BATTERY_BYTE:
+        {
+            if (file_length_in_bytes > MBC3::MAX_ROM_SIZE)
+            {
+                std::cerr << "Error: Provided file does not meet the size requirement for an MBC2 game.\n";
+                error_message = "Provided file does not meet the size requirement for an MBC2 game.";
+                return false;
+            }
+            if (((cartridge_type == MBC3_BYTE || cartridge_ram_size == MBC3_WITH_TIMER_AND_BATTERY_BYTE) && cartridge_ram_size != 0) ||
+                cartridge_ram_size > MBC3::MAX_RAM_SIZE)
+            {
+                std::cerr << "Error: Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.\n";
+                error_message = "Provided game ROM contains an invalid RAM size byte for its selected memory bank controller.";
+                return false;
+            }
+            rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
+            ram.resize(cartridge_ram_size);
+            was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
+            memory_bank_controller = std::make_unique<MBC3>(rom, ram);
             break;
         }
         case MBC5_BYTE:
