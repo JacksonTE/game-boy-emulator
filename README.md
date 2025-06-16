@@ -1,6 +1,6 @@
 # Emulate Game Boy
 
-A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game ROMs are not provided with the project and must be acquired elsewhere.
+A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game ROMs are not provided with the project but can be found easily online.
 
 ## Gameplay
 | ![Image](https://github.com/user-attachments/assets/b55f6f5c-91e9-4e4b-9c8f-3b80293b4ecd) | ![Image](https://github.com/user-attachments/assets/bde64b63-2a41-4dfc-9a43-236feb244979) | ![Image](https://github.com/user-attachments/assets/0300acab-d50c-4fe6-9c85-31351e4e9793) | 
@@ -14,12 +14,11 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 - A complete Central Processing Unit, Memory Management Unit, Pixel Processing Unit, and Internal Timer (the emulated internals of the original Game Boy).
 - Interactable user interface for loading ROMs and adjusting emulation options made with ```Dear ImGui```.
 - Rendering the frame data produced by the emulated internals using ```SDL3```.
-- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1, MBC2, or MBC5 memory bank controllers.
+- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1, MBC2, MBC3 or MBC5 memory bank controllers.
 - Three preset colour palettes including the light green featured in the above screenshots, greyscale black and white, and a darker green similar to the original hardware.
 
 ## Planned Features
 - Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
-- Add support for memory bank controller MBC3 for compatability with most games.
 - Add support for Game Boy Color (CGB) games. 
 
 ## Compilation
@@ -36,10 +35,10 @@ Here is one method to compile and run the project that uses Visual Studio:
 4. Run by clicking the play button or CTRL+F5.
 
 ## Usage Instructions
-1. Acquire a Game Boy game ROM file (not provided with the project).
+1. Acquire a Game Boy game ROM file (not provided with the project but found online easily).
 2. Run the project and in the top menu click ```File```->```Load Game ROM```.
 3. Select the ROM file to run.
-4. If the game is currently supported, it should now be running, and should be interactable via the key mappings below.
+4. If the game is currently supported, it will now be running, and will be interactable via the key mappings below.
 
 ## Controls
 | Game Boy | Key |
