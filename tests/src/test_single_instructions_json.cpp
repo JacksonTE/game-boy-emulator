@@ -209,7 +209,7 @@ class SingleInstructionTestMemory : public GameBoyCore::MemoryManagementUnit
 {
 public:
     SingleInstructionTestMemory()
-        : MemoryManagementUnit{get_timer(), get_pixel_processing_unit()}
+        : MemoryManagementUnit{get_game_cartridge_slot(), get_timer(), get_pixel_processing_unit()}
     {
         flat_memory = std::make_unique<uint8_t[]>(GameBoyCore::MEMORY_SIZE);
         std::fill_n(flat_memory.get(), GameBoyCore::MEMORY_SIZE, 0);
@@ -232,6 +232,12 @@ public:
 
 private:
     std::unique_ptr<uint8_t[]> flat_memory;
+
+    static GameBoyCore::GameCartridgeSlot &get_game_cartridge_slot()
+    {
+        static GameBoyCore::GameCartridgeSlot game_cartridge_slot{};
+        return game_cartridge_slot;
+    }
 
     static GameBoyCore::InternalTimer &get_timer()
     {

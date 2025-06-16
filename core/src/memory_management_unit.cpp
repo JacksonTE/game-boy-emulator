@@ -12,8 +12,9 @@
 namespace GameBoyCore
 {
 
-MemoryManagementUnit::MemoryManagementUnit(InternalTimer & internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference)
-    : internal_timer{internal_timer_reference},
+MemoryManagementUnit::MemoryManagementUnit(GameCartridgeSlot &game_cartridge_slot_reference, InternalTimer & internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference)
+    : game_cartridge_slot{game_cartridge_slot_reference},
+      internal_timer{internal_timer_reference},
       pixel_processing_unit{pixel_processing_unit_reference}
 {
     bootrom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
@@ -281,8 +282,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
     else if (address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
-        std::cout << std::hex << std::setfill('0')
-                  << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
+        std::cout << std::hex << std::setfill('0') << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
     }
     else if (address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
     {
@@ -319,7 +319,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 pixel_processing_unit.viewport_x_position_scx = value;
                 return;
             case 0xff44:
-                wrote_to_read_only_address(0xff44);
+                std::cout << std::hex << std::setfill('0') << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
                 return;
             case 0xff45:
                 pixel_processing_unit.lcd_y_coordinate_compare_lyc = value;
@@ -460,12 +460,6 @@ bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uin
         }
     }
     return false;
-}
-
-void MemoryManagementUnit::wrote_to_read_only_address(uint16_t address) const
-{
-    std::cout << std::hex << std::setfill('0')
-              << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
 }
 
 } // namespace GameBoyCore

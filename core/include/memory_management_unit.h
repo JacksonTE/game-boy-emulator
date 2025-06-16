@@ -47,7 +47,7 @@ enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
 class MemoryManagementUnit
 {
 public:
-    MemoryManagementUnit(InternalTimer &internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
+    MemoryManagementUnit(GameCartridgeSlot &game_cartridge_slot_reference, InternalTimer &internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
 
     virtual void reset_state();
     void set_post_boot_state();
@@ -75,7 +75,7 @@ private:
     std::unique_ptr<uint8_t[]> unmapped_input_output_registers{};
     std::unique_ptr<uint8_t[]> high_ram{};
 
-    GameCartridgeSlot game_cartridge_slot{};
+    GameCartridgeSlot &game_cartridge_slot;
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 
@@ -94,7 +94,6 @@ private:
     uint8_t oam_dma_machine_cycles_elapsed{};
 
     bool are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const;
-    void wrote_to_read_only_address(uint16_t address) const;
 };
 
 } // namespace GameBoyCore

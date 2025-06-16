@@ -6,7 +6,9 @@
 #include <memory>
 
 #include "central_processing_unit.h"
+#include "game_cartridge_slot.h"
 #include "internal_timer.h"
+#include "memory_management_unit.h"
 
 namespace GameBoyCore
 {
@@ -40,6 +42,7 @@ public:
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
 
 private:
+    GameCartridgeSlot game_cartridge_slot{};
     InternalTimer internal_timer;
     PixelProcessingUnit pixel_processing_unit;
     std::unique_ptr<MemoryManagementUnit> memory_management_unit;
