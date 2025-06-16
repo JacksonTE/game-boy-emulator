@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "bitwise_utilities.h"
+#include "console_output_utilities.h"
 #include "memory_management_unit.h"
 
 namespace GameBoyCore
@@ -28,7 +29,6 @@ MemoryManagementUnit::MemoryManagementUnit(InternalTimer & internal_timer_refere
 
 void MemoryManagementUnit::reset_state()
 {
-    // TODO should external ram also reset??
     std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
     std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
     std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
@@ -83,41 +83,34 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
     {
-        std::cerr << "Error: file not found at " << file_path << ".\n";
-        error_message = "Error: file not found at " + file_path.string();
-        return false;
+        return set_error_message_and_fail(std::string("File not found at ") + file_path.string(), error_message);
     }
     std::streamsize file_length_in_bytes = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    if (!is_bootrom_file)
+    if (is_bootrom_file)
     {
-        if (game_cartridge_slot.try_load_file(file_path, file, file_length_in_bytes, error_message))
+        if (file_length_in_bytes != BOOTROM_SIZE)
         {
-            is_game_rom_loaded_in_memory.store(true, std::memory_order_release);
-            return true;
+            return set_error_message_and_fail(std::string("Provided file of size ") + std::to_string(file_length_in_bytes) +
+                                              std::string(" bytes does not meet the boot ROM size requirement."), error_message);
         }
-        return false;
-    }
 
-    if (file_length_in_bytes != BOOTROM_SIZE)
-    {
-        std::cerr << "Error: Provided file of size " << file_length_in_bytes << " bytes does not meet the boot ROM size requirement.\n";
-        error_message = "Provided file of size " + std::to_string(file_length_in_bytes) + " bytes does not meet the boot ROM size requirement.";
-        return false;
-    }
-    const bool was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(bootrom.get()), file_length_in_bytes));
-
-    if (was_file_load_successful)
-    {
+        if (!file.read(reinterpret_cast<char *>(bootrom.get()), file_length_in_bytes))
+        {
+            return set_error_message_and_fail(std::string("Could not read bootrom file ") + file_path.string(), error_message);
+        }
         is_bootrom_loaded_in_memory.store(true, std::memory_order_release);
     }
     else
     {
-        std::cerr << "Error: Could not read bootrom file " << file_path << ".\n";
-        error_message = "Could not read bootrom file " + file_path.string();
+        if (!game_cartridge_slot.try_load_file(file_path, file, file_length_in_bytes, error_message))
+        {
+            return false;
+        }
+        is_game_rom_loaded_in_memory.store(true, std::memory_order_release);
     }
-    return was_file_load_successful;
+    return true;
 }
 
 void MemoryManagementUnit::unload_bootrom_thread_safe()

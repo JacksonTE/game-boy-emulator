@@ -48,7 +48,6 @@ class MemoryManagementUnit
 {
 public:
     MemoryManagementUnit(InternalTimer &internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
-    virtual ~MemoryManagementUnit() = default;
 
     virtual void reset_state();
     void set_post_boot_state();

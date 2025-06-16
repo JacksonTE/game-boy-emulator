@@ -85,7 +85,9 @@ void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    GameBoyCore::print_bytes_in_range(*memory_management_unit, start_address, end_address);
+    GameBoyCore::print_bytes_in_range([&](uint16_t address, bool is_access_for_oam_dma){ return memory_management_unit->read_byte(address, is_access_for_oam_dma); },
+                                      start_address,
+                                      end_address);
 }
 
 void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state)

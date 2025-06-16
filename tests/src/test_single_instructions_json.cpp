@@ -11,6 +11,7 @@
 #include "central_processing_unit.h"
 #include "memory_management_unit.h"
 #include "pixel_processing_unit.h"
+#include "register_file.h"
 
 enum class MemoryInteraction
 {
