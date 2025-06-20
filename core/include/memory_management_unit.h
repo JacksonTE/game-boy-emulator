@@ -37,6 +37,16 @@ constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
 constexpr uint8_t INTERRUPT_FLAG_SERIAL_MASK = 1 << 3;
 constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;
 
+constexpr uint8_t RIGHT_DIRECTION_PAD_FLAG_MASK = 1 << 0;
+constexpr uint8_t LEFT_DIRECTION_PAD_FLAG_MASK = 1 << 1;
+constexpr uint8_t UP_DIRECTION_PAD_FLAG_MASK = 1 << 2;
+constexpr uint8_t DOWN_DIRECTION_PAD_FLAG_MASK = 1 << 3;
+
+constexpr uint8_t A_BUTTON_FLAG_MASK = 1 << 0;
+constexpr uint8_t B_BUTTON_FLAG_MASK = 1 << 1;
+constexpr uint8_t SELECT_BUTTON_FLAG_MASK = 1 << 2;
+constexpr uint8_t START_BUTTON_FLAG_MASK = 1 << 3;
+
 enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
 {
     NotStarting,
@@ -84,6 +94,8 @@ private:
 
     std::atomic<uint8_t> joypad_button_states{0b11111111};
     std::atomic<uint8_t> joypad_direction_pad_states{0b11111111};
+    std::atomic<uint8_t> joypad_most_recent_currently_pressed_vertical_direction{0b11111111};
+    std::atomic<uint8_t> joypad_most_recent_currently_pressed_horizontal_direction{0b11111111};
     uint8_t joypad_p1_joyp{0b11111111};
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};

@@ -15,19 +15,6 @@
 #include "emulator.h"
 #include "raii_wrappers.h"
 
-constexpr uint8_t RIGHT_DIRECTION_PAD_FLAG_MASK = 1 << 0;
-constexpr uint8_t LEFT_DIRECTION_PAD_FLAG_MASK = 1 << 1;
-constexpr uint8_t UP_DIRECTION_PAD_FLAG_MASK = 1 << 2;
-constexpr uint8_t DOWN_DIRECTION_PAD_FLAG_MASK = 1 << 3;
-
-constexpr uint8_t A_BUTTON_FLAG_MASK = 1 << 0;
-constexpr uint8_t B_BUTTON_FLAG_MASK = 1 << 1;
-constexpr uint8_t SELECT_BUTTON_FLAG_MASK = 1 << 2;
-constexpr uint8_t START_BUTTON_FLAG_MASK = 1 << 3;
-
-constexpr bool BUTTON_PRESSED_STATE = false;
-constexpr bool BUTTON_RELEASED_STATE = true;
-
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 constexpr int INITIAL_WINDOW_SCALE = 5;
@@ -269,33 +256,33 @@ int main()
                     case SDL_EVENT_KEY_DOWN:
                     case SDL_EVENT_KEY_UP:
                     {
-                        const bool key_pressed_state = (sdl_event.type == SDL_EVENT_KEY_DOWN ? BUTTON_PRESSED_STATE : BUTTON_RELEASED_STATE);
+                        const bool is_key_pressed = (sdl_event.type == SDL_EVENT_KEY_DOWN);
 
                         switch (sdl_event.key.key)
                         {
                             case SDLK_W:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(UP_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(GameBoyCore::UP_DIRECTION_PAD_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_A:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(LEFT_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(GameBoyCore::LEFT_DIRECTION_PAD_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_S:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(DOWN_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(GameBoyCore::DOWN_DIRECTION_PAD_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_D:
-                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(RIGHT_DIRECTION_PAD_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(GameBoyCore::RIGHT_DIRECTION_PAD_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_APOSTROPHE:
-                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(A_BUTTON_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(GameBoyCore::A_BUTTON_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_PERIOD:
-                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(B_BUTTON_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(GameBoyCore::B_BUTTON_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_RETURN:
-                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(START_BUTTON_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(GameBoyCore::START_BUTTON_FLAG_MASK, is_key_pressed);
                                 break;
                             case SDLK_RSHIFT:
-                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(SELECT_BUTTON_FLAG_MASK, key_pressed_state);
+                                game_boy_emulator.update_joypad_button_pressed_state_thread_safe(GameBoyCore::SELECT_BUTTON_FLAG_MASK, is_key_pressed);
                                 break;
                         }
                     }
