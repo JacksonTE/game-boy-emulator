@@ -23,6 +23,7 @@ static void run_emulator_core(
     std::stop_token stop_token,
     GameBoyCore::Emulator &game_boy_emulator,
     std::atomic<bool> &is_emulation_paused,
+    std::atomic<bool> &is_emulation_speed_doubled,
     std::atomic<bool> &did_exception_occur,
     std::exception_ptr &exception_pointer)
 {
@@ -50,7 +51,9 @@ static void run_emulator_core(
             {
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
 
-                next_frame_counter_tick += counter_ticks_per_frame_rounded;
+                next_frame_counter_tick += is_emulation_speed_doubled.load(std::memory_order_acquire)
+                    ? counter_ticks_per_frame_rounded / 2
+                    : counter_ticks_per_frame_rounded;
                 const uint64_t current_counter_tick = SDL_GetPerformanceCounter();
 
                 if (next_frame_counter_tick > current_counter_tick)
@@ -212,6 +215,7 @@ int main()
 
         GameBoyCore::Emulator game_boy_emulator{};
         std::atomic<bool> is_emulation_paused{};
+        std::atomic<bool> is_emulation_speed_doubled{};
         std::atomic<bool> did_emulator_core_exception_occur{};
         std::exception_ptr emulator_core_exception_pointer{};
         std::jthread emulator_thread
@@ -219,6 +223,7 @@ int main()
             run_emulator_core,
             std::ref(game_boy_emulator),
             std::ref(is_emulation_paused),
+            std::ref(is_emulation_speed_doubled),
             std::ref(did_emulator_core_exception_occur),
             std::ref(emulator_core_exception_pointer),
         };
@@ -402,10 +407,15 @@ int main()
                 if (ImGui::BeginMenu("Emulation"))
                 {
                     const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+                    const bool current_emulation_speed_doubled_state = is_emulation_speed_doubled.load(std::memory_order_acquire);
 
                     if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         is_emulation_paused.store(!current_pause_state, std::memory_order_release);
+                    }
+                    if (ImGui::MenuItem("Toggle Double Speed Mode", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    {
+                        is_emulation_speed_doubled.store(!current_emulation_speed_doubled_state, std::memory_order_release);
                     }
                     if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
