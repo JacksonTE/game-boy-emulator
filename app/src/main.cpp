@@ -23,7 +23,8 @@ static void run_emulator_core(
     std::stop_token stop_token,
     GameBoyCore::Emulator &game_boy_emulator,
     std::atomic<bool> &is_emulation_paused,
-    std::atomic<bool> &is_emulation_speed_doubled,
+    std::atomic<bool> &is_fast_emulation_enabled,
+    std::atomic<double> &target_fast_emulation_speed,
     std::atomic<bool> &did_exception_occur,
     std::exception_ptr &exception_pointer)
 {
@@ -51,9 +52,10 @@ static void run_emulator_core(
             {
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
 
-                next_frame_counter_tick += is_emulation_speed_doubled.load(std::memory_order_acquire)
-                    ? counter_ticks_per_frame_rounded / 2
-                    : counter_ticks_per_frame_rounded;
+                double target_emulation_speed = is_fast_emulation_enabled.load(std::memory_order_acquire) 
+                    ? target_fast_emulation_speed.load(std::memory_order_acquire)
+                    : 1.0;
+                next_frame_counter_tick += counter_ticks_per_frame_rounded / target_emulation_speed;
                 const uint64_t current_counter_tick = SDL_GetPerformanceCounter();
 
                 if (next_frame_counter_tick > current_counter_tick)
@@ -120,6 +122,17 @@ static const char *colour_palette_names[] =
     "Light Green",
     "Greyscale",
     "Original Green"
+};
+
+static const char *emulation_speed_names[] =
+{
+    "1.0x",
+    "1.5x",
+    "2.0x",
+    "2.5x",
+    "3.0x",
+    "3.5x",
+    "4.0x"
 };
 
 static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer, SDL_Texture *sdl_texture)
@@ -215,7 +228,11 @@ int main()
 
         GameBoyCore::Emulator game_boy_emulator{};
         std::atomic<bool> is_emulation_paused{};
-        std::atomic<bool> is_emulation_speed_doubled{};
+
+        std::atomic<bool> is_fast_forward_enabled{};
+        std::atomic<double> target_fast_emulation_speed{1.5};
+        int selected_fast_emulation_speed_index = 1;
+
         std::atomic<bool> did_emulator_core_exception_occur{};
         std::exception_ptr emulator_core_exception_pointer{};
         std::jthread emulator_thread
@@ -223,15 +240,16 @@ int main()
             run_emulator_core,
             std::ref(game_boy_emulator),
             std::ref(is_emulation_paused),
-            std::ref(is_emulation_speed_doubled),
+            std::ref(is_fast_forward_enabled),
+            std::ref(target_fast_emulation_speed),
             std::ref(did_emulator_core_exception_occur),
             std::ref(emulator_core_exception_pointer),
         };
 
-        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
-
         const uint32_t *active_colour_palette = light_green_colour_palette;
         int selected_colour_palette_index = 0;
+
+        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
 
         std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
@@ -265,6 +283,9 @@ int main()
 
                         switch (sdl_event.key.key)
                         {
+                            case SDLK_SPACE:
+                                is_fast_forward_enabled.store(is_key_pressed, std::memory_order_release);
+                                break;
                             case SDLK_W:
                                 game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(GameBoyCore::UP_DIRECTION_PAD_FLAG_MASK, is_key_pressed);
                                 break;
@@ -374,7 +395,6 @@ int main()
                 if (ImGui::BeginMenu("Video"))
                 {
                     ImGui::SeparatorText("Colour Palette");
-
                     if (ImGui::Combo("##Colour Palette", &selected_colour_palette_index, colour_palette_names, IM_ARRAYSIZE(colour_palette_names)))
                     {
                         switch (selected_colour_palette_index)
@@ -404,18 +424,21 @@ int main()
                     }
                     ImGui::EndMenu();
                 }
+                const bool current_fast_forward_enable_state = is_fast_forward_enabled.load(std::memory_order_acquire);
                 if (ImGui::BeginMenu("Emulation"))
                 {
+                    ImGui::SeparatorText("Fast-Foward Speed");
+                    if (ImGui::Combo("##Fast-Foward Speed", &selected_fast_emulation_speed_index, emulation_speed_names, IM_ARRAYSIZE(emulation_speed_names)))
+                    {
+                        target_fast_emulation_speed = selected_fast_emulation_speed_index * 0.5 + 1;
+                    }
+                    ImGui::Spacing();
+
                     const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
-                    const bool current_emulation_speed_doubled_state = is_emulation_speed_doubled.load(std::memory_order_acquire);
 
                     if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         is_emulation_paused.store(!current_pause_state, std::memory_order_release);
-                    }
-                    if (ImGui::MenuItem("Toggle Double Speed Mode", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
-                    {
-                        is_emulation_speed_doubled.store(!current_emulation_speed_doubled_state, std::memory_order_release);
                     }
                     if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
@@ -449,6 +472,10 @@ int main()
                         is_emulation_paused.store(false, std::memory_order_release);
                     }
                     ImGui::EndMenu();
+                }
+                if (current_fast_forward_enable_state && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                {
+                    ImGui::TextDisabled("[Fast-Forward Enabled]");
                 }
                 ImGui::EndMainMenuBar();
             }

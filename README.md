@@ -51,3 +51,7 @@ Here is one method to compile and run the project that uses Visual Studio:
 | Right | <kbd>D</kbd> |
 | Start | <kbd>Enter</kbd> |
 | Select | <kbd>Shift</kbd> |
+
+| Emulator | Key |
+| --- | --- |
+| Fast-Forward | <kbd>Space</kbd> |

@@ -143,8 +143,8 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
                                              are_addresses_on_same_bus(address, oam_dma_source_address_base);
     if (does_dma_bus_conflict_occur)
     {
-        const uint16_t oam_dma_byte_to_transfer_address = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
-        address = oam_dma_byte_to_transfer_address;
+        const uint16_t address_of_byte_being_transferred_by_oam_dma = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
+        address = address_of_byte_being_transferred_by_oam_dma;
     }
 
     if (bootrom_status == 0 && address < BOOTROM_SIZE)
