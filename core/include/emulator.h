@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 
 #include "central_processing_unit.h"
 #include "game_cartridge_slot.h"
@@ -12,6 +13,9 @@
 
 namespace GameBoyCore
 {
+
+static constexpr uint16_t ROM_TITLE_START = 0x0134;
+static constexpr uint16_t ROM_TITLE_END = 0x0143;
 
 class Emulator
 {
@@ -26,8 +30,8 @@ public:
     void print_register_file_state() const;
 
     bool try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message);
-    bool is_bootrom_loaded_in_memory_thread_safe();
-    bool is_game_rom_loaded_in_memory_thread_safe();
+    bool is_bootrom_loaded_in_memory_thread_safe() const;
+    bool is_game_rom_loaded_in_memory_thread_safe() const;
     void unload_bootrom_from_memory_thread_safe();
     void unload_game_rom_from_memory_thread_safe();
 
@@ -40,6 +44,8 @@ public:
 
     uint8_t get_published_frame_buffer_index() const;
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
+
+    std::string get_loaded_game_rom_title() const;
 
 private:
     GameCartridgeSlot game_cartridge_slot{};

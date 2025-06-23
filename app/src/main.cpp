@@ -369,6 +369,7 @@ int main()
                     {
                         if (try_load_file_to_memory_with_dialog(game_boy_emulator, false, std::ref(is_emulation_paused), error_message))
                         {
+                            SDL_SetWindowTitle(sdl_window.get(), std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title()).c_str());
                             is_emulation_paused.store(false, std::memory_order_release);
                         }
                         else if (error_message != "")
@@ -446,6 +447,7 @@ int main()
                     }
                     if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
+                        SDL_SetWindowTitle(sdl_window.get(), std::string("Emulate Game Boy").c_str());
                         game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                         game_boy_emulator.reset_state(true);
                         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());

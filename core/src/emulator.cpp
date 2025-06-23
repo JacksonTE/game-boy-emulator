@@ -53,12 +53,12 @@ bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_
     return memory_management_unit->try_load_file(file_path, is_bootrom_file, error_message);
 }
 
-bool Emulator::is_bootrom_loaded_in_memory_thread_safe()
+bool Emulator::is_bootrom_loaded_in_memory_thread_safe() const
 {
     return memory_management_unit->is_bootrom_loaded_thread_safe();
 }
 
-bool Emulator::is_game_rom_loaded_in_memory_thread_safe()
+bool Emulator::is_game_rom_loaded_in_memory_thread_safe() const
 {
     return memory_management_unit->is_game_rom_loaded_thread_safe();
 }
@@ -108,6 +108,27 @@ uint8_t Emulator::get_published_frame_buffer_index() const
 std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
 {
     return pixel_processing_unit.get_pixel_frame_buffer(index);
+}
+
+std::string Emulator::get_loaded_game_rom_title() const
+{
+    std::string game_rom_title{};
+
+    if (is_game_rom_loaded_in_memory_thread_safe())
+    {
+        game_rom_title.reserve(ROM_TITLE_END - ROM_TITLE_START + 1);
+
+        for (uint16_t address = ROM_TITLE_START; address <= ROM_TITLE_END; address++)
+        {
+            const uint8_t title_byte = read_byte_from_memory(address);
+            if (title_byte == 0x00)
+            {
+                break;
+            }
+            game_rom_title.push_back(static_cast<char>(title_byte));
+        }
+    }
+    return game_rom_title;
 }
 
 void Emulator::step_components_single_machine_cycle_to_sync_with_central_processing_unit()
