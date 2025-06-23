@@ -124,15 +124,19 @@ static const char *colour_palette_names[] =
     "Original Green"
 };
 
-static const char *emulation_speed_names[] =
+static const char *fast_forward_speed_names[] =
 {
-    "1.0x",
-    "1.5x",
-    "2.0x",
-    "2.5x",
-    "3.0x",
-    "3.5x",
-    "4.0x"
+    "1.50x",
+    "1.75x",
+    "2.00x",
+    "2.25x",
+    "2.50x",
+    "2.75x",
+    "3.00x",
+    "3.25x",
+    "3.50x",
+    "3.75x",
+    "4.00x"
 };
 
 static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer, SDL_Texture *sdl_texture)
@@ -231,7 +235,7 @@ int main()
 
         std::atomic<bool> is_fast_forward_enabled{};
         std::atomic<double> target_fast_emulation_speed{1.5};
-        int selected_fast_emulation_speed_index = 1;
+        int selected_fast_emulation_speed_index = 0;
 
         std::atomic<bool> did_emulator_core_exception_occur{};
         std::exception_ptr emulator_core_exception_pointer{};
@@ -428,9 +432,9 @@ int main()
                 if (ImGui::BeginMenu("Emulation"))
                 {
                     ImGui::SeparatorText("Fast-Foward Speed");
-                    if (ImGui::Combo("##Fast-Foward Speed", &selected_fast_emulation_speed_index, emulation_speed_names, IM_ARRAYSIZE(emulation_speed_names)))
+                    if (ImGui::Combo("##Fast-Foward Speed", &selected_fast_emulation_speed_index, fast_forward_speed_names, IM_ARRAYSIZE(fast_forward_speed_names)))
                     {
-                        target_fast_emulation_speed = selected_fast_emulation_speed_index * 0.5 + 1;
+                        target_fast_emulation_speed = selected_fast_emulation_speed_index * 0.25 + 1.5;
                     }
                     ImGui::Spacing();
 
