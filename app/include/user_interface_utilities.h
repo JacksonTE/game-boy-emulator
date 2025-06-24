@@ -293,7 +293,7 @@ static void render_main_menu_bar(
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Load Game ROM"))
+            if (ImGui::MenuItem("Load Game ROM", "O"))
             {
                 try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_pause_state, did_rom_loading_error_occur, error_message);
             }
@@ -302,7 +302,7 @@ static void render_main_menu_bar(
                 try_load_file_to_memory_with_dialog(true, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_pause_state, did_rom_loading_error_occur, error_message);
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Quit"))
+            if (ImGui::MenuItem("Quit", "Alt+F4"))
             {
                 stop_emulating = true;
             }

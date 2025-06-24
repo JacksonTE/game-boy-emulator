@@ -11,10 +11,9 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 |---------------------------------|---------------------------------|---------------------------------|
 
 ## Features
-- A complete Central Processing Unit, Memory Management Unit, Pixel Processing Unit, and Internal Timer (the emulated internals of the original Game Boy).
-- Interactable user interface for loading ROMs and adjusting emulation options made with ```Dear ImGui```.
-- Rendering the frame data produced by the emulated internals using ```SDL3```.
-- Support for 32KiB ROM-only games and games with original cartridges that used the MBC1, MBC2, MBC3 or MBC5 memory bank controllers.
+- Interactable user interface for loading game ROMs and adjusting emulation options made with ```Dear ImGui```.
+- Frame data rendering using ```SDL3```.
+- Support for a majority of available Game Boy and backwards compatible Game Boy Color games.
 - Three preset colour palettes including the light green featured in the above screenshots, greyscale black and white, and a darker green similar to the original hardware.
 
 ## Planned Features
@@ -33,7 +32,7 @@ Here is one method to compile and run the project that uses Visual Studio:
 1. Clone the ```emulate-game-boy``` repository.
 2. In Visual Studio, click ```Open a local folder``` and select the ```emulate-game-boy``` folder.
 3. Two debug targets should populate at the top - select ```emulate-game-boy-app.exe```.
-4. Run by clicking the play button or CTRL+F5.
+4. Run by clicking the green play button at the top or by pressing ```CTRL+F5```.
 
 ## Usage Instructions
 1. Acquire a Game Boy game ROM file (not provided with the project but found online easily).
@@ -55,6 +54,8 @@ Here is one method to compile and run the project that uses Visual Studio:
 
 | Emulator | Key |
 | --- | --- |
+| Load Game ROM | <kbd>O</kbd> |
+| Quit | <kbd>Alt+F4</kbd> |
 | Fast-Forward | <kbd>Space</kbd> |
 | Pause | <kbd>Escape</kbd> |
 | Reset | <kbd>R</kbd> |
