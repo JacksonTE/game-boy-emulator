@@ -171,67 +171,44 @@ int main()
                 SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
             }
+
             SDL_RenderClear(sdl_renderer.get());
-
-            int renderer_output_width, renderer_output_height;
-            SDL_GetRenderOutputSize(sdl_renderer.get(), &renderer_output_width, &renderer_output_height);
-            float current_scale_x = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
-            float current_scale_y = static_cast<float>(renderer_output_height) / static_cast<float>(DISPLAY_HEIGHT_PIXELS);
-            int current_integer_scale = std::max(1, std::min(int(current_scale_x), int(current_scale_y)));
-
-            float menu_bar_logical_height = ImGui::GetFrameHeight() / static_cast<float>(current_integer_scale);
-            SDL_FRect emulation_screen_rectangle
-            {
-                0.0f,
-                menu_bar_logical_height,
-                static_cast<float>(DISPLAY_WIDTH_PIXELS),
-                static_cast<float>(DISPLAY_HEIGHT_PIXELS) - menu_bar_logical_height
-            };
+            SDL_FRect emulation_screen_rectangle = get_sized_emulation_rectangle(sdl_renderer.get());
             SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, &emulation_screen_rectangle);
 
-            // Workaround for https://github.com/ocornut/imgui/issues/8339
-            {
-                int sdl_renderer_logical_width, sdl_renderer_logical_height;
-                SDL_RendererLogicalPresentation sdl_renderer_logical_presentation_mode;
-                SDL_GetRenderLogicalPresentation(sdl_renderer.get(), &sdl_renderer_logical_width, &sdl_renderer_logical_height, &sdl_renderer_logical_presentation_mode);
-                SDL_SetRenderLogicalPresentation(sdl_renderer.get(), sdl_renderer_logical_width, sdl_renderer_logical_height, SDL_LOGICAL_PRESENTATION_DISABLED);
+            sdl_logical_presentation_imgui_workaround_t logical_values = sdl_logical_presentation_imgui_workaround_pre_frame(sdl_renderer.get());
+            ImGui_ImplSDLRenderer3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
 
-                // Normal ImGui frame rendering
-                {
-                    ImGui_ImplSDLRenderer3_NewFrame();
-                    ImGui_ImplSDL3_NewFrame();
-                    ImGui::NewFrame();
+            render_main_menu_bar(
+                stop_emulating,
+                pre_rom_loading_pause_state,
+                did_rom_loading_error_occur,
+                selected_colour_palette_index,
+                selected_fast_emulation_speed_index,
+                active_colour_palette,
+                currently_published_frame_buffer_index,
+                abgr_pixel_buffer.get(),
+                is_emulation_paused,
+                is_fast_forward_enabled,
+                target_fast_emulation_speed,
+                sdl_window.get(),
+                sdl_texture.get(),
+                game_boy_emulator,
+                error_message
+            );
+            render_error_message_popup(
+                did_rom_loading_error_occur,
+                pre_rom_loading_pause_state,
+                is_emulation_paused,
+                error_message
+            );
 
-                    render_main_menu_bar(
-                        stop_emulating,
-                        pre_rom_loading_pause_state,
-                        did_rom_loading_error_occur,
-                        selected_colour_palette_index,
-                        selected_fast_emulation_speed_index,
-                        active_colour_palette,
-                        currently_published_frame_buffer_index,
-                        abgr_pixel_buffer.get(),
-                        is_emulation_paused,
-                        is_fast_forward_enabled,
-                        target_fast_emulation_speed,
-                        sdl_window.get(),
-                        sdl_texture.get(),
-                        game_boy_emulator,
-                        error_message
-                    );
-                    render_error_message_popup(
-                        did_rom_loading_error_occur,
-                        pre_rom_loading_pause_state,
-                        is_emulation_paused,
-                        error_message
-                    );
+            ImGui::Render();
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdl_renderer.get());
+            sdl_logical_presentation_imgui_workaround_post_frame(sdl_renderer.get(), logical_values);
 
-                    ImGui::Render();
-                    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdl_renderer.get());
-                }
-
-                SDL_SetRenderLogicalPresentation(sdl_renderer.get(), sdl_renderer_logical_width, sdl_renderer_logical_height, sdl_renderer_logical_presentation_mode);
-            }
             SDL_RenderPresent(sdl_renderer.get());
         }
         NFD_Quit();
