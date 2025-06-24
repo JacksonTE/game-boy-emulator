@@ -10,9 +10,12 @@ FetchContent_Declare(
 FetchContent_Declare(
     nativefiledialog
     GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
-    GIT_TAG v1.2.1
+    GIT_TAG 0537750528db0cea592247be92a56f05a37c9471
     GIT_SHALLOW TRUE
 )
+set(NFD_PORTAL      ON  CACHE BOOL "" FORCE)
+set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(NFD_INSTALL     OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     SDL3
