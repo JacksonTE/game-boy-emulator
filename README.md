@@ -19,6 +19,7 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 
 ## Planned Features
 - Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
+- Implement save state exporting and cartridge ram exporting
 - Add support for Game Boy Color (CGB) games. 
 
 ## Compilation
@@ -55,3 +56,5 @@ Here is one method to compile and run the project that uses Visual Studio:
 | Emulator | Key |
 | --- | --- |
 | Fast-Forward | <kbd>Space</kbd> |
+| Pause | <kbd>Escape</kbd> |
+| Reset | <kbd>R</kbd> |

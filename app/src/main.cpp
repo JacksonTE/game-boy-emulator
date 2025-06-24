@@ -263,6 +263,10 @@ int main()
         bool did_rom_loading_error_occur = false;
         bool stop_emulating = false;
 
+        bool was_fast_forward_key_previously_pressed = false;
+        bool was_pause_key_previously_pressed = false;
+        bool was_reset_key_previously_pressed = false;
+
         while (!stop_emulating)
         {
             if (did_emulator_core_exception_occur.load(std::memory_order_acquire))
@@ -288,7 +292,33 @@ int main()
                         switch (sdl_event.key.key)
                         {
                             case SDLK_SPACE:
-                                is_fast_forward_enabled.store(is_key_pressed, std::memory_order_release);
+                                if (is_key_pressed && !was_fast_forward_key_previously_pressed && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                                {
+                                    is_fast_forward_enabled.store(!is_fast_forward_enabled.load(std::memory_order_acquire), std::memory_order_release);
+                                }
+                                was_fast_forward_key_previously_pressed = is_key_pressed;
+                                break;
+                            case SDLK_ESCAPE:
+                                if (is_key_pressed && !was_pause_key_previously_pressed && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                                {
+                                    is_emulation_paused.store(!is_emulation_paused.load(std::memory_order_acquire), std::memory_order_release);
+                                }
+                                was_pause_key_previously_pressed = is_key_pressed;
+                                break;
+                            case SDLK_R:
+                                if (is_key_pressed && !was_reset_key_previously_pressed && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                                {
+                                    if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
+                                    {
+                                        game_boy_emulator.reset_state(true);
+                                    }
+                                    else
+                                    {
+                                        game_boy_emulator.set_post_boot_state();
+                                    }
+                                    is_emulation_paused.store(false, std::memory_order_release);
+                                }
+                                was_reset_key_previously_pressed = is_key_pressed;
                                 break;
                             case SDLK_W:
                                 game_boy_emulator.update_joypad_direction_pad_pressed_state_thread_safe(GameBoyCore::UP_DIRECTION_PAD_FLAG_MASK, is_key_pressed);
@@ -430,6 +460,7 @@ int main()
                     ImGui::EndMenu();
                 }
                 const bool current_fast_forward_enable_state = is_fast_forward_enabled.load(std::memory_order_acquire);
+                const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
                 if (ImGui::BeginMenu("Emulation"))
                 {
                     ImGui::SeparatorText("Fast-Foward Speed");
@@ -438,10 +469,11 @@ int main()
                         target_fast_emulation_speed = selected_fast_emulation_speed_index * 0.25 + 1.5;
                     }
                     ImGui::Spacing();
-
-                    const bool current_pause_state = is_emulation_paused.load(std::memory_order_acquire);
-
-                    if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    if (ImGui::MenuItem(current_fast_forward_enable_state ? "Disable Fast-Forwarding" : "Enable Fast-Forwarding", "Space", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    {
+                        is_fast_forward_enabled.store(!current_fast_forward_enable_state, std::memory_order_release);
+                    }
+                    if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "Esc", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         is_emulation_paused.store(!current_pause_state, std::memory_order_release);
                     }
@@ -465,7 +497,7 @@ int main()
                         is_emulation_paused.store(false, std::memory_order_release);
                     }
                     ImGui::Separator();
-                    if (ImGui::MenuItem("Reset", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    if (ImGui::MenuItem("Reset", "R", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
                     {
                         if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
                         {
@@ -479,9 +511,16 @@ int main()
                     }
                     ImGui::EndMenu();
                 }
-                if (current_fast_forward_enable_state && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                 {
-                    ImGui::TextDisabled("[Fast-Forward Enabled]");
+                    if (current_pause_state)
+                    {
+                        ImGui::TextDisabled("[Emulation Paused]");
+                    }
+                    if (current_fast_forward_enable_state)
+                    {
+                        ImGui::TextDisabled("[Fast-Forward Enabled]");
+                    }
                 }
                 ImGui::EndMainMenuBar();
             }
