@@ -70,7 +70,20 @@ public:
         : renderer{SDL_CreateRenderer(window.get(), rendering_driver_name)}
     {
         if (!renderer)
+        {
             throw std::runtime_error(std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
+        }
+        SDL_SetRenderLogicalPresentation
+        (
+            renderer,
+            DISPLAY_WIDTH_PIXELS,
+            DISPLAY_HEIGHT_PIXELS,
+            SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
+        );
+        if (!SDL_SetRenderVSync(renderer, 1))
+        {
+            std::cerr << "VSync unable to be used: " << SDL_GetError() << "\n";
+        }
     }
 
     ~SdlRendererRaii()
@@ -101,7 +114,10 @@ public:
         : texture{SDL_CreateTexture(renderer.get(), format, access, width, height)}
     {
         if (!texture)
+        {
             throw std::runtime_error(std::string("SDL_CreateTexture failed: ") + SDL_GetError());
+        }
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
     }
 
     ~SdlTextureRaii()

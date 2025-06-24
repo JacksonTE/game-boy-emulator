@@ -15,30 +15,6 @@
 #include <SDL3/SDL.h>
 #include <stdbool.h>
 
-#ifdef __linux__
-static inline bool NFD_SetDisplayPropertiesFromSDLWindowForLinuxWayland(SDL_Window *sdlWindow)
-{
-    SDL_PropertiesID window_properties = SDL_GetWindowProperties(sdlWindow);
-    if (!window_properties)
-    {
-        SDL_SetError("SDL3: failed to get window properties");
-        return false;
-    }
-
-    void *wayland_display = SDL_GetPointerProperty(window_properties, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
-    if (!wayland_display)
-    {
-        return false;
-    }
-    return (NFD_SetWaylandDisplay(static_cast<wl_display *>(wayland_display)) == NFD_OKAY);
-}
-#else
-static inline bool NFD_SetDisplayPropertiesFromSDLWindowForLinuxWayland(SDL_Window *sdlWindow)
-{
-    return true;
-}
-#endif
-
 /**
  *  Converts an SDL window handle to a native window handle that can be passed to NFDe.
  *  @param sdlWindow The SDL window handle.
