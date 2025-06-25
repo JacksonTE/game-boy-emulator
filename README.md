@@ -1,6 +1,6 @@
 # Emulate Game Boy
 
-A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game ROMs are not provided with the project but can be found easily online.
+A cross-platform, cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game ROMs are not provided with the project but can be found easily online.
 
 ## Gameplay
 | ![Image](https://github.com/user-attachments/assets/b55f6f5c-91e9-4e4b-9c8f-3b80293b4ecd) | ![Image](https://github.com/user-attachments/assets/bde64b63-2a41-4dfc-9a43-236feb244979) | ![Image](https://github.com/user-attachments/assets/0300acab-d50c-4fe6-9c85-31351e4e9793) | 
@@ -18,21 +18,25 @@ A cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game RO
 
 ## Planned Features
 - Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
-- Implement save state exporting and cartridge ram exporting
+- Implement save state exporting and cartridge ram exporting.
+- Port to browser with Emscripten.
 - Add support for Game Boy Color (CGB) games. 
 
 ## Compilation
-To build this project on Windows, the following are required:
-- CMake version 3.30.5 or higher.
-- A C++ compiler supporting C++20.
-
-Here is one method to compile and run the project that uses Visual Studio:
-
-**Visual Studio CMake Project**
+**Windows**
 1. Clone the ```emulate-game-boy``` repository.
-2. In Visual Studio, click ```Open a local folder``` and select the ```emulate-game-boy``` folder.
-3. Two debug targets should populate at the top - select ```emulate-game-boy-app.exe```.
-4. Run by clicking the green play button at the top or by pressing ```CTRL+F5```.
+2. Install ```Visual Studio Community 2022```.
+3. Select the ```Desktop development with C++``` workload to download and install.
+4. In Visual Studio, click ```Open a local folder``` and select the cloned ```emulate-game-boy``` folder.
+5. Two debug targets should populate at the top - select ```emulate-game-boy-app.exe``` for the main SDL application.
+6. Run by clicking the green play button at the top or by pressing ```CTRL+F5```.
+
+**Linux**
+1. Clone the ```emulate-game-boy``` repository.
+2. Install ```build-essential```, ```cmake```, ```pkg-config```, and ```libgtk-3-dev```.
+3. In a terminal, in the ```emulate-game-boy``` directory, run ```mkdir build```, ```cmake -S . -B build```, ```cmake --build build```.
+4. This creates an executable that can be run with ```./build/bin/emulate-game-boy-app```.
+5. For subsequent builds, only ```cmake --build build``` is required from step 3.
 
 ## Usage Instructions
 1. Acquire a Game Boy game ROM file (not provided with the project but found online easily).

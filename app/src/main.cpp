@@ -12,6 +12,10 @@
 #include <string>
 #include <thread>
 
+#ifdef __linux__
+#include <gtk/gtk.h>
+#endif
+
 #include "emulator.h"
 #include "user_interface_utilities.h"
 #include "raii_wrappers.h"
@@ -76,6 +80,9 @@ int main()
 {
     try
     {
+#ifdef __linux__
+        gtk_init(NULL, NULL);
+#endif
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
         if (NFD_Init() != NFD_OKAY)
         {

@@ -13,6 +13,8 @@ FetchContent_Declare(
     GIT_TAG 0537750528db0cea592247be92a56f05a37c9471
     GIT_SHALLOW TRUE
 )
+set(NFD_PORTAL OFF  CACHE BOOL "" FORCE)
+set(NFD_GTK    ON   CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     SDL3
@@ -60,6 +62,26 @@ target_include_directories(emulate-game-boy-app
 PRIVATE
     "include"
 )
+
+if(LINUX)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+
+    target_include_directories(emulate-game-boy-app
+    PRIVATE
+        ${GTK3_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(emulate-game-boy-app
+    PRIVATE
+        ${GTK3_LIBRARIES}
+    )
+
+    target_compile_options(emulate-game-boy-app
+    PRIVATE
+        ${GTK3_CFLAGS_OTHER}
+    )
+endif()
 
 target_link_libraries(emulate-game-boy-app
 PRIVATE
