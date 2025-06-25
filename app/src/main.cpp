@@ -81,14 +81,6 @@ int main()
     try
     {
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
-#ifdef __linux__
-        gtk_init(NULL, NULL);
-#endif
-        if (NFD_Init() != NFD_OKAY)
-        {
-            std::cerr << "Error: NativeFileDialogExtended was unable to be initialized, exiting.\n";
-            return 1;
-        }
         ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window
         {
             "Emulate Game Boy",
@@ -106,6 +98,15 @@ int main()
             DISPLAY_HEIGHT_PIXELS,
         };
         ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
+
+#ifdef __linux__
+        gtk_init(NULL, NULL);
+#endif
+        if (NFD_Init() != NFD_OKAY)
+        {
+            std::cerr << "Error: NativeFileDialogExtended was unable to be initialized, exiting.\n";
+            return 1;
+        }
 
         GameBoyCore::Emulator game_boy_emulator{};
         std::atomic<bool> is_emulation_paused{};
