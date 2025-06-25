@@ -20,11 +20,11 @@ static bool try_load_file_to_memory_with_dialog(
     SDL_Window *sdl_window,
     GameBoyCore::Emulator &game_boy_emulator,
     std::atomic<bool> &is_emulation_paused,
-    bool &pre_rom_loading_pause_state,
+    bool &pre_rom_loading_error_pause_state,
     bool &did_rom_loading_error_occur,
     std::string &error_message)
 {
-    const bool previous_pause_state = is_emulation_paused.load(std::memory_order_acquire);
+    pre_rom_loading_error_pause_state = is_emulation_paused.load(std::memory_order_acquire);
     is_emulation_paused.store(true, std::memory_order_release);
 
     nfdopendialogu8args_t open_dialog_arguments{};
@@ -73,12 +73,8 @@ static bool try_load_file_to_memory_with_dialog(
     }
     else
     {
-        if (error_message != "")
-        {
-            pre_rom_loading_pause_state = previous_pause_state;
-            did_rom_loading_error_occur = true;
-        }
-        is_emulation_paused.store(previous_pause_state, std::memory_order_release);
+        did_rom_loading_error_occur = (error_message != "");
+        is_emulation_paused.store(pre_rom_loading_error_pause_state, std::memory_order_release);
     }
     return is_operation_successful;
 }
@@ -86,7 +82,7 @@ static bool try_load_file_to_memory_with_dialog(
 static void handle_sdl_events(
     bool &stop_emulating,
     bool &did_rom_loading_error_occur,
-    bool &pre_rom_loading_pause_state,
+    bool &pre_rom_loading_error_pause_state,
     bool &was_fast_forward_key_previously_pressed,
     bool &was_pause_key_previously_pressed,
     bool &was_reset_key_previously_pressed,
@@ -176,7 +172,7 @@ static void handle_sdl_events(
                 }
                 if (sdl_event.key.key == SDLK_O && is_key_pressed)
                 {
-                    try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_pause_state, did_rom_loading_error_occur, error_message);
+                    try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
                 }
             }
             break;
@@ -274,7 +270,7 @@ static const char *fast_forward_speed_names[] =
 
 static void render_main_menu_bar(
     bool &stop_emulating,
-    bool &pre_rom_loading_pause_state,
+    bool &pre_rom_loading_error_pause_state,
     bool &did_rom_loading_error_occur,
     int &selected_colour_palette_index,
     int &selected_fast_emulation_speed_index,
@@ -295,11 +291,11 @@ static void render_main_menu_bar(
         {
             if (ImGui::MenuItem("Load Game ROM", "O"))
             {
-                try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_pause_state, did_rom_loading_error_occur, error_message);
+                try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
             }
             if (ImGui::MenuItem("Load Boot ROM (Optional)"))
             {
-                try_load_file_to_memory_with_dialog(true, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_pause_state, did_rom_loading_error_occur, error_message);
+                try_load_file_to_memory_with_dialog(true, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Quit", "Alt+F4"))
@@ -409,7 +405,7 @@ static void render_main_menu_bar(
 
 static void render_error_message_popup(
     bool &did_rom_loading_error_occur,
-    bool &pre_rom_loading_pause_state,
+    bool &pre_rom_loading_error_pause_state,
     std::atomic<bool> &is_emulation_paused,
     std::string &error_message
 )
@@ -427,12 +423,12 @@ static void render_error_message_popup(
     if (ImGui::BeginPopupModal("Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
     {
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
-        ImGui::TextWrapped(error_message.c_str());
+        ImGui::TextWrapped("%s", error_message.c_str());
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
         ImGui::Separator();
         if (ImGui::Button("OK", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
         {
-            is_emulation_paused.store(pre_rom_loading_pause_state, std::memory_order_release);
+            is_emulation_paused.store(pre_rom_loading_error_pause_state, std::memory_order_release);
             ImGui::CloseCurrentPopup();
             did_rom_loading_error_occur = false;
             error_message = "";

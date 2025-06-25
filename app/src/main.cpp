@@ -80,10 +80,10 @@ int main()
 {
     try
     {
+        ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
 #ifdef __linux__
         gtk_init(NULL, NULL);
 #endif
-        ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
         if (NFD_Init() != NFD_OKAY)
         {
             std::cerr << "Error: NativeFileDialogExtended was unable to be initialized, exiting.\n";
@@ -136,7 +136,7 @@ int main()
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
 
         std::string error_message = "";
-        bool pre_rom_loading_pause_state = false;
+        bool pre_rom_loading_error_pause_state = false;
         bool did_rom_loading_error_occur = false;
         bool stop_emulating = false;
 
@@ -154,7 +154,7 @@ int main()
             handle_sdl_events(
                 stop_emulating,
                 did_rom_loading_error_occur,
-                pre_rom_loading_pause_state,
+                pre_rom_loading_error_pause_state,
                 was_fast_forward_key_previously_pressed,
                 was_pause_key_previously_pressed,
                 was_reset_key_previously_pressed,
@@ -190,7 +190,7 @@ int main()
 
             render_main_menu_bar(
                 stop_emulating,
-                pre_rom_loading_pause_state,
+                pre_rom_loading_error_pause_state,
                 did_rom_loading_error_occur,
                 selected_colour_palette_index,
                 selected_fast_emulation_speed_index,
@@ -207,7 +207,7 @@ int main()
             );
             render_error_message_popup(
                 did_rom_loading_error_occur,
-                pre_rom_loading_pause_state,
+                pre_rom_loading_error_pause_state,
                 is_emulation_paused,
                 error_message
             );

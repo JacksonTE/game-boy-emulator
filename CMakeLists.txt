@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30.5)
+cmake_minimum_required(VERSION 3.28.3)
 
 project(emulate-game-boy-project
     VERSION 1.0

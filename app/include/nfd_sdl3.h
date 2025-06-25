@@ -31,7 +31,7 @@ static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdw
         return false;
     }
     
-    void *win32_hwnd_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    void *win32_hwnd_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WIN32_HWND_POINTER, 0);
     if (win32_hwnd_pointer)
     {
         native_window->type = NFD_WINDOW_HANDLE_TYPE_WINDOWS;
@@ -39,7 +39,7 @@ static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdw
         return true;
     }
 
-    void *cocoa_window_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+    void *cocoa_window_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, 0);
     if (cocoa_window_pointer)
     {
         native_window->type = NFD_WINDOW_HANDLE_TYPE_COCOA;
@@ -47,19 +47,19 @@ static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdw
         return true;
     }
 
-    Sint64 window_id = SDL_GetNumberProperty(sdl_properties, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, NULL);
-    if (window_id != 0)
-    {
-        native_window->type = NFD_WINDOW_HANDLE_TYPE_X11;
-        native_window->handle = (void *)(uintptr_t)window_id;
-        return true;
-    }
-
-    void *wayland_surface_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, NULL);
+    void *wayland_surface_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, 0);
     if (wayland_surface_pointer)
     {
         native_window->type = NFD_WINDOW_HANDLE_TYPE_WAYLAND;
         native_window->handle = wayland_surface_pointer;
+        return true;
+    }
+
+    Sint64 window_id = SDL_GetNumberProperty(sdl_properties, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+    if (window_id > 1)
+    {
+        native_window->type = NFD_WINDOW_HANDLE_TYPE_X11;
+        native_window->handle = (void *)(uintptr_t)window_id;
         return true;
     }
 
