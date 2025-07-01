@@ -128,7 +128,7 @@ int main()
             std::ref(emulator_core_exception_pointer),
         };
 
-        const uint32_t *active_colour_palette = light_green_colour_palette;
+        const uint32_t *active_colour_palette = sage_colour_palette;
         int selected_colour_palette_index = 0;
 
         uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
@@ -139,6 +139,7 @@ int main()
         std::string error_message = "";
         bool pre_rom_loading_error_pause_state = false;
         bool did_rom_loading_error_occur = false;
+        bool is_custom_palette_editor_open = false;
         bool stop_emulating = false;
 
         bool was_fast_forward_key_previously_pressed = false;
@@ -193,6 +194,7 @@ int main()
                 stop_emulating,
                 pre_rom_loading_error_pause_state,
                 did_rom_loading_error_occur,
+                is_custom_palette_editor_open,
                 selected_colour_palette_index,
                 selected_fast_emulation_speed_index,
                 active_colour_palette,
@@ -205,6 +207,15 @@ int main()
                 sdl_texture.get(),
                 game_boy_emulator,
                 error_message
+            );
+            render_custom_colour_palette_editor(
+                game_boy_emulator,
+                is_custom_palette_editor_open,
+                currently_published_frame_buffer_index,
+                active_colour_palette,
+                selected_colour_palette_index,
+                abgr_pixel_buffer.get(),
+                sdl_texture.get()
             );
             render_error_message_popup(
                 did_rom_loading_error_occur,

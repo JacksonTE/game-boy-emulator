@@ -209,20 +209,20 @@ static constexpr uint32_t get_abgr_value_for_current_endianness(uint8_t alpha, u
     if constexpr (std::endian::native == std::endian::little)
     {
         return (static_cast<uint32_t>(red)) |
-            (static_cast<uint32_t>(green) << 8) |
-            (static_cast<uint32_t>(blue) << 16) |
-            (static_cast<uint32_t>(alpha) << 24);
+               (static_cast<uint32_t>(green) << 8) |
+               (static_cast<uint32_t>(blue) << 16) |
+               (static_cast<uint32_t>(alpha) << 24);
     }
     else
     {
         return (static_cast<uint32_t>(alpha)) |
-            (static_cast<uint32_t>(blue) << 8) |
-            (static_cast<uint32_t>(green) << 16) |
-            (static_cast<uint32_t>(red) << 24);
+               (static_cast<uint32_t>(blue) << 8) |
+               (static_cast<uint32_t>(green) << 16) |
+               (static_cast<uint32_t>(red) << 24);
     }
 }
 
-static constexpr uint32_t light_green_colour_palette[4] =
+static constexpr uint32_t sage_colour_palette[4] =
 {
     get_abgr_value_for_current_endianness(0xff, 0xd0, 0xf8, 0xe0),
     get_abgr_value_for_current_endianness(0xff, 0x70, 0xc0, 0x88),
@@ -238,7 +238,7 @@ static constexpr uint32_t greyscale_colour_palette[4] =
     get_abgr_value_for_current_endianness(0xff, 0x00, 0x00, 0x00)
 };
 
-static constexpr uint32_t original_green_colour_palette[4] =
+static constexpr uint32_t classic_colour_palette[4] =
 {
     get_abgr_value_for_current_endianness(0xff, 0x0f, 0xbc, 0x9b),
     get_abgr_value_for_current_endianness(0xff, 0x0f, 0xac, 0x8b),
@@ -246,11 +246,37 @@ static constexpr uint32_t original_green_colour_palette[4] =
     get_abgr_value_for_current_endianness(0xff, 0x0f, 0x38, 0x0f)
 };
 
+static uint32_t custom_colour_palette[4] =
+{
+    get_abgr_value_for_current_endianness(0xff, 0xef, 0xe0, 0x90),
+    get_abgr_value_for_current_endianness(0xff, 0xd8, 0xb4, 0x00),
+    get_abgr_value_for_current_endianness(0xff, 0xb6, 0x77, 0x00),
+    get_abgr_value_for_current_endianness(0xff, 0x5e, 0x04, 0x03)
+};
+
+static ImVec4 selected_custom_colour_palette_colours[4] =
+{
+    {0, 0, 0, 0},
+    {0, 0, 0, 0},
+    {0, 0, 0, 0},
+    {0, 0, 0, 0}
+};
+
+static ImVec4 get_imvec4_from_abgr(uint32_t abgr)
+{
+    const uint8_t alpha = (abgr >> 24) & 0xff;
+    const uint8_t blue = (abgr >> 16) & 0xff;
+    const uint8_t green = (abgr >> 8) & 0xff;
+    const uint8_t red = abgr & 0xff;
+    return ImVec4(red / 255.0f, green / 255.0f, blue / 255.0f, alpha / 255.0f);
+}
+
 static const char *colour_palette_names[] =
 {
-    "Light Green",
+    "Sage",
     "Greyscale",
-    "Original Green"
+    "Classic",
+    "Custom"
 };
 
 static const char *fast_forward_speed_names[] =
@@ -268,10 +294,32 @@ static const char *fast_forward_speed_names[] =
     "4.00x"
 };
 
+static void update_colour_palette(
+    GameBoyCore::Emulator &game_boy_emulator,
+    const uint32_t *&active_colour_palette,
+    const uint8_t currently_published_frame_buffer_index,
+    uint32_t *abgr_pixel_buffer,
+    SDL_Texture *sdl_texture)
+{
+    if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+    {
+        auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+
+        for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
+        {
+            abgr_pixel_buffer[i] = active_colour_palette[pixel_frame_buffer[i]];
+        }
+        SDL_UpdateTexture(sdl_texture, nullptr, abgr_pixel_buffer, DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+    }
+    else
+        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
+}
+
 static void render_main_menu_bar(
     bool &stop_emulating,
     bool &pre_rom_loading_error_pause_state,
     bool &did_rom_loading_error_occur,
+    bool &is_custom_palette_editor_open,
     int &selected_colour_palette_index,
     int &selected_fast_emulation_speed_index,
     const uint32_t *&active_colour_palette,
@@ -289,16 +337,32 @@ static void render_main_menu_bar(
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Load Game ROM", "O"))
+            if (ImGui::MenuItem("Load Game ROM", "[O]"))
             {
-                try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
+                try_load_file_to_memory_with_dialog(
+                    false,
+                    sdl_window,
+                    game_boy_emulator,
+                    std::ref(is_emulation_paused),
+                    pre_rom_loading_error_pause_state,
+                    did_rom_loading_error_occur,
+                    error_message
+                );
             }
             if (ImGui::MenuItem("Load Boot ROM (Optional)"))
             {
-                try_load_file_to_memory_with_dialog(true, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
+                try_load_file_to_memory_with_dialog(
+                    true,
+                    sdl_window,
+                    game_boy_emulator,
+                    std::ref(is_emulation_paused),
+                    pre_rom_loading_error_pause_state,
+                    did_rom_loading_error_occur,
+                    error_message
+                );
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Quit", "Alt+F4"))
+            if (ImGui::MenuItem("Quit", "[Alt+F4]"))
             {
                 stop_emulating = true;
             }
@@ -312,27 +376,30 @@ static void render_main_menu_bar(
                 switch (selected_colour_palette_index)
                 {
                     case 0:
-                        active_colour_palette = light_green_colour_palette;
+                        active_colour_palette = sage_colour_palette;
                         break;
                     case 1:
                         active_colour_palette = greyscale_colour_palette;
                         break;
                     case 2:
-                        active_colour_palette = original_green_colour_palette;
+                        active_colour_palette = classic_colour_palette;
+                        break;
+                    case 3:
+                        active_colour_palette = custom_colour_palette;
                         break;
                 }
-                if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
-                {
-                    auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
-
-                    for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
-                    {
-                        abgr_pixel_buffer[i] = active_colour_palette[pixel_frame_buffer[i]];
-                    }
-                    SDL_UpdateTexture(sdl_texture, nullptr, abgr_pixel_buffer, DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
-                }
-                else
-                    set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
+                update_colour_palette(
+                    game_boy_emulator,
+                    active_colour_palette,
+                    currently_published_frame_buffer_index,
+                    abgr_pixel_buffer,
+                    sdl_texture
+                );
+            }
+            ImGui::Spacing();
+            if (ImGui::MenuItem("Update Custom Palette"))
+            {
+                is_custom_palette_editor_open = true;
             }
             ImGui::EndMenu();
         }
@@ -343,38 +410,41 @@ static void render_main_menu_bar(
             ImGui::SeparatorText("Fast-Foward Speed");
             if (ImGui::Combo("##Fast-Foward Speed", &selected_fast_emulation_speed_index, fast_forward_speed_names, IM_ARRAYSIZE(fast_forward_speed_names)))
             {
-                target_fast_emulation_speed.store(selected_fast_emulation_speed_index * 0.25 + 1.5, std::memory_order_release);
+                const double emulation_speed_modifier = selected_fast_emulation_speed_index * 0.25 + 1.5;
+                target_fast_emulation_speed.store(emulation_speed_modifier, std::memory_order_release);
             }
             ImGui::Spacing();
-            if (ImGui::MenuItem(current_fast_forward_enable_state ? "Disable Fast-Forwarding" : "Enable Fast-Forwarding", "Space", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+            if (ImGui::MenuItem(current_fast_forward_enable_state ? "Disable Fast-Forwarding" : "Enable Fast-Forwarding", "[Space]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 is_fast_forward_enabled.store(!current_fast_forward_enable_state, std::memory_order_release);
             }
-            if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "Esc", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+            if (ImGui::MenuItem(current_pause_state ? "Unpause" : "Pause", "[Esc]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 is_emulation_paused.store(!current_pause_state, std::memory_order_release);
             }
             if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
+                set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
                 SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
                 game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                 game_boy_emulator.reset_state(true);
-                set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
+                is_fast_forward_enabled.store(false, std::memory_order_release);
                 is_emulation_paused.store(false, std::memory_order_release);
             }
             if (ImGui::MenuItem("Unload Boot ROM", "", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
             {
+                set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
                 game_boy_emulator.unload_bootrom_from_memory_thread_safe();
 
                 if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                 {
                     game_boy_emulator.set_post_boot_state();
                 }
-                set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
+                is_fast_forward_enabled.store(false, std::memory_order_release);
                 is_emulation_paused.store(false, std::memory_order_release);
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Reset", "R", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+            if (ImGui::MenuItem("Reset", "[R]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
                 {
@@ -400,6 +470,49 @@ static void render_main_menu_bar(
             }
         }
         ImGui::EndMainMenuBar();
+    }
+}
+
+static void render_custom_colour_palette_editor(
+    GameBoyCore::Emulator &game_boy_emulator,
+    bool &is_custom_palette_editor_open,
+    const uint8_t currently_published_frame_buffer_index,
+    const uint32_t *active_colour_palette,
+    int &selected_colour_palette_index,
+    uint32_t *abgr_pixel_buffer,
+    SDL_Texture *sdl_texture)
+{
+    if (is_custom_palette_editor_open)
+    {
+        ImGui::OpenPopup("Custom Palette");
+    }
+    if (ImGui::BeginPopupModal("Custom Palette", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            selected_custom_colour_palette_colours[i] = get_imvec4_from_abgr(custom_colour_palette[i]);
+            std::string colour_label = std::string("Colour ") + std::to_string(i);
+            ImGui::ColorEdit4(colour_label.c_str(), reinterpret_cast<float *>(&selected_custom_colour_palette_colours[i]), ImGuiColorEditFlags_NoInputs);
+            auto &colour = selected_custom_colour_palette_colours[i];
+            uint8_t alpha = static_cast<uint8_t>(colour.w * 255.0f + 0.5f);
+            uint8_t blue = static_cast<uint8_t>(colour.z * 255.0f + 0.5f);
+            uint8_t green = static_cast<uint8_t>(colour.y * 255.0f + 0.5f);
+            uint8_t red = static_cast<uint8_t>(colour.x * 255.0f + 0.5f);
+            custom_colour_palette[i] = get_abgr_value_for_current_endianness(alpha, blue, green, red);
+        }
+        if (ImGui::Button("OK", ImVec2(160, 0)))
+        {
+            is_custom_palette_editor_open = false;
+            update_colour_palette(
+                game_boy_emulator,
+                active_colour_palette,
+                currently_published_frame_buffer_index,
+                abgr_pixel_buffer,
+                sdl_texture
+            );
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 }
 
