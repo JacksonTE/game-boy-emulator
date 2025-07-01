@@ -152,11 +152,11 @@ public:
 
         ImGuiIO &io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.FontGlobalScale = 1.45f;
+        io.FontDefault = io.Fonts->AddFontFromFileTTF(std::string(PROJECT_ROOT + std::string("/fonts/calibri-regular.ttf")).c_str(), 18);
 
         ImGuiStyle &style = ImGui::GetStyle();
         style.ItemSpacing.x = 11.0f;
-        style.FramePadding.y += 4.0f;
+        style.FramePadding.y += 5.0f;
 
         ImGui::StyleColorsDark();
 
