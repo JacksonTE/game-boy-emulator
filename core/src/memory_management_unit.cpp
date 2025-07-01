@@ -126,14 +126,19 @@ void MemoryManagementUnit::unload_game_rom_thread_safe()
     is_game_rom_loaded_in_memory.store(false, std::memory_order_release);
 }
 
+bool MemoryManagementUnit::is_game_rom_loaded_thread_safe() const
+{
+    return is_game_rom_loaded_in_memory.load(std::memory_order_acquire);
+}
+
 bool MemoryManagementUnit::is_bootrom_loaded_thread_safe() const
 {
     return is_bootrom_loaded_in_memory.load(std::memory_order_acquire);
 }
 
-bool MemoryManagementUnit::is_game_rom_loaded_thread_safe() const
+bool MemoryManagementUnit::is_bootrom_mapped() const
 {
-    return is_game_rom_loaded_in_memory.load(std::memory_order_acquire);
+    return (bootrom_status == 0);
 }
 
 uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam_dma) const

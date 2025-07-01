@@ -11,9 +11,9 @@ namespace GameBoyCore
 
 Emulator::Emulator()
     : internal_timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-      pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-      memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
-      central_processing_unit{[this]() { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
+    pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+    memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
+    central_processing_unit{[this]() { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
 {
 }
 
@@ -53,16 +53,6 @@ bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_
     return memory_management_unit->try_load_file(file_path, is_bootrom_file, error_message);
 }
 
-bool Emulator::is_bootrom_loaded_in_memory_thread_safe() const
-{
-    return memory_management_unit->is_bootrom_loaded_thread_safe();
-}
-
-bool Emulator::is_game_rom_loaded_in_memory_thread_safe() const
-{
-    return memory_management_unit->is_game_rom_loaded_thread_safe();
-}
-
 void Emulator::unload_bootrom_from_memory_thread_safe()
 {
     memory_management_unit->unload_bootrom_thread_safe();
@@ -71,6 +61,21 @@ void Emulator::unload_bootrom_from_memory_thread_safe()
 void Emulator::unload_game_rom_from_memory_thread_safe()
 {
     memory_management_unit->unload_game_rom_thread_safe();
+}
+
+bool Emulator::is_game_rom_loaded_in_memory_thread_safe() const
+{
+    return memory_management_unit->is_game_rom_loaded_thread_safe();
+}
+
+bool Emulator::is_bootrom_loaded_in_memory_thread_safe() const
+{
+    return memory_management_unit->is_bootrom_loaded_thread_safe();
+}
+
+bool Emulator::is_bootrom_mapped_in_memory() const
+{
+    return memory_management_unit->is_bootrom_mapped();
 }
 
 uint8_t Emulator::read_byte_from_memory(uint16_t address) const

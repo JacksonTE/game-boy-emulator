@@ -64,8 +64,9 @@ public:
     bool try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message);
     void unload_bootrom_thread_safe();
     void unload_game_rom_thread_safe();
-    bool is_bootrom_loaded_thread_safe() const;
     bool is_game_rom_loaded_thread_safe() const;
+    bool is_bootrom_loaded_thread_safe() const;
+    bool is_bootrom_mapped() const;
 
     virtual uint8_t read_byte(uint16_t address, bool is_access_for_oam_dma) const;
     virtual void write_byte(uint16_t address, uint8_t value, bool is_access_for_oam_dma);

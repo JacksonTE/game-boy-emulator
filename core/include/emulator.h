@@ -30,10 +30,11 @@ public:
     void print_register_file_state() const;
 
     bool try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message);
-    bool is_bootrom_loaded_in_memory_thread_safe() const;
-    bool is_game_rom_loaded_in_memory_thread_safe() const;
     void unload_bootrom_from_memory_thread_safe();
     void unload_game_rom_from_memory_thread_safe();
+    bool is_game_rom_loaded_in_memory_thread_safe() const;
+    bool is_bootrom_loaded_in_memory_thread_safe() const;
+    bool is_bootrom_mapped_in_memory() const;
 
     uint8_t read_byte_from_memory(uint16_t address) const;
     void write_byte_to_memory(uint16_t address, uint8_t value);

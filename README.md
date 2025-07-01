@@ -14,7 +14,7 @@ A cross-platform, cycle accurate emulator of the Nintendo Game Boy (DMG) written
 - Interactable user interface for loading game ROMs and adjusting emulation options made with ```Dear ImGui```.
 - Frame data rendering using ```SDL3```.
 - Support for a majority of available Game Boy and backwards compatible Game Boy Color games.
-- Three preset colour palettes including the light green featured in the above screenshots, greyscale black and white, and a darker green similar to the original hardware.
+- Three preset colour palettes and a custom colour palette with selectable colours.
 
 ## Planned Features
 - Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
