@@ -494,7 +494,16 @@ static void render_custom_colour_palette_editor(
         {
             selected_custom_colour_palette_colours[i] = get_imvec4_from_abgr(custom_colour_palette[i]);
             std::string colour_label = std::string("Colour ") + std::to_string(i);
-            ImGui::ColorEdit4(colour_label.c_str(), reinterpret_cast<float *>(&selected_custom_colour_palette_colours[i]), ImGuiColorEditFlags_NoInputs);
+            if (ImGui::ColorEdit4(colour_label.c_str(), reinterpret_cast<float *>(&selected_custom_colour_palette_colours[i]), ImGuiColorEditFlags_NoInputs))
+            {
+                update_colour_palette(
+                    game_boy_emulator,
+                    active_colour_palette,
+                    currently_published_frame_buffer_index,
+                    abgr_pixel_buffer,
+                    sdl_texture
+                );
+            }
             auto &colour = selected_custom_colour_palette_colours[i];
             uint8_t alpha = static_cast<uint8_t>(colour.w * 255.0f + 0.5f);
             uint8_t blue = static_cast<uint8_t>(colour.z * 255.0f + 0.5f);
@@ -505,13 +514,6 @@ static void render_custom_colour_palette_editor(
         if (ImGui::Button("OK", ImVec2(160, 0)))
         {
             is_custom_palette_editor_open = false;
-            update_colour_palette(
-                game_boy_emulator,
-                active_colour_palette,
-                currently_published_frame_buffer_index,
-                abgr_pixel_buffer,
-                sdl_texture
-            );
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
