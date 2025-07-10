@@ -197,13 +197,13 @@ void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t 
     video_ram[local_address] = value;
 }
 
-uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_for_central_processing_unit) const
+uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_unrestricted) const
 {
     if (is_oam_dma_in_progress)
         return 0xff;
 
     const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
-    if (is_access_for_central_processing_unit && is_lcd_enable_bit_set)
+    if (!is_access_unrestricted && is_lcd_enable_bit_set)
     {
         if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
             previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
@@ -216,9 +216,9 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
     return object_attribute_memory[local_address];
 }
 
-void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma)
+void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_unrestricted)
 {
-    if (!is_access_for_oam_dma)
+    if (!is_access_unrestricted)
     {
         if (is_oam_dma_in_progress)
             return;
@@ -296,13 +296,14 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
     if (scanline_selected_objects.size() < MAX_OBJECTS_PER_LINE)
     {
         const uint16_t object_start_global_address = OBJECT_ATTRIBUTE_MEMORY_START + (2 * current_scanline_dot_number) - 4;
+        const bool is_access_unrestricted = true;
         ObjectAttributes current_object
         {
             object_start_global_address,
-            read_byte_object_attribute_memory(object_start_global_address, false),
-            read_byte_object_attribute_memory(object_start_global_address + 1, false),
-            read_byte_object_attribute_memory(object_start_global_address + 2, false),
-            read_byte_object_attribute_memory(object_start_global_address + 3, false),
+            read_byte_object_attribute_memory(object_start_global_address, is_access_unrestricted),
+            read_byte_object_attribute_memory(object_start_global_address + 1, is_access_unrestricted),
+            read_byte_object_attribute_memory(object_start_global_address + 2, is_access_unrestricted),
+            read_byte_object_attribute_memory(object_start_global_address + 3, is_access_unrestricted),
         };
 
         const uint8_t object_height = is_bit_set(lcd_control_lcdc, 2) ? 16 : 8;
@@ -670,8 +671,9 @@ void PixelProcessingUnit::step_object_fetcher_single_dot()
         case PixelSliceFetcherStep::GetTileId:
             if (!object_fetcher.is_in_first_dot_of_current_step)
             {
-                get_current_object().tile_index = read_byte_object_attribute_memory(get_current_object().object_start_global_address + 2, false);
-                get_current_object().flags = read_byte_object_attribute_memory(get_current_object().object_start_global_address + 3, false);
+                const bool is_access_unrestricted = true;
+                get_current_object().tile_index = read_byte_object_attribute_memory(get_current_object().object_start_global_address + 2, is_access_unrestricted);
+                get_current_object().flags = read_byte_object_attribute_memory(get_current_object().object_start_global_address + 3, is_access_unrestricted);
 
                 const bool is_object_double_height = is_bit_set(lcd_control_lcdc, 2);
                 if (is_object_double_height)

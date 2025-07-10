@@ -47,6 +47,12 @@ constexpr uint8_t B_BUTTON_FLAG_MASK = 1 << 1;
 constexpr uint8_t SELECT_BUTTON_FLAG_MASK = 1 << 2;
 constexpr uint8_t START_BUTTON_FLAG_MASK = 1 << 3;
 
+enum class FileType
+{
+    GameRom,
+    Bootrom
+};
+
 enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
 {
     NotStarting,
@@ -61,15 +67,15 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message);
+    bool try_load_file(const std::filesystem::path &file_path, FileType file_type, std::string &error_message);
     void unload_bootrom_thread_safe();
     void unload_game_rom_thread_safe();
     bool is_game_rom_loaded_thread_safe() const;
     bool is_bootrom_loaded_thread_safe() const;
     bool is_bootrom_mapped() const;
 
-    virtual uint8_t read_byte(uint16_t address, bool is_access_for_oam_dma) const;
-    virtual void write_byte(uint16_t address, uint8_t value, bool is_access_for_oam_dma);
+    virtual uint8_t read_byte(uint16_t address, bool is_access_unrestricted) const;
+    virtual void write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted);
 
     void step_single_machine_cycle();
 
@@ -77,8 +83,8 @@ public:
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
     uint8_t get_pending_interrupt_mask() const;
 
-    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state);
-    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state);
+    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed);
+    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
 
 private:
     std::unique_ptr<uint8_t[]> bootrom{};

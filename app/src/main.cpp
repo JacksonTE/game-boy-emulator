@@ -131,7 +131,8 @@ int main()
         const uint32_t *active_colour_palette = sage_colour_palette;
         int selected_colour_palette_index = 0;
 
-        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+        uint8_t previously_published_frame_buffer_index = 0;
+        uint8_t currently_published_frame_buffer_index = 0;
 
         std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
@@ -167,7 +168,7 @@ int main()
                 error_message
             );
 
-            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+            currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
 
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {

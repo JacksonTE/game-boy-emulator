@@ -79,7 +79,7 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, bool is_bootrom_file, std::string &error_message)
+bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, FileType file_type, std::string &error_message)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -89,7 +89,7 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
     std::streamsize file_length_in_bytes = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    if (is_bootrom_file)
+    if (file_type == FileType::Bootrom)
     {
         if (file_length_in_bytes != BOOTROM_SIZE)
         {
@@ -141,10 +141,10 @@ bool MemoryManagementUnit::is_bootrom_mapped() const
     return (bootrom_status == 0);
 }
 
-uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam_dma) const
+uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestricted) const
 {
-    const bool does_dma_bus_conflict_occur = pixel_processing_unit.is_oam_dma_in_progress &&
-                                             !is_access_for_oam_dma &&
+    const bool does_dma_bus_conflict_occur = !is_access_unrestricted &&
+                                             pixel_processing_unit.is_oam_dma_in_progress &&
                                              are_addresses_on_same_bus(address, oam_dma_source_address_base);
     if (does_dma_bus_conflict_occur)
     {
@@ -180,7 +180,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
     }
     else if (address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
     {
-        return pixel_processing_unit.read_byte_object_attribute_memory(address, true);
+        return pixel_processing_unit.read_byte_object_attribute_memory(address, is_access_unrestricted);
     }
     else if (address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
@@ -261,7 +261,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_for_oam
         return interrupt_enable_ie;
 }
 
-void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_access_for_oam_dma)
+void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted)
 {
     if (address < ROM_BANK_0X_START + ROM_BANK_SIZE)
     {
@@ -287,7 +287,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
     else if (address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
     {
-        pixel_processing_unit.write_byte_object_attribute_memory(address, value, is_access_for_oam_dma);
+        pixel_processing_unit.write_byte_object_attribute_memory(address, value, is_access_unrestricted);
     }
     else if (address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {

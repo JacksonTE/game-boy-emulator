@@ -48,9 +48,9 @@ void Emulator::print_register_file_state() const
     GameBoyCore::print_register_file_state(central_processing_unit.get_register_file());
 }
 
-bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message)
+bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string &error_message)
 {
-    return memory_management_unit->try_load_file(file_path, is_bootrom_file, error_message);
+    return memory_management_unit->try_load_file(file_path, file_type, error_message);
 }
 
 void Emulator::unload_bootrom_from_memory_thread_safe()
@@ -90,19 +90,19 @@ void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    GameBoyCore::print_bytes_in_range([&](uint16_t address, bool is_access_for_oam_dma){ return memory_management_unit->read_byte(address, is_access_for_oam_dma); },
+    GameBoyCore::print_bytes_in_range([&](uint16_t address, bool is_access_for_oam_dma) { return memory_management_unit->read_byte(address, is_access_for_oam_dma); },
                                       start_address,
                                       end_address);
 }
 
-void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state)
+void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed)
 {
-    memory_management_unit->update_joypad_button_pressed_state_thread_safe(button_flag_mask, new_button_pressed_state);
+    memory_management_unit->update_joypad_button_pressed_state_thread_safe(button_flag_mask, is_button_pressed);
 }
 
-void Emulator::update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state)
+void Emulator::update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed)
 {
-    memory_management_unit->update_joypad_direction_pad_pressed_state_thread_safe(direction_flag_mask, new_direction_pressed_state);
+    memory_management_unit->update_joypad_direction_pad_pressed_state_thread_safe(direction_flag_mask, is_direction_pressed);
 }
 
 uint8_t Emulator::get_published_frame_buffer_index() const

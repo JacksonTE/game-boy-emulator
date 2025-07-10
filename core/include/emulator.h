@@ -29,7 +29,7 @@ public:
     RegisterFile<std::endian::native> get_register_file() const;
     void print_register_file_state() const;
 
-    bool try_load_file_to_memory(std::filesystem::path file_path, bool is_bootrom_file, std::string &error_message);
+    bool try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string &error_message);
     void unload_bootrom_from_memory_thread_safe();
     void unload_game_rom_from_memory_thread_safe();
     bool is_game_rom_loaded_in_memory_thread_safe() const;
@@ -40,8 +40,8 @@ public:
     void write_byte_to_memory(uint16_t address, uint8_t value);
     void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
 
-    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool new_button_pressed_state);
-    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool new_direction_pressed_state);
+    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed);
+    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
 
     uint8_t get_published_frame_buffer_index() const;
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);

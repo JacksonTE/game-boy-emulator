@@ -16,7 +16,7 @@ constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
 static bool try_load_file_to_memory_with_dialog(
-    bool is_bootrom_file,
+    GameBoyCore::FileType file_type,
     SDL_Window *sdl_window,
     GameBoyCore::Emulator &game_boy_emulator,
     std::atomic<bool> &is_emulation_paused,
@@ -30,7 +30,7 @@ static bool try_load_file_to_memory_with_dialog(
     nfdopendialogu8args_t open_dialog_arguments{};
     nfdu8filteritem_t filters[] =
     {
-        {is_bootrom_file ? "Game Boy Boot ROMs" : "Game Boy ROMs", "gb,gbc,bin,rom"}
+        {file_type == GameBoyCore::FileType::Bootrom ? "Game Boy Bootroms" : "Game Boy ROMs", "gb,gbc,bin,rom"}
     };
     open_dialog_arguments.filterList = filters;
     open_dialog_arguments.filterCount = 1;
@@ -43,9 +43,9 @@ static bool try_load_file_to_memory_with_dialog(
 
     if (result == NFD_OKAY)
     {
-        if (game_boy_emulator.try_load_file_to_memory(rom_path, is_bootrom_file, error_message))
+        if (game_boy_emulator.try_load_file_to_memory(rom_path, file_type, error_message))
         {
-            if (!is_bootrom_file)
+            if (file_type == GameBoyCore::FileType::GameRom)
             {
                 if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
                 {
@@ -66,7 +66,7 @@ static bool try_load_file_to_memory_with_dialog(
 
     if (is_operation_successful)
     {
-        if (!is_bootrom_file)
+        if (file_type == GameBoyCore::FileType::GameRom)
         {
             SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title()).c_str());
         }
@@ -173,7 +173,7 @@ static void handle_sdl_events(
                 }
                 if (sdl_event.key.key == SDLK_O && is_key_pressed)
                 {
-                    try_load_file_to_memory_with_dialog(false, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
+                    try_load_file_to_memory_with_dialog(GameBoyCore::FileType::GameRom, sdl_window, game_boy_emulator, std::ref(is_emulation_paused), pre_rom_loading_error_pause_state, did_rom_loading_error_occur, error_message);
                 }
             }
             break;
@@ -344,7 +344,7 @@ static void render_main_menu_bar(
             if (ImGui::MenuItem("Load Game ROM", "[O]"))
             {
                 try_load_file_to_memory_with_dialog(
-                    false,
+                    GameBoyCore::FileType::GameRom,
                     sdl_window,
                     game_boy_emulator,
                     std::ref(is_emulation_paused),
@@ -356,7 +356,7 @@ static void render_main_menu_bar(
             if (ImGui::MenuItem("Load Boot ROM (Optional)"))
             {
                 try_load_file_to_memory_with_dialog(
-                    true,
+                    GameBoyCore::FileType::Bootrom,
                     sdl_window,
                     game_boy_emulator,
                     std::ref(is_emulation_paused),

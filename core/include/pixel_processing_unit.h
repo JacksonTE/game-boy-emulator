@@ -204,8 +204,8 @@ public:
     uint8_t read_byte_video_ram(uint16_t memory_address) const;
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
 
-    uint8_t read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_for_central_processing_unit) const;
-    void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_for_oam_dma);
+    uint8_t read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_unrestricted) const;
+    void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_unrestricted);
 
     void step_single_machine_cycle();
 

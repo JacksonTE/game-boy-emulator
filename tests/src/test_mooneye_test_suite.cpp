@@ -21,7 +21,6 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
     {
         // Skip tests that are specific to other Game Boy models than DMG
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
-            entry.path().filename() != "sources-GS.gb" && // TODO add this test after MBC5
             entry.path().filename() != "unused_hwio-GS.gb" && // TODO add this test after APU is done
             entry.path().filename() != "boot_div-dmg0.gb" &&
             entry.path().filename() != "boot_div-S.gb" &&
@@ -50,7 +49,7 @@ protected:
     void SetUp() override
     {
         ASSERT_TRUE(std::filesystem::exists(GetParam())) << "ROM file not found: " << GetParam();
-        game_boy_emulator.try_load_file_to_memory(GetParam(), false, error_message);
+        game_boy_emulator.try_load_file_to_memory(GetParam(), GameBoyCore::FileType::GameRom, error_message);
         game_boy_emulator.set_post_boot_state();
     }
 };
