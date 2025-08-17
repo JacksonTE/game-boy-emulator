@@ -154,14 +154,14 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
         }
         test_case.initial_register_values.program_counter = test_case_object["initial"]["pc"].get<uint16_t>();
         test_case.initial_register_values.stack_pointer = test_case_object["initial"]["sp"].get<uint16_t>();
-        test_case.initial_register_values.a = test_case_object["initial"]["a"].get<uint8_t>();
-        test_case.initial_register_values.b = test_case_object["initial"]["b"].get<uint8_t>();
-        test_case.initial_register_values.c = test_case_object["initial"]["c"].get<uint8_t>();
-        test_case.initial_register_values.d = test_case_object["initial"]["d"].get<uint8_t>();
-        test_case.initial_register_values.e = test_case_object["initial"]["e"].get<uint8_t>();
+        test_case.initial_register_values.A = test_case_object["initial"]["a"].get<uint8_t>();
+        test_case.initial_register_values.B = test_case_object["initial"]["b"].get<uint8_t>();
+        test_case.initial_register_values.C = test_case_object["initial"]["c"].get<uint8_t>();
+        test_case.initial_register_values.D = test_case_object["initial"]["d"].get<uint8_t>();
+        test_case.initial_register_values.E = test_case_object["initial"]["e"].get<uint8_t>();
         test_case.initial_register_values.flags = test_case_object["initial"]["f"].get<uint8_t>();
-        test_case.initial_register_values.h = test_case_object["initial"]["h"].get<uint8_t>();
-        test_case.initial_register_values.l = test_case_object["initial"]["l"].get<uint8_t>();
+        test_case.initial_register_values.H = test_case_object["initial"]["h"].get<uint8_t>();
+        test_case.initial_register_values.L = test_case_object["initial"]["l"].get<uint8_t>();
 
         for (const auto &expected_ram_array : test_case_object["final"]["ram"])
         {
@@ -171,14 +171,14 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
         }
         test_case.expected_register_values.program_counter = test_case_object["final"]["pc"].get<uint16_t>();
         test_case.expected_register_values.stack_pointer = test_case_object["final"]["sp"].get<uint16_t>();
-        test_case.expected_register_values.a = test_case_object["final"]["a"].get<uint8_t>();
-        test_case.expected_register_values.b = test_case_object["final"]["b"].get<uint8_t>();
-        test_case.expected_register_values.c = test_case_object["final"]["c"].get<uint8_t>();
-        test_case.expected_register_values.d = test_case_object["final"]["d"].get<uint8_t>();
-        test_case.expected_register_values.e = test_case_object["final"]["e"].get<uint8_t>();
+        test_case.expected_register_values.A = test_case_object["final"]["a"].get<uint8_t>();
+        test_case.expected_register_values.B = test_case_object["final"]["b"].get<uint8_t>();
+        test_case.expected_register_values.C = test_case_object["final"]["c"].get<uint8_t>();
+        test_case.expected_register_values.D = test_case_object["final"]["d"].get<uint8_t>();
+        test_case.expected_register_values.E = test_case_object["final"]["e"].get<uint8_t>();
         test_case.expected_register_values.flags = test_case_object["final"]["f"].get<uint8_t>();
-        test_case.expected_register_values.h = test_case_object["final"]["h"].get<uint8_t>();
-        test_case.expected_register_values.l = test_case_object["final"]["l"].get<uint8_t>();
+        test_case.expected_register_values.H = test_case_object["final"]["h"].get<uint8_t>();
+        test_case.expected_register_values.L = test_case_object["final"]["l"].get<uint8_t>();
 
         for (const auto &expected_cycles_array : test_case_object["cycles"])
         {
@@ -326,10 +326,10 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
         game_boy_central_processing_unit->step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
         game_boy_central_processing_unit->step_single_instruction();
 
-        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().af, test_case.expected_register_values.af);
-        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().bc, test_case.expected_register_values.bc);
-        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().de, test_case.expected_register_values.de);
-        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().hl, test_case.expected_register_values.hl);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().AF, test_case.expected_register_values.AF);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().BC, test_case.expected_register_values.BC);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().DE, test_case.expected_register_values.DE);
+        EXPECT_EQ(game_boy_central_processing_unit->get_register_file().HL, test_case.expected_register_values.HL);
 
         // Compare expected program_counter against program_counter-1 since next instruction is 
         // fetched at the end of the current one, advancing the program counter an extra time

@@ -45,25 +45,25 @@ inline void print_register_file_state(RegisterFile<std::endian::native> register
     std::cout << "=================== CPU Registers ===================\n";
     std::cout << std::hex << std::setfill('0');
 
-    std::cout << "AF: 0x" << std::setw(4) << register_file.af << "   "
-              << "(A: 0x" << std::setw(2) << static_cast<int>(register_file.a) << ","
+    std::cout << "AF: 0x" << std::setw(4) << register_file.AF << "   "
+              << "(A: 0x" << std::setw(2) << static_cast<int>(register_file.A) << ","
               << " F: 0x" << std::setw(2) << static_cast<int>(register_file.flags) << ")   "
-              << "Flags ZNHC: " << (is_flag_set(register_file.flags, FLAG_ZERO_MASK) ? "1" : "0")
-              << (is_flag_set(register_file.flags, FLAG_SUBTRACT_MASK) ? "1" : "0")
-              << (is_flag_set(register_file.flags, FLAG_HALF_CARRY_MASK) ? "1" : "0")
-              << (is_flag_set(register_file.flags, FLAG_CARRY_MASK) ? "1" : "0") << "\n";
+              << "Flags ZNHC: " << (is_flag_set(register_file.flags, ZERO_FLAG_MASK) ? "1" : "0")
+              << (is_flag_set(register_file.flags, SUBTRACT_FLAG_MASK) ? "1" : "0")
+              << (is_flag_set(register_file.flags, HALF_CARRY_FLAG_MASK) ? "1" : "0")
+              << (is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? "1" : "0") << "\n";
 
-    std::cout << "BC: 0x" << std::setw(4) << register_file.bc << "   "
-              << "(B: 0x" << std::setw(2) << static_cast<int>(register_file.b) << ","
-              << " C: 0x" << std::setw(2) << static_cast<int>(register_file.c) << ")\n";
+    std::cout << "BC: 0x" << std::setw(4) << register_file.BC << "   "
+              << "(B: 0x" << std::setw(2) << static_cast<int>(register_file.B) << ","
+              << " C: 0x" << std::setw(2) << static_cast<int>(register_file.C) << ")\n";
 
-    std::cout << "DE: 0x" << std::setw(4) << register_file.de << "   "
-              << "(D: 0x" << std::setw(2) << static_cast<int>(register_file.d) << ","
-              << " E: 0x" << std::setw(2) << static_cast<int>(register_file.e) << ")\n";
+    std::cout << "DE: 0x" << std::setw(4) << register_file.DE << "   "
+              << "(D: 0x" << std::setw(2) << static_cast<int>(register_file.D) << ","
+              << " E: 0x" << std::setw(2) << static_cast<int>(register_file.E) << ")\n";
 
-    std::cout << "HL: 0x" << std::setw(4) << register_file.hl << "   "
-              << "(H: 0x" << std::setw(2) << static_cast<int>(register_file.h) << ","
-              << " L: 0x" << std::setw(2) << static_cast<int>(register_file.l) << ")\n";
+    std::cout << "HL: 0x" << std::setw(4) << register_file.HL << "   "
+              << "(H: 0x" << std::setw(2) << static_cast<int>(register_file.H) << ","
+              << " L: 0x" << std::setw(2) << static_cast<int>(register_file.L) << ")\n";
 
     std::cout << "Stack Pointer: 0x" << std::setw(4) << register_file.stack_pointer << "\n";
     std::cout << "Program Counter: 0x" << std::setw(4) << register_file.program_counter << "\n";

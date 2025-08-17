@@ -67,11 +67,11 @@ TEST_P(MooneyeTest, TestRom)
         game_boy_emulator.step_central_processing_unit_single_instruction();
         auto r = game_boy_emulator.get_register_file();
 
-        if (r.b == 0x42 && r.c == 0x42 && r.d == 0x42 && r.e == 0x42 && r.h == 0x42 && r.l == 0x42)
+        if (r.B == 0x42 && r.C == 0x42 && r.D == 0x42 && r.E == 0x42 && r.H == 0x42 && r.L == 0x42)
         {
             FAIL();
         }
-        else if (r.b == 3 && r.c == 5 && r.d == 8 && r.e == 13 && r.h == 21 && r.l == 34)
+        else if (r.B == 3 && r.C == 5 && r.D == 8 && r.E == 13 && r.H == 21 && r.L == 34)
         {
             did_test_succeed = true;
             break;

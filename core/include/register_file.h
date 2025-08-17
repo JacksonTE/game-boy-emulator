@@ -3,10 +3,10 @@
 #include <bit>
 #include <cstdint>
 
-constexpr uint8_t FLAG_ZERO_MASK = 1 << 7;
-constexpr uint8_t FLAG_SUBTRACT_MASK = 1 << 6; // Also known as the 'N' flag
-constexpr uint8_t FLAG_HALF_CARRY_MASK = 1 << 5; // For a carry from bit 3-4 or 11-12
-constexpr uint8_t FLAG_CARRY_MASK = 1 << 4;
+constexpr uint8_t ZERO_FLAG_MASK = 1 << 7;
+constexpr uint8_t SUBTRACT_FLAG_MASK = 1 << 6; // Also known as the 'N' flag
+constexpr uint8_t HALF_CARRY_FLAG_MASK = 1 << 5; // For a carry from bit 3-4 or 11-12
+constexpr uint8_t CARRY_FLAG_MASK = 1 << 4;
 
 namespace GameBoyCore
 {
@@ -22,36 +22,36 @@ struct RegisterFile<std::endian::little>
         struct
         {
             uint8_t flags;
-            uint8_t a;
+            uint8_t A;
         };
-        uint16_t af{};
+        uint16_t AF{};
     };
     union
     {
         struct
         {
-            uint8_t c;
-            uint8_t b;
+            uint8_t C;
+            uint8_t B;
         };
-        uint16_t bc{};
+        uint16_t BC{};
     };
     union
     {
         struct
         {
-            uint8_t e;
-            uint8_t d;
+            uint8_t E;
+            uint8_t D;
         };
-        uint16_t de{};
+        uint16_t DE{};
     };
     union
     {
         struct
         {
-            uint8_t l;
-            uint8_t h;
+            uint8_t L;
+            uint8_t H;
         };
-        uint16_t hl{};
+        uint16_t HL{};
     };
     uint16_t stack_pointer{};
     uint16_t program_counter{};
@@ -64,37 +64,37 @@ struct RegisterFile<std::endian::big>
     {
         struct
         {
-            uint8_t a;
+            uint8_t A;
             uint8_t flags;
         };
-        uint16_t af{};
+        uint16_t AF{};
     };
     union
     {
         struct
         {
-            uint8_t b;
-            uint8_t c;
+            uint8_t B;
+            uint8_t C;
         };
-        uint16_t bc{};
+        uint16_t BC{};
     };
     union
     {
         struct
         {
-            uint8_t d;
-            uint8_t e;
+            uint8_t D;
+            uint8_t E;
         };
-        uint16_t de{};
+        uint16_t DE{};
     };
     union
     {
         struct
         {
-            uint8_t h;
-            uint8_t l;
+            uint8_t H;
+            uint8_t L;
         };
-        uint16_t hl{};
+        uint16_t HL{};
     };
     uint16_t stack_pointer{};
     uint16_t program_counter{};
