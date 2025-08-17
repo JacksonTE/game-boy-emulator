@@ -33,14 +33,14 @@ constexpr uint16_t HIGH_RAM_START = 0xff80;
 constexpr uint8_t OAM_DMA_MACHINE_CYCLE_DURATION = 0xa0;
 
 constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
-constexpr uint8_t INTERRUPT_FLAG_JOYPAD_MASK = 1 << 4;
-constexpr uint8_t INTERRUPT_FLAG_SERIAL_MASK = 1 << 3;
-constexpr uint8_t INTERRUPT_FLAG_TIMER_MASK = 1 << 2;
+constexpr uint8_t JOYPAD_INTERRUPT_FLAG_MASK = 1 << 4;
+constexpr uint8_t SERIAL_INTERRUPT_FLAG_MASK = 1 << 3;
+constexpr uint8_t TIMER_INTERRUPT_FLAG_MASK = 1 << 2;
 
-constexpr uint8_t RIGHT_DIRECTION_PAD_FLAG_MASK = 1 << 0;
-constexpr uint8_t LEFT_DIRECTION_PAD_FLAG_MASK = 1 << 1;
-constexpr uint8_t UP_DIRECTION_PAD_FLAG_MASK = 1 << 2;
-constexpr uint8_t DOWN_DIRECTION_PAD_FLAG_MASK = 1 << 3;
+constexpr uint8_t RIGHT_DPAD_DIRECTION_FLAG_MASK = 1 << 0;
+constexpr uint8_t LEFT_DPAD_DIRECTION_FLAG_MASK = 1 << 1;
+constexpr uint8_t UP_DPAD_DIRECTION_FLAG_MASK = 1 << 2;
+constexpr uint8_t DOWN_DPAD_DIRECTION_FLAG_MASK = 1 << 3;
 
 constexpr uint8_t A_BUTTON_FLAG_MASK = 1 << 0;
 constexpr uint8_t B_BUTTON_FLAG_MASK = 1 << 1;
@@ -49,8 +49,8 @@ constexpr uint8_t START_BUTTON_FLAG_MASK = 1 << 3;
 
 enum class FileType
 {
-    GameRom,
-    Bootrom
+    GameROM,
+    BootROM
 };
 
 enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
@@ -83,8 +83,8 @@ public:
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
     uint8_t get_pending_interrupt_mask() const;
 
-    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed);
-    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
+    void update_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed);
+    void update_dpad_direction_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
 
 private:
     std::unique_ptr<uint8_t[]> bootrom{};
@@ -96,13 +96,13 @@ private:
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 
-    std::atomic<bool> is_bootrom_loaded_in_memory{};
-    std::atomic<bool> is_game_rom_loaded_in_memory{};
+    std::atomic<bool> atomic_is_bootrom_loaded_in_memory{};
+    std::atomic<bool> atomic_is_game_rom_loaded_in_memory{};
 
-    std::atomic<uint8_t> joypad_button_states{0b11111111};
-    std::atomic<uint8_t> joypad_direction_pad_states{0b11111111};
-    std::atomic<uint8_t> joypad_most_recent_currently_pressed_vertical_direction{0b11111111};
-    std::atomic<uint8_t> joypad_most_recent_currently_pressed_horizontal_direction{0b11111111};
+    std::atomic<uint8_t> atomic_button_pressed_states{0b11111111};
+    std::atomic<uint8_t> atomic_dpad_direction_pressed_states{0b11111111};
+    std::atomic<uint8_t> atomic_most_recent_currently_pressed_vertical_direction{0b11111111};
+    std::atomic<uint8_t> atomic_most_recent_currently_pressed_horizontal_direction{0b11111111};
     uint8_t joypad_p1_joyp{0b11111111};
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};

@@ -40,13 +40,13 @@ public:
     void write_byte_to_memory(uint16_t address, uint8_t value);
     void print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const;
 
-    void update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed);
-    void update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
+    void update_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed);
+    void update_dpad_direction_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
 
-    uint8_t get_published_frame_buffer_index() const;
+    uint8_t get_published_frame_buffer_index_thread_safe() const;
     std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
 
-    std::string get_loaded_game_rom_title() const;
+    std::string get_loaded_game_rom_title_thread_safe() const;
 
 private:
     GameCartridgeSlot game_cartridge_slot{};

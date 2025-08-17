@@ -95,19 +95,19 @@ void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_
                                       end_address);
 }
 
-void Emulator::update_joypad_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed)
+void Emulator::update_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed)
 {
-    memory_management_unit->update_joypad_button_pressed_state_thread_safe(button_flag_mask, is_button_pressed);
+    memory_management_unit->update_button_pressed_state_thread_safe(button_flag_mask, is_button_pressed);
 }
 
-void Emulator::update_joypad_direction_pad_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed)
+void Emulator::update_dpad_direction_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed)
 {
-    memory_management_unit->update_joypad_direction_pad_pressed_state_thread_safe(direction_flag_mask, is_direction_pressed);
+    memory_management_unit->update_dpad_direction_pressed_state_thread_safe(direction_flag_mask, is_direction_pressed);
 }
 
-uint8_t Emulator::get_published_frame_buffer_index() const
+uint8_t Emulator::get_published_frame_buffer_index_thread_safe() const
 {
-    return pixel_processing_unit.get_published_frame_buffer_index();
+    return pixel_processing_unit.get_published_frame_buffer_index_thread_safe();
 }
 
 std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
@@ -115,7 +115,7 @@ std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
     return pixel_processing_unit.get_pixel_frame_buffer(index);
 }
 
-std::string Emulator::get_loaded_game_rom_title() const
+std::string Emulator::get_loaded_game_rom_title_thread_safe() const
 {
     std::string game_rom_title{};
 

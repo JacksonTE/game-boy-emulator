@@ -32,7 +32,7 @@ void InternalTimer::step_single_machine_cycle()
 
     if (did_tima_overflow_occur)
     {
-        request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
+        request_interrupt_callback(TIMER_INTERRUPT_FLAG_MASK);
         timer_tima = timer_modulo_tma;
     }
     is_tima_overflow_handled = did_tima_overflow_occur;
@@ -94,7 +94,7 @@ void InternalTimer::update_tima_early()
 {
     if (update_tima_and_get_overflow_state())
     {
-        request_interrupt_callback(INTERRUPT_FLAG_TIMER_MASK);
+        request_interrupt_callback(TIMER_INTERRUPT_FLAG_MASK);
         timer_tima = timer_modulo_tma;
     }
 }

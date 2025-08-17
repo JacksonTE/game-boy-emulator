@@ -23,10 +23,10 @@
 static void run_emulator_core(
     std::stop_token stop_token,
     GameBoyCore::Emulator &game_boy_emulator,
-    std::atomic<bool> &is_emulation_paused,
-    std::atomic<bool> &is_fast_emulation_enabled,
-    std::atomic<double> &target_fast_emulation_speed,
-    std::atomic<bool> &did_exception_occur,
+    std::atomic<bool> &atomic_is_emulation_paused,
+    std::atomic<bool> &atomic_is_fast_emulation_enabled,
+    std::atomic<double> &atomic_target_fast_emulation_speed,
+    std::atomic<bool> &atomic_did_exception_occur,
     std::exception_ptr &exception_pointer)
 {
     try
@@ -36,25 +36,25 @@ static void run_emulator_core(
         const uint64_t counter_ticks_per_frame_rounded = static_cast<uint64_t>(frame_duration_seconds * counter_ticks_per_second + 0.5);
 
         uint64_t next_frame_counter_tick = SDL_GetPerformanceCounter();
-        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 
         while (!stop_token.stop_requested())
         {
             if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
-                is_emulation_paused.load(std::memory_order_acquire))
+                atomic_is_emulation_paused.load(std::memory_order_acquire))
             {
                 continue;
             }
             game_boy_emulator.step_central_processing_unit_single_instruction();
 
-            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
 
-                double target_emulation_speed = is_fast_emulation_enabled.load(std::memory_order_acquire) 
-                    ? target_fast_emulation_speed.load(std::memory_order_acquire)
+                double target_emulation_speed = atomic_is_fast_emulation_enabled.load(std::memory_order_acquire)
+                    ? atomic_target_fast_emulation_speed.load(std::memory_order_acquire)
                     : 1.0;
                 next_frame_counter_tick += counter_ticks_per_frame_rounded / target_emulation_speed;
                 const uint64_t current_counter_tick = SDL_GetPerformanceCounter();
@@ -72,7 +72,7 @@ static void run_emulator_core(
     catch (...)
     {
         exception_pointer = std::current_exception();
-        did_exception_occur.store(true, std::memory_order_release);
+        atomic_did_exception_occur.store(true, std::memory_order_release);
     }
 }
 
@@ -109,22 +109,22 @@ int main()
         }
 
         GameBoyCore::Emulator game_boy_emulator{};
-        std::atomic<bool> is_emulation_paused{};
+        std::atomic<bool> atomic_is_emulation_paused{};
 
-        std::atomic<bool> is_fast_forward_enabled{};
-        std::atomic<double> target_fast_emulation_speed{1.5};
+        std::atomic<bool> atomic_is_fast_forward_enabled{};
+        std::atomic<double> atomic_target_fast_emulation_speed{1.5};
         int selected_fast_emulation_speed_index = 0;
 
-        std::atomic<bool> did_emulator_core_exception_occur{};
+        std::atomic<bool> atomic_did_emulator_core_exception_occur{};
         std::exception_ptr emulator_core_exception_pointer{};
         std::jthread emulator_thread
         {
             run_emulator_core,
             std::ref(game_boy_emulator),
-            std::ref(is_emulation_paused),
-            std::ref(is_fast_forward_enabled),
-            std::ref(target_fast_emulation_speed),
-            std::ref(did_emulator_core_exception_occur),
+            std::ref(atomic_is_emulation_paused),
+            std::ref(atomic_is_fast_forward_enabled),
+            std::ref(atomic_target_fast_emulation_speed),
+            std::ref(atomic_did_emulator_core_exception_occur),
             std::ref(emulator_core_exception_pointer),
         };
 
@@ -138,7 +138,7 @@ int main()
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
 
         std::string error_message = "";
-        bool pre_rom_loading_error_pause_state = false;
+        bool is_emulation_paused_before_rom_loading = false;
         bool did_rom_loading_error_occur = false;
         bool is_custom_palette_editor_open = false;
         bool stop_emulating = false;
@@ -149,7 +149,7 @@ int main()
 
         while (!stop_emulating)
         {
-            if (did_emulator_core_exception_occur.load(std::memory_order_acquire))
+            if (atomic_did_emulator_core_exception_occur.load(std::memory_order_acquire))
             {
                 std::rethrow_exception(emulator_core_exception_pointer);
             }
@@ -157,18 +157,18 @@ int main()
             handle_sdl_events(
                 stop_emulating,
                 did_rom_loading_error_occur,
-                pre_rom_loading_error_pause_state,
+                is_emulation_paused_before_rom_loading,
                 was_fast_forward_key_previously_pressed,
                 was_pause_key_previously_pressed,
                 was_reset_key_previously_pressed,
-                is_emulation_paused,
-                is_fast_forward_enabled,
+                atomic_is_emulation_paused,
+                atomic_is_fast_forward_enabled,
                 game_boy_emulator,
                 sdl_window.get(),
                 error_message
             );
 
-            currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index();
+            currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
@@ -193,7 +193,7 @@ int main()
 
             render_main_menu_bar(
                 stop_emulating,
-                pre_rom_loading_error_pause_state,
+                is_emulation_paused_before_rom_loading,
                 did_rom_loading_error_occur,
                 is_custom_palette_editor_open,
                 selected_colour_palette_index,
@@ -201,9 +201,9 @@ int main()
                 active_colour_palette,
                 currently_published_frame_buffer_index,
                 abgr_pixel_buffer.get(),
-                is_emulation_paused,
-                is_fast_forward_enabled,
-                target_fast_emulation_speed,
+                atomic_is_emulation_paused,
+                atomic_is_fast_forward_enabled,
+                atomic_target_fast_emulation_speed,
                 sdl_window.get(),
                 sdl_texture.get(),
                 game_boy_emulator,
@@ -220,8 +220,8 @@ int main()
             );
             render_error_message_popup(
                 did_rom_loading_error_occur,
-                pre_rom_loading_error_pause_state,
-                is_emulation_paused,
+                is_emulation_paused_before_rom_loading,
+                atomic_is_emulation_paused,
                 error_message
             );
 

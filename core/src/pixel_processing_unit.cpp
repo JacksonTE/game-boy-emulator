@@ -106,9 +106,9 @@ void PixelProcessingUnit::set_post_boot_state()
     background_palette_bgp = 0xfc;
 }
 
-uint8_t PixelProcessingUnit::get_published_frame_buffer_index() const
+uint8_t PixelProcessingUnit::get_published_frame_buffer_index_thread_safe() const
 {
-    return published_frame_index.load(std::memory_order_acquire);
+    return atomic_published_frame_index.load(std::memory_order_acquire);
 }
 
 std::unique_ptr<uint8_t[]> &PixelProcessingUnit::get_pixel_frame_buffer(uint8_t index)
@@ -748,7 +748,7 @@ uint8_t PixelProcessingUnit::get_object_fetcher_tile_row_byte(uint8_t offset)
 
 void PixelProcessingUnit::publish_new_frame()
 {
-    published_frame_index.store(in_progress_frame_index, std::memory_order_release);
+    atomic_published_frame_index.store(in_progress_frame_index, std::memory_order_release);
     in_progress_frame_index = 1 - in_progress_frame_index;
 }
 
