@@ -23,7 +23,7 @@ void InternalTimer::reset_state()
 void InternalTimer::set_post_boot_state()
 {
     reset_state();
-    system_counter = 0xabc8;
+    system_counter = 0xABC8;
 }
 
 void InternalTimer::step_single_machine_cycle()

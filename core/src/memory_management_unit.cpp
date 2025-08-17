@@ -48,30 +48,30 @@ void MemoryManagementUnit::set_post_boot_state()
 {
     bootrom_status = 0x01;
     joypad_p1_joyp = 0b11001111;
-    write_byte(0xff01, 0x00, false);
-    write_byte(0xff02, 0x7e, false);
+    write_byte(0xFF01, 0x00, false);
+    write_byte(0xFF02, 0x7E, false);
     interrupt_flag_if = 0b11100001;
-    write_byte(0xff10, 0x80, false);
-    write_byte(0xff11, 0xbf, false);
-    write_byte(0xff12, 0xf3, false);
-    write_byte(0xff13, 0xff, false);
-    write_byte(0xff14, 0xbf, false);
-    write_byte(0xff16, 0x3f, false);
-    write_byte(0xff17, 0x00, false);
-    write_byte(0xff18, 0xff, false);
-    write_byte(0xff19, 0xbf, false);
-    write_byte(0xff1a, 0x7f, false);
-    write_byte(0xff1b, 0xff, false);
-    write_byte(0xff1c, 0x9f, false);
-    write_byte(0xff1d, 0xff, false);
-    write_byte(0xff1e, 0xbf, false);
-    write_byte(0xff20, 0xff, false);
-    write_byte(0xff21, 0x00, false);
-    write_byte(0xff22, 0x00, false);
-    write_byte(0xff23, 0xbf, false);
-    write_byte(0xff24, 0x77, false);
-    write_byte(0xff25, 0xf3, false);
-    write_byte(0xff26, 0xf1, false);
+    write_byte(0xFF10, 0x80, false);
+    write_byte(0xFF11, 0xBF, false);
+    write_byte(0xFF12, 0xF3, false);
+    write_byte(0xFF13, 0xFF, false);
+    write_byte(0xFF14, 0xBF, false);
+    write_byte(0xFF16, 0x3F, false);
+    write_byte(0xFF17, 0x00, false);
+    write_byte(0xFF18, 0xFF, false);
+    write_byte(0xFF19, 0xBF, false);
+    write_byte(0xFF1A, 0x7F, false);
+    write_byte(0xFF1B, 0xFF, false);
+    write_byte(0xFF1C, 0x9F, false);
+    write_byte(0xFF1D, 0xFF, false);
+    write_byte(0xFF1E, 0xBf, false);
+    write_byte(0xFF20, 0xFF, false);
+    write_byte(0xFF21, 0x00, false);
+    write_byte(0xFF22, 0x00, false);
+    write_byte(0xFF23, 0xBF, false);
+    write_byte(0xFF24, 0x77, false);
+    write_byte(0xFF25, 0xF3, false);
+    write_byte(0xFF26, 0xF1, false);
     interrupt_enable_ie = 0b00000000;
 
     oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
@@ -190,7 +190,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
     {
         switch (address)
         {
-            case 0xff00:
+            case 0xFf00:
             {
                 const bool is_select_buttons_enabled = !is_bit_set(joypad_p1_joyp, 5);
                 const bool is_select_directional_pad_enabled = !is_bit_set(joypad_p1_joyp, 4);
@@ -201,51 +201,51 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
                                                                      atomic_most_recent_currently_pressed_horizontal_direction.load(std::memory_order_acquire);
                     if (is_select_buttons_enabled)
                     {
-                        return (joypad_p1_joyp & 0xf0) | ((atomic_button_pressed_states.load(std::memory_order_acquire) | most_recent_direction_pad_states) & 0x0f);
+                        return (joypad_p1_joyp & 0xF0) | ((atomic_button_pressed_states.load(std::memory_order_acquire) | most_recent_direction_pad_states) & 0x0F);
                     }
-                    return (joypad_p1_joyp & 0xf0) | (most_recent_direction_pad_states & 0x0f);
+                    return (joypad_p1_joyp & 0xF0) | (most_recent_direction_pad_states & 0x0F);
                 }
                 else if (is_select_buttons_enabled)
                 {
-                    return (joypad_p1_joyp & 0xf0) | (atomic_button_pressed_states.load(std::memory_order_acquire) & 0x0f);
+                    return (joypad_p1_joyp & 0xF0) | (atomic_button_pressed_states.load(std::memory_order_acquire) & 0x0F);
                 }
                 return joypad_p1_joyp;
             }
-            case 0xff04:
+            case 0xFf04:
                 return internal_timer.read_div();
-            case 0xff05:
+            case 0xFf05:
                 return internal_timer.read_tima();
-            case 0xff06:
+            case 0xFf06:
                 return internal_timer.read_tma();
-            case 0xff07:
+            case 0xFf07:
                 return internal_timer.read_tac();
-            case 0xff0f:
+            case 0xFf0f:
                 return interrupt_flag_if | 0b11100000;
-            case 0xff40:
+            case 0xFf40:
                 return pixel_processing_unit.read_lcd_control_lcdc();
-            case 0xff41:
+            case 0xFf41:
                 return pixel_processing_unit.read_lcd_status_stat();
-            case 0xff42:
+            case 0xFf42:
                 return pixel_processing_unit.viewport_y_position_scy;
-            case 0xff43:
+            case 0xFf43:
                 return pixel_processing_unit.viewport_x_position_scx;
-            case 0xff44:
+            case 0xFf44:
                 return pixel_processing_unit.read_lcd_y_coordinate_ly();
-            case 0xff45:
+            case 0xFf45:
                 return pixel_processing_unit.lcd_y_coordinate_compare_lyc;
-            case 0xff46:
+            case 0xFf46:
                 return pixel_processing_unit.object_attribute_memory_direct_memory_access_dma;
-            case 0xff47:
+            case 0xFf47:
                 return pixel_processing_unit.background_palette_bgp;
-            case 0xff48:
+            case 0xFf48:
                 return pixel_processing_unit.object_palette_0_obp0;
-            case 0xff49:
+            case 0xFf49:
                 return pixel_processing_unit.object_palette_1_obp1;
-            case 0xff4a:
+            case 0xFf4a:
                 return pixel_processing_unit.window_y_position_wy;
-            case 0xff4b:
+            case 0xFf4b:
                 return pixel_processing_unit.window_x_position_plus_7_wx;
-            case 0xff50:
+            case 0xFf50:
                 return bootrom_status;
             default:
                 const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;
@@ -297,62 +297,62 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     {
         switch (address)
         {
-            case 0xff00:
+            case 0xFf00:
                 joypad_p1_joyp = value | 0b11001111;
                 return;
-            case 0xff04:
+            case 0xFf04:
                 internal_timer.write_div(value);
                 return;
-            case 0xff05:
+            case 0xFf05:
                 internal_timer.write_tima(value);
                 return;
-            case 0xff06:
+            case 0xFf06:
                 internal_timer.write_tma(value);
                 return;
-            case 0xff07:
+            case 0xFf07:
                 internal_timer.write_tac(value);
                 return;
-            case 0xff0f:
+            case 0xFf0f:
                 interrupt_flag_if = value | 0b11100000;
                 return;
-            case 0xff40:
+            case 0xFf40:
                 pixel_processing_unit.write_lcd_control_lcdc(value);
                 return;
-            case 0xff41:
+            case 0xFf41:
                 pixel_processing_unit.write_lcd_status_stat(value);
                 return;
-            case 0xff42:
+            case 0xFf42:
                 pixel_processing_unit.viewport_y_position_scy = value;
                 return;
-            case 0xff43:
+            case 0xFf43:
                 pixel_processing_unit.viewport_x_position_scx = value;
                 return;
-            case 0xff44:
+            case 0xFf44:
                 std::cout << std::hex << std::setfill('0') << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
                 return;
-            case 0xff45:
+            case 0xFf45:
                 pixel_processing_unit.lcd_y_coordinate_compare_lyc = value;
                 return;
-            case 0xff46:
+            case 0xFf46:
                 pixel_processing_unit.object_attribute_memory_direct_memory_access_dma = value;
                 oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo;
                 return;
-            case 0xff47:
+            case 0xFf47:
                 pixel_processing_unit.background_palette_bgp = value;
                 return;
-            case 0xff48:
+            case 0xFf48:
                 pixel_processing_unit.object_palette_0_obp0 = value;
                 return;
-            case 0xff49:
+            case 0xFf49:
                 pixel_processing_unit.object_palette_1_obp1 = value;
                 return;
-            case 0xff4a:
+            case 0xFf4a:
                 pixel_processing_unit.window_y_position_wy = value;
                 return;
-            case 0xff4b:
+            case 0xFf4b:
                 pixel_processing_unit.window_x_position_plus_7_wx = value;
                 return;
-            case 0xff50:
+            case 0xFf50:
                 bootrom_status = value;
                 return;
             default:
@@ -392,7 +392,7 @@ void MemoryManagementUnit::step_single_machine_cycle()
     }
     else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
     {
-        oam_dma_source_address_base = ((pixel_processing_unit.object_attribute_memory_direct_memory_access_dma >= 0xfe)
+        oam_dma_source_address_base = ((pixel_processing_unit.object_attribute_memory_direct_memory_access_dma >= 0xFe)
             ? pixel_processing_unit.object_attribute_memory_direct_memory_access_dma - 0x20
             : pixel_processing_unit.object_attribute_memory_direct_memory_access_dma) << 8;
 

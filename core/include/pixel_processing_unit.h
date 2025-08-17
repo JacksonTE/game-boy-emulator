@@ -15,10 +15,10 @@ constexpr uint8_t INTERRUPT_FLAG_STAT_MASK = 1 << 1;
 constexpr uint8_t INTERRUPT_FLAG_VERTICAL_BLANK_MASK = 1 << 0;
 
 constexpr uint16_t VIDEO_RAM_SIZE = 0x2000;
-constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 0x00a0;
+constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_SIZE = 0x00A0;
 
 constexpr uint16_t VIDEO_RAM_START = 0x8000;
-constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xfe00;
+constexpr uint16_t OBJECT_ATTRIBUTE_MEMORY_START = 0xFE00;
 
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
@@ -178,8 +178,8 @@ public:
     uint8_t lcd_y_coordinate_compare_lyc{};
     uint8_t object_attribute_memory_direct_memory_access_dma{};
     uint8_t background_palette_bgp{};
-    uint8_t object_palette_0_obp0{0xff};
-    uint8_t object_palette_1_obp1{0xff};
+    uint8_t object_palette_0_obp0{0xFF};
+    uint8_t object_palette_1_obp1{0xFF};
     uint8_t window_y_position_wy{};
     uint8_t window_x_position_plus_7_wx{};
 

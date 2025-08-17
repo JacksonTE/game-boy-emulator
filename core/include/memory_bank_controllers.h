@@ -14,18 +14,18 @@ constexpr uint8_t MBC1_WITH_RAM_AND_BATTERY_BYTE = 0x03;
 constexpr uint8_t MBC2_BYTE = 0x05;
 constexpr uint8_t MBC2_WITH_BATTERY_BYTE = 0x06;
 
-constexpr uint8_t MBC3_WITH_TIMER_AND_BATTERY_BYTE = 0x0f;
+constexpr uint8_t MBC3_WITH_TIMER_AND_BATTERY_BYTE = 0x0F;
 constexpr uint8_t MBC3_WITH_TIMER_AND_RAM_AND_BATTERY_BYTE = 0x10;
 constexpr uint8_t MBC3_BYTE = 0x11;
 constexpr uint8_t MBC3_WITH_RAM_BYTE = 0x12;
 constexpr uint8_t MBC3_WITH_RAM_AND_BATTERY_BYTE = 0x13;
 
 constexpr uint8_t MBC5_BYTE = 0x19;
-constexpr uint8_t MBC5_WITH_RAM_BYTE = 0x1a;
-constexpr uint8_t MBC5_WITH_RAM_AND_BATTERY_BYTE = 0x1b;
-constexpr uint8_t MBC5_WITH_RUMBLE = 0x1c;
-constexpr uint8_t MBC5_WITH_RUMBLE_AND_RAM = 0x1d;
-constexpr uint8_t MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY = 0x1e;
+constexpr uint8_t MBC5_WITH_RAM_BYTE = 0x1A;
+constexpr uint8_t MBC5_WITH_RAM_AND_BATTERY_BYTE = 0x1B;
+constexpr uint8_t MBC5_WITH_RUMBLE = 0x1C;
+constexpr uint8_t MBC5_WITH_RUMBLE_AND_RAM = 0x1D;
+constexpr uint8_t MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY = 0x1E;
 
 constexpr uint16_t ROM_BANK_SIZE = 0x4000;
 constexpr uint8_t ROM_BANK_SIZE_POWER_OF_TWO = 14;

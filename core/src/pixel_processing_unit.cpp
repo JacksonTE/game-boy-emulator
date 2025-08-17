@@ -55,8 +55,8 @@ void PixelProcessingUnit::reset_state()
     lcd_y_coordinate_compare_lyc = 0;
     object_attribute_memory_direct_memory_access_dma = 0;
     background_palette_bgp = 0x00;
-    object_palette_0_obp0 = 0xff;
-    object_palette_1_obp1 = 0xff;
+    object_palette_0_obp0 = 0xFF;
+    object_palette_1_obp1 = 0xFF;
     window_y_position_wy = 0;
     window_x_position_plus_7_wx = 0;
     is_oam_dma_in_progress = false;
@@ -98,12 +98,12 @@ void PixelProcessingUnit::set_post_boot_state()
 
     previous_mode = PixelProcessingUnitMode::VerticalBlank;
     current_mode = PixelProcessingUnitMode::VerticalBlank;
-    current_scanline_dot_number = 0x018c;
+    current_scanline_dot_number = 0x018C;
 
     lcd_control_lcdc = 0x91;
     lcd_status_stat = 0x85;
-    object_attribute_memory_direct_memory_access_dma = 0xff;
-    background_palette_bgp = 0xfc;
+    object_attribute_memory_direct_memory_access_dma = 0xFF;
+    background_palette_bgp = 0xFC;
 }
 
 uint8_t PixelProcessingUnit::get_published_frame_buffer_index_thread_safe() const
@@ -159,7 +159,7 @@ void PixelProcessingUnit::write_lcd_status_stat(uint8_t value)
     {
         stat_value_after_spurious_interrupt = new_stat_value;
         did_spurious_stat_interrupt_occur = true;
-        lcd_status_stat = 0xff; // TODO eventually confirm spurious interrupt timing with Ocean’s Road Rash and Vic Tokai’s Xerd no Densetsu
+        lcd_status_stat = 0xFF; // TODO eventually confirm spurious interrupt timing with Ocean’s Road Rash and Vic Tokai’s Xerd no Densetsu
     }
     else
         lcd_status_stat = new_stat_value;
@@ -178,7 +178,7 @@ uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
         if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
             current_mode == PixelProcessingUnitMode::PixelTransfer && !is_in_first_scanline_after_lcd_enable)
         {
-            return 0xff;
+            return 0xFF;
         }
     }
     const uint16_t local_address = memory_address - VIDEO_RAM_START;
@@ -200,7 +200,7 @@ void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t 
 uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_unrestricted) const
 {
     if (is_oam_dma_in_progress)
-        return 0xff;
+        return 0xFF;
 
     const bool is_lcd_enable_bit_set = is_bit_set(lcd_control_lcdc, 7);
     if (!is_access_unrestricted && is_lcd_enable_bit_set)
@@ -209,7 +209,7 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
             previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
             previous_mode == PixelProcessingUnitMode::PixelTransfer)
         {
-            return 0xff;
+            return 0xFF;
         }
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;

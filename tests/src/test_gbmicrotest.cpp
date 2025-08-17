@@ -206,11 +206,11 @@ TEST_P(GbmicroTest, TestRom)
     {
         game_boy_emulator.step_central_processing_unit_single_instruction();
 
-        const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xff80);
-        const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xff81);
-        const uint8_t test_pass_fail_byte = game_boy_emulator.read_byte_from_memory(0xff82);
+        const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xFf80);
+        const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xFf81);
+        const uint8_t test_pass_fail_byte = game_boy_emulator.read_byte_from_memory(0xFf82);
 
-        if (test_pass_fail_byte == 0xff)
+        if (test_pass_fail_byte == 0xFF)
         {
             FAIL() << "Test failed with result 0x" << std::hex << static_cast<int>(test_result_byte) << ". Expected result was 0x" << static_cast<int>(test_expected_result_byte) << "\n";
         }

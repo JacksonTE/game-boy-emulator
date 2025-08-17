@@ -10,10 +10,10 @@
 namespace GameBoyCore
 {
 
-constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xcb;
+constexpr uint8_t INSTRUCTION_PREFIX_BYTE = 0xCB;
 
 constexpr uint16_t CARTRIDGE_HEADER_START = 0x0134;
-constexpr uint16_t CARTRIDGE_HEADER_END = 0x014c;
+constexpr uint16_t CARTRIDGE_HEADER_END = 0x014C;
 
 enum class InterruptMasterEnableState
 {
@@ -101,24 +101,24 @@ private:
     void unused_opcode() const;
     void rotate_left_circular_a_0x07();
     void load_memory_immediate16_stack_pointer_0x08();
-    void rotate_right_circular_a_0x0f();
+    void rotate_right_circular_a_0x0F();
     void rotate_left_through_carry_a_0x17();
-    void rotate_right_through_carry_a_0x1f();
+    void rotate_right_through_carry_a_0x1F();
     void decimal_adjust_a_0x27();
-    void complement_a_0x2f();
+    void complement_a_0x2F();
     void set_carry_flag_0x37();
-    void complement_carry_flag_0x3f();
+    void complement_carry_flag_0x3F();
     void halt_0x76();
-    void return_0xc9();
-    void return_from_interrupt_0xd9();
-    void add_stack_pointer_signed_immediate8_0xe8();
-    void jump_hl_0xe9();
-    void pop_stack_af_0xf1();
-    void disable_interrupts_0xf3();
-    void push_stack_af_0xf5();
-    void load_hl_stack_pointer_with_signed_offset_0xf8();
-    void load_stack_pointer_hl_0xf9();
-    void enable_interrupts_0xfb();
+    void return_0xC9();
+    void return_from_interrupt_0xD9();
+    void add_stack_pointer_signed_immediate8_0xE8();
+    void jump_hl_0xE9();
+    void pop_stack_af_0xF1();
+    void disable_interrupts_0xF3();
+    void push_stack_af_0xF5();
+    void load_hl_stack_pointer_with_signed_offset_0xF8();
+    void load_stack_pointer_hl_0xF9();
+    void enable_interrupts_0xFB();
 };
 
 } // namespace GameBoyCore

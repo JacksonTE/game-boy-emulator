@@ -13,7 +13,7 @@ namespace GameBoyCore
 
 inline void print_bytes_in_range(std::function<uint8_t(uint16_t, bool)> read_byte, uint16_t start_address, uint16_t end_address)
 {
-    std::cout << std::hex << std::setfill('0');
+    std::cout << std::hex << std::uppercase << std::setfill('0');
     std::cout << "=========== Memory Range 0x" << std::setw(4) << start_address << " - 0x" << std::setw(4) << end_address << " ============\n";
 
     for (uint32_t address = start_address; address <= end_address; address++)

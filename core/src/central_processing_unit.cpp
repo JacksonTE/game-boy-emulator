@@ -44,11 +44,11 @@ void CentralProcessingUnit::set_post_boot_state()
     register_file.B = 0x00;
     register_file.C = 0x13;
     register_file.D = 0x00;
-    register_file.E = 0xd8;
+    register_file.E = 0xD8;
     register_file.H = 0x01;
-    register_file.L = 0x4d;
+    register_file.L = 0x4D;
     register_file.program_counter = 0x100;
-    register_file.stack_pointer = 0xfffe;
+    register_file.stack_pointer = 0xFFFE;
 }
 
 RegisterFile<std::endian::native> CentralProcessingUnit::get_register_file() const
@@ -59,7 +59,7 @@ RegisterFile<std::endian::native> CentralProcessingUnit::get_register_file() con
 void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endian::native> &new_register_values)
 {
     register_file.A = new_register_values.A;
-    register_file.flags = new_register_values.flags & 0xf0; // Lower nibble of flags must always be zeroed
+    register_file.flags = new_register_values.flags & 0xF0; // Lower nibble of flags must always be zeroed
     register_file.BC = new_register_values.BC;
     register_file.DE = new_register_values.DE;
     register_file.HL = new_register_values.HL;
@@ -125,7 +125,7 @@ void CentralProcessingUnit::service_interrupt()
     decrement_and_step_emulator_components(register_file.stack_pointer);
     write_byte_and_step_emulator_components(register_file.stack_pointer--, register_file.program_counter >> 8);
     uint8_t interrupt_flag_mask = memory_management_unit.get_pending_interrupt_mask();
-    write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xff);
+    write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xFF);
 
     memory_management_unit.clear_interrupt_flag_bit(interrupt_flag_mask);
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
@@ -220,23 +220,23 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x09:
             add_hl(register_file.BC);
             break;
-        case 0x0a:
+        case 0x0A:
             load(register_file.A, read_byte_and_step_emulator_components(register_file.BC));
             break;
-        case 0x0b:
+        case 0x0B:
             decrement_and_step_emulator_components(register_file.BC);
             break;
-        case 0x0c:
+        case 0x0C:
             increment(register_file.C);
             break;
-        case 0x0d:
+        case 0x0D:
             decrement(register_file.C);
             break;
-        case 0x0e:
+        case 0x0E:
             load(register_file.C, fetch_immediate8_and_step_emulator_components());
             break;
-        case 0x0f:
-            rotate_right_circular_a_0x0f();
+        case 0x0F:
+            rotate_right_circular_a_0x0F();
             break;
         case 0x10:
             // stop instruction - STOP - unused until Game Boy Color
@@ -268,23 +268,23 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x19:
             add_hl(register_file.DE);
             break;
-        case 0x1a:
+        case 0x1A:
             load(register_file.A, read_byte_and_step_emulator_components(register_file.DE));
             break;
-        case 0x1b:
+        case 0x1B:
             decrement_and_step_emulator_components(register_file.DE);
             break;
-        case 0x1c:
+        case 0x1C:
             increment(register_file.E);
             break;
-        case 0x1d:
+        case 0x1D:
             decrement(register_file.E);
             break;
-        case 0x1e:
+        case 0x1E:
             load(register_file.E, fetch_immediate8_and_step_emulator_components());
             break;
-        case 0x1f:
-            rotate_right_through_carry_a_0x1f();
+        case 0x1F:
+            rotate_right_through_carry_a_0x1F();
             break;
         case 0x20:
             jump_relative_conditional_signed_immediate8(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
@@ -316,23 +316,23 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x29:
             add_hl(register_file.HL);
             break;
-        case 0x2a:
+        case 0x2A:
             load(register_file.A, read_byte_and_step_emulator_components(register_file.HL++));
             break;
-        case 0x2b:
+        case 0x2B:
             decrement_and_step_emulator_components(register_file.HL);
             break;
-        case 0x2c:
+        case 0x2C:
             increment(register_file.L);
             break;
-        case 0x2d:
+        case 0x2D:
             decrement(register_file.L);
             break;
-        case 0x2e:
+        case 0x2E:
             load(register_file.L, fetch_immediate8_and_step_emulator_components());
             break;
-        case 0x2f:
-            complement_a_0x2f();
+        case 0x2F:
+            complement_a_0x2F();
             break;
         case 0x30:
             jump_relative_conditional_signed_immediate8(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
@@ -364,23 +364,23 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x39:
             add_hl(register_file.stack_pointer);
             break;
-        case 0x3a:
+        case 0x3A:
             load(register_file.A, read_byte_and_step_emulator_components(register_file.HL--));
             break;
-        case 0x3b:
+        case 0x3B:
             decrement_and_step_emulator_components(register_file.stack_pointer);
             break;
-        case 0x3c:
+        case 0x3C:
             increment(register_file.A);
             break;
-        case 0x3d:
+        case 0x3D:
             decrement(register_file.A);
             break;
-        case 0x3e:
+        case 0x3E:
             load(register_file.A, fetch_immediate8_and_step_emulator_components());
             break;
-        case 0x3f:
-            complement_carry_flag_0x3f();
+        case 0x3F:
+            complement_carry_flag_0x3F();
             break;
         case 0x40:
         case 0x41:
@@ -391,11 +391,11 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x47:
         case 0x48:
         case 0x49:
-        case 0x4a:
-        case 0x4b:
-        case 0x4c:
-        case 0x4d:
-        case 0x4f:
+        case 0x4A:
+        case 0x4B:
+        case 0x4C:
+        case 0x4D:
+        case 0x4F:
         case 0x50:
         case 0x51:
         case 0x52:
@@ -405,11 +405,11 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x57:
         case 0x58:
         case 0x59:
-        case 0x5a:
-        case 0x5b:
-        case 0x5c:
-        case 0x5d:
-        case 0x5f:
+        case 0x5A:
+        case 0x5B:
+        case 0x5C:
+        case 0x5D:
+        case 0x5F:
         case 0x60:
         case 0x61:
         case 0x62:
@@ -419,27 +419,27 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
         case 0x67:
         case 0x68:
         case 0x69:
-        case 0x6a:
-        case 0x6b:
-        case 0x6c:
-        case 0x6d:
-        case 0x6f:
+        case 0x6A:
+        case 0x6B:
+        case 0x6C:
+        case 0x6D:
+        case 0x6F:
         case 0x78:
         case 0x79:
-        case 0x7a:
-        case 0x7b:
-        case 0x7c:
-        case 0x7d:
-        case 0x7f:
+        case 0x7A:
+        case 0x7B:
+        case 0x7C:
+        case 0x7D:
+        case 0x7F:
             load(get_register_by_index(destination_register_index), get_register_by_index(source_register_index));
             break;
         case 0x46:
         case 0x56:
         case 0x66:
-        case 0x4e:
-        case 0x5e:
-        case 0x6e:
-        case 0x7e:
+        case 0x4E:
+        case 0x5E:
+        case 0x6E:
+        case 0x7E:
             load(get_register_by_index(destination_register_index), read_byte_and_step_emulator_components(register_file.HL));
             break;
         case 0x70:
@@ -468,14 +468,14 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
             break;
         case 0x88:
         case 0x89:
-        case 0x8a:
-        case 0x8b:
-        case 0x8c:
-        case 0x8d:
-        case 0x8f:
+        case 0x8A:
+        case 0x8B:
+        case 0x8C:
+        case 0x8D:
+        case 0x8F:
             add_with_carry_a(get_register_by_index(source_register_index));
             break;
-        case 0x8e:
+        case 0x8E:
             add_with_carry_a(read_byte_and_step_emulator_components(register_file.HL));
             break;
         case 0x90:
@@ -492,218 +492,218 @@ void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
             break;
         case 0x98:
         case 0x99:
-        case 0x9a:
-        case 0x9b:
-        case 0x9c:
-        case 0x9d:
-        case 0x9f:
+        case 0x9A:
+        case 0x9B:
+        case 0x9C:
+        case 0x9D:
+        case 0x9F:
             subtract_with_carry_a(get_register_by_index(source_register_index));
             break;
-        case 0x9e:
+        case 0x9E:
             subtract_with_carry_a(read_byte_and_step_emulator_components(register_file.HL));
             break;
-        case 0xa0:
-        case 0xa1:
-        case 0xa2:
-        case 0xa3:
-        case 0xa4:
-        case 0xa5:
-        case 0xa7:
+        case 0xA0:
+        case 0xA1:
+        case 0xA2:
+        case 0xA3:
+        case 0xA4:
+        case 0xA5:
+        case 0xA7:
             and_a(get_register_by_index(source_register_index));
             break;
-        case 0xa6:
+        case 0xA6:
             and_a(read_byte_and_step_emulator_components(register_file.HL));
             break;
-        case 0xa8:
-        case 0xa9:
-        case 0xaa:
-        case 0xab:
-        case 0xac:
-        case 0xad:
-        case 0xaf:
+        case 0xA8:
+        case 0xA9:
+        case 0xAA:
+        case 0xAB:
+        case 0xAC:
+        case 0xAD:
+        case 0xAF:
             xor_a(get_register_by_index(source_register_index));
             break;
-        case 0xae:
+        case 0xAE:
             xor_a(read_byte_and_step_emulator_components(register_file.HL));
             break;
-        case 0xb0:
-        case 0xb1:
-        case 0xb2:
-        case 0xb3:
-        case 0xb4:
-        case 0xb5:
-        case 0xb7:
+        case 0xB0:
+        case 0xB1:
+        case 0xB2:
+        case 0xB3:
+        case 0xB4:
+        case 0xB5:
+        case 0xB7:
             or_a(get_register_by_index(source_register_index));
             break;
-        case 0xb6:
+        case 0xB6:
             or_a(read_byte_and_step_emulator_components(register_file.HL));
             break;
-        case 0xb8:
-        case 0xb9:
-        case 0xba:
-        case 0xbb:
-        case 0xbc:
-        case 0xbd:
-        case 0xbf:
+        case 0xB8:
+        case 0xB9:
+        case 0xBA:
+        case 0xBB:
+        case 0xBC:
+        case 0xBD:
+        case 0xBF:
             compare_a(get_register_by_index(source_register_index));
             break;
-        case 0xbe:
+        case 0xBE:
             compare_a(read_byte_and_step_emulator_components(register_file.HL));
             break;
-        case 0xc0:
+        case 0xC0:
             return_conditional(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
             break;
-        case 0xc1:
+        case 0xC1:
             pop_stack(register_file.BC);
             break;
-        case 0xc2:
+        case 0xC2:
             jump_conditional_immediate16(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
             break;
-        case 0xc3:
+        case 0xC3:
             jump_conditional_immediate16(true);
             break;
-        case 0xc4:
+        case 0xC4:
             call_conditional_immediate16(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
             break;
-        case 0xc5:
+        case 0xC5:
             push_stack(register_file.BC);
             break;
-        case 0xc6:
+        case 0xC6:
             add_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xc7:
+        case 0xC7:
             restart_at_address(0x00);
             break;
-        case 0xc8:
+        case 0xC8:
             return_conditional(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
             break;
-        case 0xc9:
-            return_0xc9();
+        case 0xC9:
+            return_0xC9();
             break;
-        case 0xca:
+        case 0xCA:
             jump_conditional_immediate16(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
             break;
-        case 0xcc:
+        case 0xCC:
             call_conditional_immediate16(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
             break;
-        case 0xcd:
+        case 0xCD:
             call_conditional_immediate16(true);
             break;
-        case 0xce:
+        case 0xCE:
             add_with_carry_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xcf:
+        case 0xCF:
             restart_at_address(0x08);
             break;
-        case 0xd0:
+        case 0xD0:
             return_conditional(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
             break;
-        case 0xd1:
+        case 0xD1:
             pop_stack(register_file.DE);
             break;
-        case 0xd2:
+        case 0xD2:
             jump_conditional_immediate16(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
             break;
-        case 0xd4:
+        case 0xD4:
             call_conditional_immediate16(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
             break;
-        case 0xd5:
+        case 0xD5:
             push_stack(register_file.DE);
             break;
-        case 0xd6:
+        case 0xD6:
             subtract_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xd7:
+        case 0xD7:
             restart_at_address(0x10);
             break;
-        case 0xd8:
+        case 0xD8:
             return_conditional(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
             break;
-        case 0xd9:
-            return_from_interrupt_0xd9();
+        case 0xD9:
+            return_from_interrupt_0xD9();
             break;
-        case 0xda:
+        case 0xDA:
             jump_conditional_immediate16(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
             break;
-        case 0xdc:
+        case 0xDC:
             call_conditional_immediate16(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
             break;
-        case 0xde:
+        case 0xDE:
             subtract_with_carry_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xdf:
+        case 0xDF:
             restart_at_address(0x18);
             break;
-        case 0xe0:
+        case 0xE0:
             load_memory(INPUT_OUTPUT_REGISTERS_START + fetch_immediate8_and_step_emulator_components(), register_file.A);
             break;
-        case 0xe1:
+        case 0xE1:
             pop_stack(register_file.HL);
             break;
-        case 0xe2:
+        case 0xE2:
             load_memory(INPUT_OUTPUT_REGISTERS_START + register_file.C, register_file.A);
             break;
-        case 0xe5:
+        case 0xE5:
             push_stack(register_file.HL);
             break;
-        case 0xe6:
+        case 0xE6:
             and_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xe7:
+        case 0xE7:
             restart_at_address(0x20);
             break;
-        case 0xe8:
-            add_stack_pointer_signed_immediate8_0xe8();
+        case 0xE8:
+            add_stack_pointer_signed_immediate8_0xE8();
             break;
-        case 0xe9:
-            jump_hl_0xe9();
+        case 0xE9:
+            jump_hl_0xE9();
             break;
-        case 0xea:
+        case 0xEA:
             load_memory(fetch_immediate16_and_step_emulator_components(), register_file.A);
             break;
-        case 0xee:
+        case 0xEE:
             xor_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xef:
+        case 0xEF:
             restart_at_address(0x28);
             break;
-        case 0xf0:
+        case 0xF0:
             load(register_file.A, read_byte_and_step_emulator_components(INPUT_OUTPUT_REGISTERS_START + fetch_immediate8_and_step_emulator_components()));
             break;
-        case 0xf1:
-            pop_stack_af_0xf1();
+        case 0xF1:
+            pop_stack_af_0xF1();
             break;
-        case 0xf2:
+        case 0xF2:
             load(register_file.A, read_byte_and_step_emulator_components(INPUT_OUTPUT_REGISTERS_START + register_file.C));
             break;
-        case 0xf3:
-            disable_interrupts_0xf3();
+        case 0xF3:
+            disable_interrupts_0xF3();
             break;
-        case 0xf5:
+        case 0xF5:
             push_stack(register_file.AF);
             break;
-        case 0xf6:
+        case 0xF6:
             or_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xf7:
+        case 0xF7:
             restart_at_address(0x30);
             break;
-        case 0xf8:
-            load_hl_stack_pointer_with_signed_offset_0xf8();
+        case 0xF8:
+            load_hl_stack_pointer_with_signed_offset_0xF8();
             break;
-        case 0xf9:
-            load_stack_pointer_hl_0xf9();
+        case 0xF9:
+            load_stack_pointer_hl_0xF9();
             break;
-        case 0xfa:
+        case 0xFA:
             load(register_file.A, read_byte_and_step_emulator_components(fetch_immediate16_and_step_emulator_components()));
             break;
-        case 0xfb:
-            enable_interrupts_0xfb();
+        case 0xFB:
+            enable_interrupts_0xFB();
             break;
-        case 0xfe:
+        case 0xFE:
             compare_a(fetch_immediate8_and_step_emulator_components());
             break;
-        case 0xff:
+        case 0xFF:
             restart_at_address(0x38);
             break;
         default:
@@ -733,14 +733,14 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
             break;
         case 0x08:
         case 0x09:
-        case 0x0a:
-        case 0x0b:
-        case 0x0c:
-        case 0x0d:
-        case 0x0f:
+        case 0x0A:
+        case 0x0B:
+        case 0x0C:
+        case 0x0D:
+        case 0x0F:
             rotate_right_circular(get_register_by_index(destination_register_index));
             break;
-        case 0x0e:
+        case 0x0E:
             operate_on_register_hl_and_write(&CentralProcessingUnit::rotate_right_circular);
             break;
         case 0x10:
@@ -757,14 +757,14 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
             break;
         case 0x18:
         case 0x19:
-        case 0x1a:
-        case 0x1b:
-        case 0x1c:
-        case 0x1d:
-        case 0x1f:
+        case 0x1A:
+        case 0x1B:
+        case 0x1C:
+        case 0x1D:
+        case 0x1F:
             rotate_right_through_carry(get_register_by_index(destination_register_index));
             break;
-        case 0x1e:
+        case 0x1E:
             operate_on_register_hl_and_write(&CentralProcessingUnit::rotate_right_through_carry);
             break;
         case 0x20:
@@ -781,14 +781,14 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
             break;
         case 0x28:
         case 0x29:
-        case 0x2a:
-        case 0x2b:
-        case 0x2c:
-        case 0x2d:
-        case 0x2f:
+        case 0x2A:
+        case 0x2B:
+        case 0x2C:
+        case 0x2D:
+        case 0x2F:
             shift_right_arithmetic(get_register_by_index(destination_register_index));
             break;
-        case 0x2e:
+        case 0x2E:
             operate_on_register_hl_and_write(&CentralProcessingUnit::shift_right_arithmetic);
             break;
         case 0x30:
@@ -805,14 +805,14 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
             break;
         case 0x38:
         case 0x39:
-        case 0x3a:
-        case 0x3b:
-        case 0x3c:
-        case 0x3d:
-        case 0x3f:
+        case 0x3A:
+        case 0x3B:
+        case 0x3C:
+        case 0x3D:
+        case 0x3F:
             shift_right_logical(get_register_by_index(destination_register_index));
             break;
-        case 0x3e:
+        case 0x3E:
             operate_on_register_hl_and_write(&CentralProcessingUnit::shift_right_logical);
             break;        
         case 0x40:
@@ -824,11 +824,11 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0x47:
         case 0x48:
         case 0x49:
-        case 0x4a:
-        case 0x4b:
-        case 0x4c:
-        case 0x4d:
-        case 0x4f:
+        case 0x4A:
+        case 0x4B:
+        case 0x4C:
+        case 0x4D:
+        case 0x4F:
         case 0x50:
         case 0x51:
         case 0x52:
@@ -838,11 +838,11 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0x57:
         case 0x58:
         case 0x59:
-        case 0x5a:
-        case 0x5b:
-        case 0x5c:
-        case 0x5d:
-        case 0x5f:
+        case 0x5A:
+        case 0x5B:
+        case 0x5C:
+        case 0x5D:
+        case 0x5F:
         case 0x60:
         case 0x61:
         case 0x62:
@@ -852,11 +852,11 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0x67:
         case 0x68:
         case 0x69:
-        case 0x6a:
-        case 0x6b:
-        case 0x6c:
-        case 0x6d:
-        case 0x6f:
+        case 0x6A:
+        case 0x6B:
+        case 0x6C:
+        case 0x6D:
+        case 0x6F:
         case 0x70:
         case 0x71:
         case 0x72:
@@ -866,21 +866,21 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0x77:
         case 0x78:
         case 0x79:
-        case 0x7a:
-        case 0x7b:
-        case 0x7c:
-        case 0x7d:
-        case 0x7f:
+        case 0x7A:
+        case 0x7B:
+        case 0x7C:
+        case 0x7D:
+        case 0x7F:
             test_bit(bit_position, get_register_by_index(destination_register_index));
             break;
         case 0x46:
-        case 0x4e:
+        case 0x4E:
         case 0x56:
-        case 0x5e:
+        case 0x5E:
         case 0x66:
-        case 0x6e:
+        case 0x6E:
         case 0x76:
-        case 0x7e:
+        case 0x7E:
             operate_on_register_hl(&CentralProcessingUnit::test_bit, bit_position);
             break;
         case 0x80:
@@ -892,11 +892,11 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0x87:
         case 0x88:
         case 0x89:
-        case 0x8a:
-        case 0x8b:
-        case 0x8c:
-        case 0x8d:
-        case 0x8f:
+        case 0x8A:
+        case 0x8B:
+        case 0x8C:
+        case 0x8D:
+        case 0x8F:
         case 0x90:
         case 0x91:
         case 0x92:
@@ -906,117 +906,117 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
         case 0x97:
         case 0x98:
         case 0x99:
-        case 0x9a:
-        case 0x9b:
-        case 0x9c:
-        case 0x9d:
-        case 0x9f:
-        case 0xa0:
-        case 0xa1:
-        case 0xa2:
-        case 0xa3:
-        case 0xa4:
-        case 0xa5:
-        case 0xa7:
-        case 0xa8:
-        case 0xa9:
-        case 0xaa:
-        case 0xab:
-        case 0xac:
-        case 0xad:
-        case 0xaf:
-        case 0xb0:
-        case 0xb1:
-        case 0xb2:
-        case 0xb3:
-        case 0xb4:
-        case 0xb5:
-        case 0xb7:
-        case 0xb8:
-        case 0xb9:
-        case 0xba:
-        case 0xbb:
-        case 0xbc:
-        case 0xbd:
-        case 0xbf:
+        case 0x9A:
+        case 0x9B:
+        case 0x9C:
+        case 0x9D:
+        case 0x9F:
+        case 0xA0:
+        case 0xA1:
+        case 0xA2:
+        case 0xA3:
+        case 0xA4:
+        case 0xA5:
+        case 0xA7:
+        case 0xA8:
+        case 0xA9:
+        case 0xAA:
+        case 0xAB:
+        case 0xAC:
+        case 0xAD:
+        case 0xAF:
+        case 0xB0:
+        case 0xB1:
+        case 0xB2:
+        case 0xB3:
+        case 0xB4:
+        case 0xB5:
+        case 0xB7:
+        case 0xB8:
+        case 0xB9:
+        case 0xBA:
+        case 0xBB:
+        case 0xBC:
+        case 0xBD:
+        case 0xBF:
             reset_bit(bit_position, get_register_by_index(destination_register_index));
             break;
         case 0x86:
-        case 0x8e:
+        case 0x8E:
         case 0x96:
-        case 0x9e:
-        case 0xa6:
-        case 0xae:
-        case 0xb6:
-        case 0xbe:
+        case 0x9E:
+        case 0xA6:
+        case 0xAE:
+        case 0xB6:
+        case 0xBE:
             operate_on_register_hl_and_write(&CentralProcessingUnit::reset_bit, bit_position);
             break;
-        case 0xc0:
-        case 0xc1:
-        case 0xc2:
-        case 0xc3:
-        case 0xc4:
-        case 0xc5:
-        case 0xc7:
-        case 0xc8:
-        case 0xc9:
-        case 0xca:
-        case 0xcb:
-        case 0xcc:
-        case 0xcd:
-        case 0xcf:
-        case 0xd0:
-        case 0xd1:
-        case 0xd2:
-        case 0xd3:
-        case 0xd4:
-        case 0xd5:
-        case 0xd7:
-        case 0xd8:
-        case 0xd9:
-        case 0xda:
-        case 0xdb:
-        case 0xdc:
-        case 0xdd:
-        case 0xdf:
-        case 0xe0:
-        case 0xe1:
-        case 0xe2:
-        case 0xe3:
-        case 0xe4:
-        case 0xe5:
-        case 0xe7:
-        case 0xe8:
-        case 0xe9:
-        case 0xea:
-        case 0xeb:
-        case 0xec:
-        case 0xed:
-        case 0xef:
-        case 0xf0:
-        case 0xf1:
-        case 0xf2:
-        case 0xf3:
-        case 0xf4:
-        case 0xf5:
-        case 0xf7:
-        case 0xf8:
-        case 0xf9:
-        case 0xfa:
-        case 0xfb:
-        case 0xfc:
-        case 0xfd:
-        case 0xff:
+        case 0xC0:
+        case 0xC1:
+        case 0xC2:
+        case 0xC3:
+        case 0xC4:
+        case 0xC5:
+        case 0xC7:
+        case 0xC8:
+        case 0xC9:
+        case 0xCA:
+        case 0xCB:
+        case 0xCC:
+        case 0xCD:
+        case 0xCF:
+        case 0xD0:
+        case 0xD1:
+        case 0xD2:
+        case 0xD3:
+        case 0xD4:
+        case 0xD5:
+        case 0xD7:
+        case 0xD8:
+        case 0xD9:
+        case 0xDA:
+        case 0xDB:
+        case 0xDC:
+        case 0xDD:
+        case 0xDF:
+        case 0xE0:
+        case 0xE1:
+        case 0xE2:
+        case 0xE3:
+        case 0xE4:
+        case 0xE5:
+        case 0xE7:
+        case 0xE8:
+        case 0xE9:
+        case 0xEA:
+        case 0xEB:
+        case 0xEC:
+        case 0xED:
+        case 0xEF:
+        case 0xF0:
+        case 0xF1:
+        case 0xF2:
+        case 0xF3:
+        case 0xF4:
+        case 0xF5:
+        case 0xF7:
+        case 0xF8:
+        case 0xF9:
+        case 0xFA:
+        case 0xFB:
+        case 0xFC:
+        case 0xFD:
+        case 0xFF:
             set_bit(bit_position, get_register_by_index(destination_register_index));
             break;
-        case 0xc6:
-        case 0xce:
-        case 0xd6:
-        case 0xde:
-        case 0xe6:
-        case 0xee:
-        case 0xf6:
-        case 0xfe:
+        case 0xC6:
+        case 0xCE:
+        case 0xD6:
+        case 0xDE:
+        case 0xE6:
+        case 0xEE:
+        case 0xF6:
+        case 0xFE:
             operate_on_register_hl_and_write(&CentralProcessingUnit::set_bit, bit_position);
             break;
     }
@@ -1039,7 +1039,7 @@ void CentralProcessingUnit::load_memory(uint16_t address, uint8_t value)
 
 void CentralProcessingUnit::increment(uint8_t &register8)
 {
-    const bool does_half_carry_occur = (register8 & 0x0f) == 0x0f;
+    const bool does_half_carry_occur = (register8 & 0x0F) == 0x0F;
     register8++;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
@@ -1054,7 +1054,7 @@ void CentralProcessingUnit::increment_and_step_emulator_components(uint16_t &reg
 
 void CentralProcessingUnit::decrement(uint8_t &register8)
 {
-    const bool does_half_carry_occur = (register8 & 0x0f) == 0x00;
+    const bool does_half_carry_occur = (register8 & 0x0F) == 0x00;
     register8--;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
@@ -1070,8 +1070,8 @@ void CentralProcessingUnit::decrement_and_step_emulator_components(uint16_t &reg
 void CentralProcessingUnit::add_hl(uint16_t value)
 {
     emulator_step_single_machine_cycle_callback();
-    const bool does_half_carry_occur = (register_file.HL & 0x0fff) + (value & 0x0fff) > 0x0fff;
-    const bool does_carry_occur = static_cast<uint32_t>(register_file.HL) + value > 0xffff;
+    const bool does_half_carry_occur = (register_file.HL & 0x0FFF) + (value & 0x0FFF) > 0x0FFF;
+    const bool does_carry_occur = static_cast<uint32_t>(register_file.HL) + value > 0xFFFF;
     register_file.HL += value;
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
     update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
@@ -1080,8 +1080,8 @@ void CentralProcessingUnit::add_hl(uint16_t value)
 
 void CentralProcessingUnit::add_a(uint8_t value)
 {
-    const bool does_half_carry_occur = (register_file.A & 0x0f) + (value & 0x0f) > 0x0f;
-    const bool does_carry_occur = static_cast<uint16_t>(register_file.A) + value > 0xff;
+    const bool does_half_carry_occur = (register_file.A & 0x0F) + (value & 0x0F) > 0x0F;
+    const bool does_carry_occur = static_cast<uint16_t>(register_file.A) + value > 0xFF;
     register_file.A += value;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
@@ -1092,8 +1092,8 @@ void CentralProcessingUnit::add_a(uint8_t value)
 void CentralProcessingUnit::add_with_carry_a(uint8_t value)
 {
     const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
-    const bool does_half_carry_occur = (register_file.A & 0x0f) + (value & 0x0f) + carry_in > 0x0f;
-    const bool does_carry_occur = static_cast<uint16_t>(register_file.A) + value + carry_in > 0xff;
+    const bool does_half_carry_occur = (register_file.A & 0x0F) + (value & 0x0F) + carry_in > 0x0F;
+    const bool does_carry_occur = static_cast<uint16_t>(register_file.A) + value + carry_in > 0xFF;
     register_file.A += value + carry_in;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
@@ -1103,7 +1103,7 @@ void CentralProcessingUnit::add_with_carry_a(uint8_t value)
 
 void CentralProcessingUnit::subtract_a(uint8_t value)
 {
-    const bool does_half_carry_occur = (register_file.A & 0x0f) < (value & 0x0f);
+    const bool does_half_carry_occur = (register_file.A & 0x0F) < (value & 0x0F);
     const bool does_carry_occur = register_file.A < value;
     register_file.A -= value;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
@@ -1115,7 +1115,7 @@ void CentralProcessingUnit::subtract_a(uint8_t value)
 void CentralProcessingUnit::subtract_with_carry_a(uint8_t value)
 {
     const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
-    const bool does_half_carry_occur = (register_file.A & 0x0f) < (value & 0x0f) + carry_in;
+    const bool does_half_carry_occur = (register_file.A & 0x0F) < (value & 0x0F) + carry_in;
     const bool does_carry_occur = register_file.A < value + carry_in;
     register_file.A -= value + carry_in;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
@@ -1153,7 +1153,7 @@ void CentralProcessingUnit::or_a(uint8_t value)
 
 void CentralProcessingUnit::compare_a(uint8_t value)
 {
-    const bool does_half_carry_occur = (register_file.A & 0x0f) < (value & 0x0f);
+    const bool does_half_carry_occur = (register_file.A & 0x0F) < (value & 0x0F);
     const bool does_carry_occur = register_file.A < value;
     update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == value);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
@@ -1191,7 +1191,7 @@ void CentralProcessingUnit::push_stack(uint16_t value)
 {
     decrement_and_step_emulator_components(register_file.stack_pointer);
     write_byte_and_step_emulator_components(register_file.stack_pointer--, value >> 8);
-    write_byte_and_step_emulator_components(register_file.stack_pointer, value & 0xff);
+    write_byte_and_step_emulator_components(register_file.stack_pointer, value & 0xFF);
 }
 
 void CentralProcessingUnit::call_conditional_immediate16(bool is_condition_met)
@@ -1205,7 +1205,7 @@ void CentralProcessingUnit::return_conditional(bool is_condition_met)
 {
     emulator_step_single_machine_cycle_callback();
     if (is_condition_met)
-        return_0xc9();
+        return_0xC9();
 }
 
 void CentralProcessingUnit::restart_at_address(uint16_t address)
@@ -1279,7 +1279,7 @@ void CentralProcessingUnit::shift_right_arithmetic(uint8_t &register8)
 
 void CentralProcessingUnit::swap_nibbles(uint8_t &register8)
 {
-    register8 = ((register8 & 0x0f) << 4) | ((register8 & 0xf0) >> 4);
+    register8 = ((register8 & 0x0F) << 4) | ((register8 & 0xF0) >> 4);
     update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
     update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
@@ -1356,13 +1356,13 @@ void CentralProcessingUnit::rotate_left_circular_a_0x07()
 void CentralProcessingUnit::load_memory_immediate16_stack_pointer_0x08()
 {
     uint16_t immediate16 = fetch_immediate16_and_step_emulator_components();
-    const uint8_t stack_pointer_low_byte = static_cast<uint8_t>(register_file.stack_pointer & 0xff);
+    const uint8_t stack_pointer_low_byte = static_cast<uint8_t>(register_file.stack_pointer & 0xFF);
     const uint8_t stack_pointer_high_byte = static_cast<uint8_t>(register_file.stack_pointer >> 8);
     write_byte_and_step_emulator_components(immediate16, stack_pointer_low_byte);
     write_byte_and_step_emulator_components(immediate16 + 1, stack_pointer_high_byte);
 }
 
-void CentralProcessingUnit::rotate_right_circular_a_0x0f()
+void CentralProcessingUnit::rotate_right_circular_a_0x0F()
 {
     rotate_right_circular(register_file.A);
     update_flag(register_file.flags, ZERO_FLAG_MASK, false);
@@ -1374,7 +1374,7 @@ void CentralProcessingUnit::rotate_left_through_carry_a_0x17()
     update_flag(register_file.flags, ZERO_FLAG_MASK, false);
 }
 
-void CentralProcessingUnit::rotate_right_through_carry_a_0x1f()
+void CentralProcessingUnit::rotate_right_through_carry_a_0x1F()
 {
     rotate_right_through_carry(register_file.A);
     update_flag(register_file.flags, ZERO_FLAG_MASK, false);
@@ -1386,7 +1386,7 @@ void CentralProcessingUnit::decimal_adjust_a_0x27()
     bool does_carry_occur = false;
     uint8_t adjustment = 0;
     // Previous operation was between two binary coded decimals (BCDs) and this corrects register A back to BCD format
-    if (is_flag_set(register_file.flags, HALF_CARRY_FLAG_MASK) || (was_addition_most_recent && (register_file.A & 0x0f) > 0x09))
+    if (is_flag_set(register_file.flags, HALF_CARRY_FLAG_MASK) || (was_addition_most_recent && (register_file.A & 0x0F) > 0x09))
     {
         adjustment |= 0x06;
     }
@@ -1403,7 +1403,7 @@ void CentralProcessingUnit::decimal_adjust_a_0x27()
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::complement_a_0x2f()
+void CentralProcessingUnit::complement_a_0x2F()
 {
     register_file.A = ~register_file.A;
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
@@ -1417,7 +1417,7 @@ void CentralProcessingUnit::set_carry_flag_0x37()
     update_flag(register_file.flags, CARRY_FLAG_MASK, true);
 }
 
-void CentralProcessingUnit::complement_carry_flag_0x3f()
+void CentralProcessingUnit::complement_carry_flag_0x3F()
 {
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
     update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
@@ -1429,7 +1429,7 @@ void CentralProcessingUnit::halt_0x76()
     is_halted = true;
 }
 
-void CentralProcessingUnit::return_0xc9()
+void CentralProcessingUnit::return_0xC9()
 {
     uint16_t stack_top = 0;
     pop_stack(stack_top);
@@ -1437,20 +1437,20 @@ void CentralProcessingUnit::return_0xc9()
     register_file.program_counter = stack_top;
 }
 
-void CentralProcessingUnit::return_from_interrupt_0xd9()
+void CentralProcessingUnit::return_from_interrupt_0xD9()
 {
-    return_0xc9();
+    return_0xC9();
     interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
 }
 
-void CentralProcessingUnit::add_stack_pointer_signed_immediate8_0xe8()
+void CentralProcessingUnit::add_stack_pointer_signed_immediate8_0xE8()
 {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_step_emulator_components();
     emulator_step_single_machine_cycle_callback();
     emulator_step_single_machine_cycle_callback();
-    const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
-    const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
+    const bool does_half_carry_occur = (register_file.stack_pointer & 0x0F) + (unsigned_offset & 0x0F) > 0x0F;
+    const bool does_carry_occur = (register_file.stack_pointer & 0xFF) + (unsigned_offset & 0xFF) > 0xFF;
     register_file.stack_pointer += static_cast<int8_t>(unsigned_offset);
     update_flag(register_file.flags, ZERO_FLAG_MASK, false);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
@@ -1458,29 +1458,29 @@ void CentralProcessingUnit::add_stack_pointer_signed_immediate8_0xe8()
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
  }
 
-void CentralProcessingUnit::jump_hl_0xe9()
+void CentralProcessingUnit::jump_hl_0xE9()
 {
     register_file.program_counter = register_file.HL;
 }
 
-void CentralProcessingUnit::pop_stack_af_0xf1()
+void CentralProcessingUnit::pop_stack_af_0xF1()
 {
     pop_stack(register_file.AF);
-    register_file.flags &= 0xf0; // Lower nibble of flags must always be zeroed
+    register_file.flags &= 0xF0; // Lower nibble of flags must always be zeroed
 }
 
-void CentralProcessingUnit::disable_interrupts_0xf3()
+void CentralProcessingUnit::disable_interrupts_0xF3()
 {
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
 }
 
-void CentralProcessingUnit::load_hl_stack_pointer_with_signed_offset_0xf8()
+void CentralProcessingUnit::load_hl_stack_pointer_with_signed_offset_0xF8()
 {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_step_emulator_components();
     emulator_step_single_machine_cycle_callback();
-    const bool does_half_carry_occur = (register_file.stack_pointer & 0x0f) + (unsigned_offset & 0x0f) > 0x0f;
-    const bool does_carry_occur = (register_file.stack_pointer & 0xff) + (unsigned_offset & 0xff) > 0xff;
+    const bool does_half_carry_occur = (register_file.stack_pointer & 0x0F) + (unsigned_offset & 0x0F) > 0x0F;
+    const bool does_carry_occur = (register_file.stack_pointer & 0xFF) + (unsigned_offset & 0xFF) > 0xFF;
     register_file.HL = register_file.stack_pointer + static_cast<int8_t>(unsigned_offset);
     update_flag(register_file.flags, ZERO_FLAG_MASK, false);
     update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
@@ -1488,13 +1488,13 @@ void CentralProcessingUnit::load_hl_stack_pointer_with_signed_offset_0xf8()
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::load_stack_pointer_hl_0xf9()
+void CentralProcessingUnit::load_stack_pointer_hl_0xF9()
 {
     emulator_step_single_machine_cycle_callback();
     register_file.stack_pointer = register_file.HL;
 }
 
-void CentralProcessingUnit::enable_interrupts_0xfb()
+void CentralProcessingUnit::enable_interrupts_0xFB()
 {
     if (interrupt_master_enable_ime == InterruptMasterEnableState::Disabled)
         interrupt_master_enable_ime = InterruptMasterEnableState::WillEnable;

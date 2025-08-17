@@ -31,12 +31,12 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
 
     static constexpr uint8_t expected_logo[LOGO_SIZE] =
     {
-        0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b,
-        0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
-        0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e,
-        0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
-        0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc,
-        0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e
+        0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
+        0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+        0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+        0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+        0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+        0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
     };
     std::array<uint8_t, LOGO_SIZE> logo_bytes{};
     file.seekg(LOGO_START_POSITION, std::ios::beg);
@@ -47,11 +47,11 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
         return set_error_message_and_fail(std::string("Logo in provided ROM does not match the expected pattern."), error_message);
     }
 
-    uint8_t color_game_boy_required_flag = 0xc0;
+    uint8_t color_game_boy_required_flag = 0xC0;
     file.seekg(0x143, std::ios::beg);
     file.read(reinterpret_cast<char *>(&color_game_boy_required_flag), 1);
 
-    if (color_game_boy_required_flag == 0xc0)
+    if (color_game_boy_required_flag == 0xC0)
     {
         return set_error_message_and_fail(std::string("Provided game ROM requires Game Boy Color functionality to run."), error_message);
     }
@@ -187,7 +187,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, st
                 return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."), error_message);
             }
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
-            ram.resize(MBC2::BUILT_IN_RAM_SIZE, 0xf0);
+            ram.resize(MBC2::BUILT_IN_RAM_SIZE, 0xF0);
             was_file_load_successful = static_cast<bool>(file.read(reinterpret_cast<char *>(rom.data()), file_length_in_bytes));
             memory_bank_controller = std::make_unique<MBC2>(rom, ram);
             break;

@@ -16,21 +16,21 @@ constexpr uint16_t BOOTROM_SIZE = 0x100;
 
 constexpr uint16_t EXTERNAL_RAM_SIZE = 0x2000;
 constexpr uint16_t WORK_RAM_SIZE = 0x2000;
-constexpr uint16_t ECHO_RAM_SIZE = 0x1e00;
+constexpr uint16_t ECHO_RAM_SIZE = 0x1E00;
 constexpr uint16_t UNUSABLE_MEMORY_SIZE = 0x0060;
 constexpr uint16_t INPUT_OUTPUT_REGISTERS_SIZE = 0x0080;
-constexpr uint16_t HIGH_RAM_SIZE = 0x007f;
+constexpr uint16_t HIGH_RAM_SIZE = 0x007F;
 
 constexpr uint16_t ROM_BANK_X0_START = 0x0000;
 constexpr uint16_t ROM_BANK_0X_START = 0x4000;
-constexpr uint16_t EXTERNAL_RAM_START = 0xa000;
-constexpr uint16_t WORK_RAM_START = 0xc000;
-constexpr uint16_t ECHO_RAM_START = 0xe000;
-constexpr uint16_t UNUSABLE_MEMORY_START = 0xfea0;
-constexpr uint16_t INPUT_OUTPUT_REGISTERS_START = 0xff00;
-constexpr uint16_t HIGH_RAM_START = 0xff80;
+constexpr uint16_t EXTERNAL_RAM_START = 0xA000;
+constexpr uint16_t WORK_RAM_START = 0xC000;
+constexpr uint16_t ECHO_RAM_START = 0xE000;
+constexpr uint16_t UNUSABLE_MEMORY_START = 0xFEA0;
+constexpr uint16_t INPUT_OUTPUT_REGISTERS_START = 0xFF00;
+constexpr uint16_t HIGH_RAM_START = 0xFF80;
 
-constexpr uint8_t OAM_DMA_MACHINE_CYCLE_DURATION = 0xa0;
+constexpr uint8_t OAM_DMA_MACHINE_CYCLE_DURATION = 0xA0;
 
 constexpr uint8_t NUMBER_OF_INTERRUPT_TYPES = 5;
 constexpr uint8_t JOYPAD_INTERRUPT_FLAG_MASK = 1 << 4;
