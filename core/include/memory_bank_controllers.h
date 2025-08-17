@@ -120,10 +120,8 @@ private:
         uint8_t minutes_counter{};
         uint8_t hours_counter{};
         uint16_t days_counter{};
-
     } real_time_clock;
 };
-
 
 class MBC5 : public MemoryBankControllerBase
 {

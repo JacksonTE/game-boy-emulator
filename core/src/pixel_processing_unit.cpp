@@ -393,7 +393,10 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
               (next_object_pixel.is_priority_bit_set && next_background_pixel.colour_index != 0) ||
               next_object_pixel.colour_index == 0)))
         {
-            const uint8_t palette_colour_position = next_background_pixel.colour_index << 1;
+            const uint8_t colour_index = are_background_and_window_enabled
+                ? next_background_pixel.colour_index
+                : 0b00;
+            const uint8_t palette_colour_position = colour_index << 1;
             pixel_with_palette_applied = (background_palette_bgp & (0b11 << palette_colour_position)) >> palette_colour_position;
         }
         else

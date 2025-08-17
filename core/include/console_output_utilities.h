@@ -26,17 +26,22 @@ inline void print_bytes_in_range(std::function<uint8_t(uint16_t, bool)> read_byt
             std::cout << std::setw(4) << line_offset << ": ";
 
             for (uint16_t i = 0; i < remainder; i++)
+            {
                 std::cout << "   ";
+            }
         }
         std::cout << std::setw(2) << static_cast<int>(read_byte(address, false)) << " ";
 
         if ((address + 1) % 0x10 == 0)
+        {
             std::cout << "\n";
+        }
     }
 
     if ((end_address + 1) % 0x10 != 0)
+    {
         std::cout << "\n";
-
+    }
     std::cout << "=====================================================\n";
 }
 
