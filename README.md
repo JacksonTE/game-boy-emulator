@@ -16,10 +16,10 @@ A cross-platform, cycle accurate emulator of the Nintendo Game Boy (DMG) written
 - Three preset colour palettes and a custom colour palette with selectable colours.
 
 ## Planned Features
-- Implement the Audio Processing Unit (APU) to recreate sound from Game Boy ROMs.
+- Implement the Audio Processing Unit to recreate sound from Game Boy ROMs.
 - Implement save state exporting and cartridge ram exporting.
 - Port to browser with Emscripten.
-- Add support for Game Boy Color (CGB) games. 
+- Add support for Game Boy Color games. 
 
 ## Compilation
 **Windows**
