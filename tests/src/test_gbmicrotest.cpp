@@ -206,9 +206,9 @@ TEST_P(GbmicroTest, TestRom)
     {
         game_boy_emulator.step_central_processing_unit_single_instruction();
 
-        const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xFf80);
-        const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xFf81);
-        const uint8_t test_pass_fail_byte = game_boy_emulator.read_byte_from_memory(0xFf82);
+        const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xFF80);
+        const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xFF81);
+        const uint8_t test_pass_fail_byte = game_boy_emulator.read_byte_from_memory(0xFF82);
 
         if (test_pass_fail_byte == 0xFF)
         {

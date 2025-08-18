@@ -283,7 +283,7 @@ void MBC3::write_byte(uint16_t address, uint8_t value)
                     real_time_clock.hours_counter = value % 24;
                     break;
                 case 0x0B:
-                    real_time_clock.days_counter = (real_time_clock.days_counter & 0xFf00) | value;
+                    real_time_clock.days_counter = (real_time_clock.days_counter & 0xFF00) | value;
                     break;
                 case 0x0C:
                     set_bit(real_time_clock.days_counter, 8, is_bit_set(value, 0));
@@ -340,7 +340,7 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
     else if (address < 0x3000)
     {
         const uint8_t bits_0_to_7_of_rom_bank_number = value;
-        selected_rom_bank_number = ((selected_rom_bank_number & 0xFf00) | bits_0_to_7_of_rom_bank_number) & (number_of_rom_banks - 1);
+        selected_rom_bank_number = ((selected_rom_bank_number & 0xFF00) | bits_0_to_7_of_rom_bank_number) & (number_of_rom_banks - 1);
     }
     else if (address < 0x4000)
     {
