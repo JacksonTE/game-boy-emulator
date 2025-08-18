@@ -3,11 +3,10 @@
 A cross-platform, cycle accurate emulator of the Nintendo Game Boy (DMG) written in C++. Game ROMs are not provided with the project but can be found easily online.
 
 ## Gameplay
-| ![Image](https://github.com/user-attachments/assets/b55f6f5c-91e9-4e4b-9c8f-3b80293b4ecd) | ![Image](https://github.com/user-attachments/assets/bde64b63-2a41-4dfc-9a43-236feb244979) | ![Image](https://github.com/user-attachments/assets/0300acab-d50c-4fe6-9c85-31351e4e9793) | 
+| ![Tetris Game Boy Gameplay](https://github.com/user-attachments/assets/23dae5d8-91a8-4843-bf50-9f1a194e72ac) | ![Kirby Gameplay](https://github.com/user-attachments/assets/6bd456a0-53ad-4fef-9dcf-ecd0b2504eca) | ![Super Mario Land Gameplay](https://github.com/user-attachments/assets/86acf98d-a079-49a3-92b6-7070b0591d3f) |
 |---------------------------------|---------------------------------|---------------------------------|
 
-## Screenshots
-| <img width="399" alt="Image" src="https://github.com/user-attachments/assets/9dbadadd-039c-4363-a377-5190fed293b7" /> | <img width="398" alt="Image" src="https://github.com/user-attachments/assets/57bcda3e-c0d3-4004-b749-548d11c65bae" /> | <img width="395" alt="Image" src="https://github.com/user-attachments/assets/77706150-6746-4ac2-b9af-740071f5e7ee" /> | 
+| ![Pokemon Yellow Gameplay](https://github.com/user-attachments/assets/a6dce68c-cbb2-4688-8d13-b7fac0789bbb) | ![Donkey Kong Gameplay](https://github.com/user-attachments/assets/634cb879-4189-4196-b395-6e6e06999298) | ![Zelda Gameplay](https://github.com/user-attachments/assets/fc67733c-b722-44d2-9a22-70717476da85) | 
 |---------------------------------|---------------------------------|---------------------------------|
 
 ## Features
