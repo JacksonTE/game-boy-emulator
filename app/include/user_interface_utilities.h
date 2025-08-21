@@ -47,7 +47,7 @@ static bool try_load_file_to_memory_with_dialog(
         {
             if (file_type == GameBoyCore::FileType::GameROM)
             {
-                if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
+                if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
                 {
                     game_boy_emulator.reset_state(true);
                 }
@@ -133,7 +133,7 @@ static void handle_sdl_events(
                         case SDLK_R:
                             if (is_key_pressed && !was_reset_key_previously_pressed)
                             {
-                                if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
+                                if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
                                 {
                                     game_boy_emulator.reset_state(true);
                                 }
@@ -380,12 +380,12 @@ static void render_main_menu_bar(
                 is_emulation_paused_atomic.store(false, std::memory_order_release);
             }
             ImGui::Spacing();
-            if (ImGui::MenuItem("Unload Boot ROM", "", false, game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe()))
+            if (ImGui::MenuItem("Unload Boot ROM", "", false, game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe()))
             {
                 is_emulation_paused_atomic.store(true, std::memory_order_release);
-                game_boy_emulator.unload_bootrom_from_memory_thread_safe();
+                game_boy_emulator.unload_boot_rom_from_memory_thread_safe();
 
-                if (game_boy_emulator.is_bootrom_mapped_in_memory() && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
+                if (game_boy_emulator.is_boot_rom_mapped_in_memory() && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                 {
                     game_boy_emulator.set_post_boot_state();
                 }
@@ -462,7 +462,7 @@ static void render_main_menu_bar(
             ImGui::Spacing();
             if (ImGui::MenuItem("Reset", "[R]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
-                if (game_boy_emulator.is_bootrom_loaded_in_memory_thread_safe())
+                if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
                 {
                     game_boy_emulator.reset_state(true);
                 }

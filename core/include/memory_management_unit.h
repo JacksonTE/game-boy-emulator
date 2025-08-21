@@ -67,12 +67,12 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file(const std::filesystem::path &file_path, FileType file_type, std::string &error_message);
-    void unload_bootrom_thread_safe();
+    bool try_load_file_to_read_only_memory(const std::filesystem::path &file_path, FileType file_type, std::string &error_message);
+    void unload_boot_rom_thread_safe();
     void unload_game_rom_thread_safe();
     bool is_game_rom_loaded_thread_safe() const;
-    bool is_bootrom_loaded_thread_safe() const;
-    bool is_bootrom_mapped() const;
+    bool is_boot_rom_loaded_thread_safe() const;
+    bool is_boot_rom_mapped() const;
 
     virtual uint8_t read_byte(uint16_t address, bool is_access_unrestricted) const;
     virtual void write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted);
@@ -87,7 +87,7 @@ public:
     void update_dpad_direction_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
 
 private:
-    std::unique_ptr<uint8_t[]> bootrom{};
+    std::unique_ptr<uint8_t[]> boot_rom{};
     std::unique_ptr<uint8_t[]> work_ram{};
     std::unique_ptr<uint8_t[]> unmapped_input_output_registers{};
     std::unique_ptr<uint8_t[]> high_ram{};
@@ -96,7 +96,7 @@ private:
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 
-    std::atomic<bool> is_bootrom_loaded_in_memory_atomic{};
+    std::atomic<bool> is_boot_rom_loaded_in_memory_atomic{};
     std::atomic<bool> is_game_rom_loaded_in_memory_atomic{};
 
     std::atomic<uint8_t> button_pressed_states_atomic{0b11111111};
@@ -105,7 +105,7 @@ private:
     std::atomic<uint8_t> most_recent_currently_pressed_horizontal_direction_atomic{0b11111111};
     uint8_t joypad_p1_joyp{0b11111111};
     uint8_t interrupt_flag_if{0b11100000};
-    uint8_t bootrom_status{};
+    uint8_t boot_rom_status{};
     uint8_t interrupt_enable_ie{};
 
     ObjectAttributeMemoryDirectMemoryAccessStartupState oam_dma_startup_state{ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting};

@@ -17,12 +17,12 @@ MemoryManagementUnit::MemoryManagementUnit(GameCartridgeSlot &game_cartridge_slo
       internal_timer{internal_timer_reference},
       pixel_processing_unit{pixel_processing_unit_reference}
 {
-    bootrom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
+    boot_rom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
     work_ram = std::make_unique<uint8_t[]>(WORK_RAM_SIZE);
     unmapped_input_output_registers = std::make_unique<uint8_t[]>(INPUT_OUTPUT_REGISTERS_SIZE);
     high_ram = std::make_unique<uint8_t[]>(HIGH_RAM_SIZE);
 
-    std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
+    std::fill_n(boot_rom.get(), BOOTROM_SIZE, 0);
     std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
     std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
     std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
@@ -36,7 +36,7 @@ void MemoryManagementUnit::reset_state()
 
     joypad_p1_joyp = 0b11111111;
     interrupt_flag_if = 0b11100000;
-    bootrom_status = 0x00;
+    boot_rom_status = 0x00;
     interrupt_enable_ie = 0b00000000;
 
     oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
@@ -46,7 +46,7 @@ void MemoryManagementUnit::reset_state()
 
 void MemoryManagementUnit::set_post_boot_state()
 {
-    bootrom_status = 0x01;
+    boot_rom_status = 0x01;
     joypad_p1_joyp = 0b11001111;
     write_byte(0xFF01, 0x00, false);
     write_byte(0xFF02, 0x7E, false);
@@ -79,7 +79,7 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path, FileType file_type, std::string &error_message)
+bool MemoryManagementUnit::try_load_file_to_read_only_memory(const std::filesystem::path &file_path, FileType file_type, std::string &error_message)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
@@ -97,11 +97,11 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
                                               std::string(" bytes does not meet the boot ROM size requirement."), error_message);
         }
 
-        if (!file.read(reinterpret_cast<char *>(bootrom.get()), file_length_in_bytes))
+        if (!file.read(reinterpret_cast<char *>(boot_rom.get()), file_length_in_bytes))
         {
-            return set_error_message_and_fail(std::string("Could not read bootrom file ") + file_path.string(), error_message);
+            return set_error_message_and_fail(std::string("Could not read boot_rom file ") + file_path.string(), error_message);
         }
-        is_bootrom_loaded_in_memory_atomic.store(true, std::memory_order_release);
+        is_boot_rom_loaded_in_memory_atomic.store(true, std::memory_order_release);
     }
     else
     {
@@ -114,10 +114,10 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
     return true;
 }
 
-void MemoryManagementUnit::unload_bootrom_thread_safe()
+void MemoryManagementUnit::unload_boot_rom_thread_safe()
 {
-    std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
-    is_bootrom_loaded_in_memory_atomic.store(false, std::memory_order_release);
+    std::fill_n(boot_rom.get(), BOOTROM_SIZE, 0);
+    is_boot_rom_loaded_in_memory_atomic.store(false, std::memory_order_release);
 }
 
 void MemoryManagementUnit::unload_game_rom_thread_safe()
@@ -131,14 +131,14 @@ bool MemoryManagementUnit::is_game_rom_loaded_thread_safe() const
     return is_game_rom_loaded_in_memory_atomic.load(std::memory_order_acquire);
 }
 
-bool MemoryManagementUnit::is_bootrom_loaded_thread_safe() const
+bool MemoryManagementUnit::is_boot_rom_loaded_thread_safe() const
 {
-    return is_bootrom_loaded_in_memory_atomic.load(std::memory_order_acquire);
+    return is_boot_rom_loaded_in_memory_atomic.load(std::memory_order_acquire);
 }
 
-bool MemoryManagementUnit::is_bootrom_mapped() const
+bool MemoryManagementUnit::is_boot_rom_mapped() const
 {
-    return (bootrom_status == 0);
+    return (boot_rom_status == 0);
 }
 
 uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestricted) const
@@ -152,9 +152,9 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
         address = address_of_byte_being_transferred_by_oam_dma;
     }
 
-    if (bootrom_status == 0 && address < BOOTROM_SIZE)
+    if (boot_rom_status == 0 && address < BOOTROM_SIZE)
     {
-        return bootrom[address];
+        return boot_rom[address];
     }
     else if (address < ROM_BANK_0X_START + ROM_BANK_SIZE)
     {
@@ -246,7 +246,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
             case 0xFF4B:
                 return pixel_processing_unit.window_x_position_plus_7_wx;
             case 0xFF50:
-                return bootrom_status;
+                return boot_rom_status;
             default:
                 const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;
                 return unmapped_input_output_registers[local_address];
@@ -353,7 +353,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 pixel_processing_unit.window_x_position_plus_7_wx = value;
                 return;
             case 0xFF50:
-                bootrom_status = value;
+                boot_rom_status = value;
                 return;
             default:
                 const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;

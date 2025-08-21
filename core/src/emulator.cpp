@@ -50,12 +50,12 @@ void Emulator::print_register_file_state() const
 
 bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string &error_message)
 {
-    return memory_management_unit->try_load_file(file_path, file_type, error_message);
+    return memory_management_unit->try_load_file_to_read_only_memory(file_path, file_type, error_message);
 }
 
-void Emulator::unload_bootrom_from_memory_thread_safe()
+void Emulator::unload_boot_rom_from_memory_thread_safe()
 {
-    memory_management_unit->unload_bootrom_thread_safe();
+    memory_management_unit->unload_boot_rom_thread_safe();
 }
 
 void Emulator::unload_game_rom_from_memory_thread_safe()
@@ -68,14 +68,14 @@ bool Emulator::is_game_rom_loaded_in_memory_thread_safe() const
     return memory_management_unit->is_game_rom_loaded_thread_safe();
 }
 
-bool Emulator::is_bootrom_loaded_in_memory_thread_safe() const
+bool Emulator::is_boot_rom_loaded_in_memory_thread_safe() const
 {
-    return memory_management_unit->is_bootrom_loaded_thread_safe();
+    return memory_management_unit->is_boot_rom_loaded_thread_safe();
 }
 
-bool Emulator::is_bootrom_mapped_in_memory() const
+bool Emulator::is_boot_rom_mapped_in_memory() const
 {
-    return memory_management_unit->is_bootrom_mapped();
+    return memory_management_unit->is_boot_rom_mapped();
 }
 
 uint8_t Emulator::read_byte_from_memory(uint16_t address) const
