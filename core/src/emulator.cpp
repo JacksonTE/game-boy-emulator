@@ -11,9 +11,9 @@ namespace GameBoyCore
 
 Emulator::Emulator()
     : internal_timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-    pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-    memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
-    central_processing_unit{[this]() { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
+      pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
+      memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
+      central_processing_unit{[this]() { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
 {
 }
 
@@ -48,7 +48,7 @@ void Emulator::print_register_file_state() const
     GameBoyCore::print_register_file_state(central_processing_unit.get_register_file());
 }
 
-bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string &error_message)
+bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message)
 {
     return memory_management_unit->try_load_file_to_read_only_memory(file_path, file_type, error_message);
 }
@@ -110,7 +110,7 @@ uint8_t Emulator::get_published_frame_buffer_index_thread_safe() const
     return pixel_processing_unit.get_published_frame_buffer_index_thread_safe();
 }
 
-std::unique_ptr<uint8_t[]> &Emulator::get_pixel_frame_buffer(uint8_t index)
+std::unique_ptr<uint8_t[]>& Emulator::get_pixel_frame_buffer(uint8_t index)
 {
     return pixel_processing_unit.get_pixel_frame_buffer(index);
 }

@@ -10,7 +10,7 @@
 namespace GameBoyCore
 {
 
-MemoryBankControllerBase::MemoryBankControllerBase(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+MemoryBankControllerBase::MemoryBankControllerBase(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
     : cartridge_rom{rom},
       cartridge_ram{ram}
 {
@@ -33,7 +33,7 @@ void MemoryBankControllerBase::write_byte(uint16_t address, uint8_t value)
               << "Attempted to write to read only address 0x" << std::setw(4) << address << " in a ROM-only cartridge. No operation will occur.\n";
 }
 
-MBC1::MBC1(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+MBC1::MBC1(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
     : MemoryBankControllerBase{rom, ram}
 {
     number_of_rom_banks = rom.size() >> ROM_BANK_SIZE_POWER_OF_TWO;
@@ -111,7 +111,7 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
         throw std::runtime_error("Attemped to write to an out of bounds address in the cartridge's ROM or RAM. Exiting.");
 }
 
-MBC2::MBC2(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+MBC2::MBC2(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
     : MemoryBankControllerBase{rom, ram}
 {
 }
@@ -176,7 +176,7 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
 }
 
-MBC3::MBC3(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+MBC3::MBC3(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
     : MemoryBankControllerBase{rom, ram}
 {
     number_of_rom_banks = rom.size() >> ROM_BANK_SIZE_POWER_OF_TWO;
@@ -297,7 +297,7 @@ void MBC3::write_byte(uint16_t address, uint8_t value)
         throw std::runtime_error("Attemped to write to an out of bounds address in the cartridge's ROM or RAM. Exiting.");
 }
 
-MBC5::MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram)
+MBC5::MBC5(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
     : MemoryBankControllerBase{rom, ram}
 {
     number_of_rom_banks = rom.size() >> ROM_BANK_SIZE_POWER_OF_TWO;

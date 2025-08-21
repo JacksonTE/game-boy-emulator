@@ -23,7 +23,7 @@
  *  @return Either true to indicate success, or false to indicate failure.  If false is returned,
  * you can call SDL_GetError() for more information.  However, it is intended that users ignore the
  * error and simply pass a value-initialized nfdwindowhandle_t to NFDe if this function fails. */
-static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdwindowhandle_t *native_window)
+static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window* sdl_window, nfdwindowhandle_t* native_window)
 {
     SDL_PropertiesID sdl_properties = SDL_GetWindowProperties(sdl_window);
     if (!sdl_properties)
@@ -31,7 +31,7 @@ static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdw
         return false;
     }
     
-    void *win32_hwnd_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WIN32_HWND_POINTER, 0);
+    void* win32_hwnd_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WIN32_HWND_POINTER, 0);
     if (win32_hwnd_pointer)
     {
         native_window->type = NFD_WINDOW_HANDLE_TYPE_WINDOWS;
@@ -39,7 +39,7 @@ static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdw
         return true;
     }
 
-    void *cocoa_window_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, 0);
+    void* cocoa_window_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, 0);
     if (cocoa_window_pointer)
     {
         native_window->type = NFD_WINDOW_HANDLE_TYPE_COCOA;
@@ -47,7 +47,7 @@ static inline bool NFD_GetNativeWindowFromSDLWindow(SDL_Window *sdl_window, nfdw
         return true;
     }
 
-    void *wayland_surface_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, 0);
+    void* wayland_surface_pointer = SDL_GetPointerProperty(sdl_properties, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, 0);
     if (wayland_surface_pointer)
     {
         native_window->type = NFD_WINDOW_HANDLE_TYPE_WAYLAND;

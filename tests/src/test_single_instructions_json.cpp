@@ -44,7 +44,7 @@ struct MachineCycleOperation
     {
     }
 
-    bool operator==(const MachineCycleOperation &other) const
+    bool operator==(const MachineCycleOperation& other) const
     {
         if (memory_interaction != other.memory_interaction)
             return false;
@@ -78,7 +78,7 @@ static std::string memory_interaction_to_string(MemoryInteraction operation)
     }
 }
 
-static std::ostream &operator<<(std::ostream &output_stream, const MachineCycleOperation &interaction)
+static std::ostream& operator<<(std::ostream& output_stream, const MachineCycleOperation& interaction)
 {
     output_stream << "MachineCycleOperation{"
                   << "memory_interaction: " << memory_interaction_to_string(interaction.memory_interaction) << ", "
@@ -109,7 +109,7 @@ static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
 
     std::vector<std::filesystem::path> json_test_file_paths;
 
-    for (const auto &entry : std::filesystem::directory_iterator(directory))
+    for (const auto& entry : std::filesystem::directory_iterator(directory))
     {
         // Skip 'halt' and 'stop' tests - their correct functionality isn't tested well with the json tests
         if (entry.is_regular_file() && entry.path().extension() == ".json" &&
@@ -118,7 +118,7 @@ static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
             json_test_file_paths.push_back(entry.path());
         }
     }
-    std::sort(json_test_file_paths.begin(), json_test_file_paths.end(), [](const std::filesystem::path &a, const std::filesystem::path &b)
+    std::sort(json_test_file_paths.begin(), json_test_file_paths.end(), [](const std::filesystem::path& a, const std::filesystem::path& b)
     {
         std::string a_string = a.string();
         std::string b_string = b.string();
@@ -130,7 +130,7 @@ static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
     return json_test_file_paths;
 }
 
-static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(const std::filesystem::path &json_test_file_path)
+static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(const std::filesystem::path& json_test_file_path)
 {
     std::ifstream file(json_test_file_path);
     if (!file)
@@ -140,16 +140,16 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
     file >> json_test_file_object;
     std::vector<SingleInstructionTestCase> json_test_cases;
 
-    for (const auto &test_case_object : json_test_file_object)
+    for (const auto& test_case_object : json_test_file_object)
     {
         SingleInstructionTestCase test_case;
 
         test_case.test_name = test_case_object["name"].get<std::string>();
 
-        for (const auto &initial_ram_array : test_case_object["initial"]["ram"])
+        for (const auto& initial_ram_array : test_case_object["initial"]["ram"])
         {
-            const auto &address = initial_ram_array[0];
-            const auto &initial_value = initial_ram_array[1];
+            const auto& address = initial_ram_array[0];
+            const auto& initial_value = initial_ram_array[1];
             test_case.initial_ram_address_value_pairs.emplace_back(address, initial_value);
         }
         test_case.initial_register_values.program_counter = test_case_object["initial"]["pc"].get<uint16_t>();
@@ -163,10 +163,10 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
         test_case.initial_register_values.H = test_case_object["initial"]["h"].get<uint8_t>();
         test_case.initial_register_values.L = test_case_object["initial"]["l"].get<uint8_t>();
 
-        for (const auto &expected_ram_array : test_case_object["final"]["ram"])
+        for (const auto& expected_ram_array : test_case_object["final"]["ram"])
         {
-            const auto &address = expected_ram_array[0];
-            const auto &expected_final_value = expected_ram_array[1];
+            const auto& address = expected_ram_array[0];
+            const auto& expected_final_value = expected_ram_array[1];
             test_case.expected_ram_address_value_pairs.emplace_back(address, expected_final_value);
         }
         test_case.expected_register_values.program_counter = test_case_object["final"]["pc"].get<uint16_t>();
@@ -180,21 +180,21 @@ static std::vector<SingleInstructionTestCase> load_test_cases_from_json_file(con
         test_case.expected_register_values.H = test_case_object["final"]["h"].get<uint8_t>();
         test_case.expected_register_values.L = test_case_object["final"]["l"].get<uint8_t>();
 
-        for (const auto &expected_cycles_array : test_case_object["cycles"])
+        for (const auto& expected_cycles_array : test_case_object["cycles"])
         {
-            const auto &expected_operation_performed = expected_cycles_array[2];
+            const auto& expected_operation_performed = expected_cycles_array[2];
 
             if (expected_operation_performed == "---")
                 test_case.expected_memory_interactions.emplace_back(MemoryInteraction::None);
             else
             {
-                const auto &expected_address_accessed = expected_cycles_array[0];
+                const auto& expected_address_accessed = expected_cycles_array[0];
 
                 if (expected_operation_performed == "r-m")
                     test_case.expected_memory_interactions.emplace_back(MemoryInteraction::Read, expected_address_accessed);
                 else
                 {
-                    const auto &expected_value_written = expected_cycles_array[1];
+                    const auto& expected_value_written = expected_cycles_array[1];
                     test_case.expected_memory_interactions.emplace_back(MemoryInteraction::Write, expected_address_accessed, expected_value_written);
                 }
             }
@@ -233,19 +233,19 @@ public:
 private:
     std::unique_ptr<uint8_t[]> flat_memory;
 
-    static GameBoyCore::GameCartridgeSlot &get_game_cartridge_slot()
+    static GameBoyCore::GameCartridgeSlot& get_game_cartridge_slot()
     {
         static GameBoyCore::GameCartridgeSlot game_cartridge_slot{};
         return game_cartridge_slot;
     }
 
-    static GameBoyCore::InternalTimer &get_timer()
+    static GameBoyCore::InternalTimer& get_timer()
     {
         static GameBoyCore::InternalTimer test_internal_timer{[](uint8_t) {}};
         return test_internal_timer;
     }
 
-    static GameBoyCore::PixelProcessingUnit &get_pixel_processing_unit()
+    static GameBoyCore::PixelProcessingUnit& get_pixel_processing_unit()
     {
         static GameBoyCore::PixelProcessingUnit test_pixel_processing_unit{[](uint8_t) {}};
         return test_pixel_processing_unit;
@@ -296,13 +296,13 @@ protected:
         );
     }
 
-    void set_initial_values(const SingleInstructionTestCase &test_case)
+    void set_initial_values(const SingleInstructionTestCase& test_case)
     {
         machine_cycle_operations.clear();
         game_boy_central_processing_unit->memory_management_unit->reset_state();
         game_boy_central_processing_unit->reset_state(false);
 
-        for (const std::pair<uint16_t, uint8_t> &pair : test_case.initial_ram_address_value_pairs)
+        for (const std::pair<uint16_t, uint8_t>& pair : test_case.initial_ram_address_value_pairs)
         {
             game_boy_central_processing_unit->memory_management_unit->write_byte(pair.first, pair.second);
         }
@@ -319,7 +319,7 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
 
     for (size_t i = 0; i < test_cases_for_one_instruction.size(); i++)
     {
-        const auto &test_case = test_cases_for_one_instruction.at(i);
+        const auto& test_case = test_cases_for_one_instruction.at(i);
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
@@ -338,7 +338,7 @@ TEST_P(SingleInstructionTest, JsonTestCasesFile)
 
         EXPECT_EQ(game_boy_central_processing_unit->get_register_file().stack_pointer, test_case.expected_register_values.stack_pointer);
 
-        for (const std::pair<uint16_t, uint8_t> &expected_pair : test_case.expected_ram_address_value_pairs)
+        for (const std::pair<uint16_t, uint8_t>& expected_pair : test_case.expected_ram_address_value_pairs)
         {
             EXPECT_EQ(game_boy_central_processing_unit->memory_management_unit->read_byte(expected_pair.first), expected_pair.second);
         }

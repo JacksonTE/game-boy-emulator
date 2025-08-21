@@ -8,7 +8,7 @@
 namespace GameBoyCore
 {
 
-CentralProcessingUnit::CentralProcessingUnit(std::function<void()> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference)
+CentralProcessingUnit::CentralProcessingUnit(std::function<void()> emulator_step_single_machine_cycle, MemoryManagementUnit& memory_management_unit_reference)
     : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
       memory_management_unit{memory_management_unit_reference}
 {
@@ -56,7 +56,7 @@ RegisterFile<std::endian::native> CentralProcessingUnit::get_register_file() con
     return register_file;
 }
 
-void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endian::native> &new_register_values)
+void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endian::native>& new_register_values)
 {
     register_file.A = new_register_values.A;
     register_file.flags = new_register_values.flags & 0xF0; // Lower nibble of flags must always be zeroed
@@ -160,7 +160,7 @@ uint16_t CentralProcessingUnit::fetch_immediate16_and_step_emulator_components()
     return low_byte | static_cast<uint16_t>(fetch_immediate8_and_step_emulator_components() << 8);
 }
 
-uint8_t &CentralProcessingUnit::get_register_by_index(uint8_t index)
+uint8_t& CentralProcessingUnit::get_register_by_index(uint8_t index)
 {
     switch (index)
     {
@@ -1027,7 +1027,7 @@ void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
 // ================================
 
 template <typename T>
-void CentralProcessingUnit::load(T &destination_register, T value)
+void CentralProcessingUnit::load(T& destination_register, T value)
 {
     destination_register = value;
 }
@@ -1037,7 +1037,7 @@ void CentralProcessingUnit::load_memory(uint16_t address, uint8_t value)
     write_byte_and_step_emulator_components(address, value);
 }
 
-void CentralProcessingUnit::increment(uint8_t &register8)
+void CentralProcessingUnit::increment(uint8_t& register8)
 {
     const bool does_half_carry_occur = (register8 & 0x0F) == 0x0F;
     register8++;
@@ -1046,13 +1046,13 @@ void CentralProcessingUnit::increment(uint8_t &register8)
     update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
 }
 
-void CentralProcessingUnit::increment_and_step_emulator_components(uint16_t &register16)
+void CentralProcessingUnit::increment_and_step_emulator_components(uint16_t& register16)
 {
     emulator_step_single_machine_cycle_callback();
     register16++;
 }
 
-void CentralProcessingUnit::decrement(uint8_t &register8)
+void CentralProcessingUnit::decrement(uint8_t& register8)
 {
     const bool does_half_carry_occur = (register8 & 0x0F) == 0x00;
     register8--;
@@ -1061,7 +1061,7 @@ void CentralProcessingUnit::decrement(uint8_t &register8)
     update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
 }
 
-void CentralProcessingUnit::decrement_and_step_emulator_components(uint16_t &register16)
+void CentralProcessingUnit::decrement_and_step_emulator_components(uint16_t& register16)
 {
     emulator_step_single_machine_cycle_callback();
     register16--;
@@ -1181,7 +1181,7 @@ void CentralProcessingUnit::jump_conditional_immediate16(bool is_condition_met)
     }
 }
 
-void CentralProcessingUnit::pop_stack(uint16_t &destination_register16)
+void CentralProcessingUnit::pop_stack(uint16_t& destination_register16)
 {
     uint8_t low_byte = read_byte_and_step_emulator_components(register_file.stack_pointer++);
     destination_register16 = low_byte | static_cast<uint16_t>(read_byte_and_step_emulator_components(register_file.stack_pointer++) << 8);
@@ -1214,7 +1214,7 @@ void CentralProcessingUnit::restart_at_address(uint16_t address)
     register_file.program_counter = address;
 }
 
-void CentralProcessingUnit::rotate_left_circular(uint8_t &register8)
+void CentralProcessingUnit::rotate_left_circular(uint8_t& register8)
 {
     const bool does_carry_occur = (register8 & 0b10000000) != 0;
     register8 = (register8 << 1) | (register8 >> 7);
@@ -1224,7 +1224,7 @@ void CentralProcessingUnit::rotate_left_circular(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::rotate_right_circular(uint8_t &register8)
+void CentralProcessingUnit::rotate_right_circular(uint8_t& register8)
 {
     const bool does_carry_occur = (register8 & 0b00000001) != 0;
     register8 = (register8 << 7) | (register8 >> 1);
@@ -1234,7 +1234,7 @@ void CentralProcessingUnit::rotate_right_circular(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::rotate_left_through_carry(uint8_t &register8)
+void CentralProcessingUnit::rotate_left_through_carry(uint8_t& register8)
 {
     const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
     const bool does_carry_occur = (register8 & 0b10000000) != 0;
@@ -1245,7 +1245,7 @@ void CentralProcessingUnit::rotate_left_through_carry(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::rotate_right_through_carry(uint8_t &register8)
+void CentralProcessingUnit::rotate_right_through_carry(uint8_t& register8)
 {
     const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
     const bool does_carry_occur = (register8 & 0b00000001) != 0;
@@ -1256,7 +1256,7 @@ void CentralProcessingUnit::rotate_right_through_carry(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::shift_left_arithmetic(uint8_t &register8)
+void CentralProcessingUnit::shift_left_arithmetic(uint8_t& register8)
 {
     const bool does_carry_occur = (register8 & 0b10000000) != 0;
     register8 <<= 1;
@@ -1266,7 +1266,7 @@ void CentralProcessingUnit::shift_left_arithmetic(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::shift_right_arithmetic(uint8_t &register8)
+void CentralProcessingUnit::shift_right_arithmetic(uint8_t& register8)
 {
     const bool does_carry_occur = (register8 & 0b00000001) != 0;
     const uint8_t preserved_sign_bit = register8 & 0b10000000;
@@ -1277,7 +1277,7 @@ void CentralProcessingUnit::shift_right_arithmetic(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::swap_nibbles(uint8_t &register8)
+void CentralProcessingUnit::swap_nibbles(uint8_t& register8)
 {
     register8 = ((register8 & 0x0F) << 4) | ((register8 & 0xF0) >> 4);
     update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
@@ -1286,7 +1286,7 @@ void CentralProcessingUnit::swap_nibbles(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, false);
 }
 
-void CentralProcessingUnit::shift_right_logical(uint8_t &register8)
+void CentralProcessingUnit::shift_right_logical(uint8_t& register8)
 {
     const bool does_carry_occur = (register8 & 0b00000001) != 0;
     register8 >>= 1;
@@ -1296,7 +1296,7 @@ void CentralProcessingUnit::shift_right_logical(uint8_t &register8)
     update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
 }
 
-void CentralProcessingUnit::test_bit(uint8_t bit_position_to_test, uint8_t &register8)
+void CentralProcessingUnit::test_bit(uint8_t bit_position_to_test, uint8_t& register8)
 {
     const bool is_bit_set = (register8 & (1 << bit_position_to_test)) != 0;
     update_flag(register_file.flags, ZERO_FLAG_MASK, !is_bit_set);
@@ -1304,30 +1304,30 @@ void CentralProcessingUnit::test_bit(uint8_t bit_position_to_test, uint8_t &regi
     update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, true);
 }
 
-void CentralProcessingUnit::reset_bit(uint8_t bit_position_to_reset, uint8_t &register8)
+void CentralProcessingUnit::reset_bit(uint8_t bit_position_to_reset, uint8_t& register8)
 {
     register8 &= ~(1 << bit_position_to_reset);
 }
 
-void CentralProcessingUnit::set_bit(uint8_t bit_position_to_set, uint8_t &register8)
+void CentralProcessingUnit::set_bit(uint8_t bit_position_to_set, uint8_t& register8)
 {
     register8 |= (1 << bit_position_to_set);
 }
 
-void CentralProcessingUnit::operate_on_register_hl(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position)
+void CentralProcessingUnit::operate_on_register_hl(void (CentralProcessingUnit::* operation)(uint8_t, uint8_t&), uint8_t bit_position)
 {
     uint8_t memory_hl = read_byte_and_step_emulator_components(register_file.HL);
     (this->*operation)(bit_position, memory_hl);
 }
 
-void CentralProcessingUnit::operate_on_register_hl_and_write(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position)
+void CentralProcessingUnit::operate_on_register_hl_and_write(void (CentralProcessingUnit::* operation)(uint8_t, uint8_t&), uint8_t bit_position)
 {
     uint8_t memory_hl = read_byte_and_step_emulator_components(register_file.HL);
     (this->*operation)(bit_position, memory_hl);
     write_byte_and_step_emulator_components(register_file.HL, memory_hl);
 }
 
-void CentralProcessingUnit::operate_on_register_hl_and_write(void (CentralProcessingUnit:: *operation)(uint8_t &))
+void CentralProcessingUnit::operate_on_register_hl_and_write(void (CentralProcessingUnit::* operation)(uint8_t&))
 {
     uint8_t memory_hl = read_byte_and_step_emulator_components(register_file.HL);
     (this->*operation)(memory_hl);

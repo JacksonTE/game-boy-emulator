@@ -17,12 +17,12 @@ constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
 static bool try_load_file_to_memory_with_dialog(
     GameBoyCore::FileType file_type,
-    SDL_Window *sdl_window,
-    GameBoyCore::Emulator &game_boy_emulator,
-    std::atomic<bool> &is_emulation_paused_atomic,
-    bool &is_emulation_paused_before_rom_loading,
-    bool &did_rom_loading_error_occur,
-    std::string &error_message)
+    SDL_Window* sdl_window,
+    GameBoyCore::Emulator& game_boy_emulator,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    bool& is_emulation_paused_before_rom_loading,
+    bool& did_rom_loading_error_occur,
+    std::string& error_message)
 {
     is_emulation_paused_before_rom_loading = is_emulation_paused_atomic.load(std::memory_order_acquire);
     is_emulation_paused_atomic.store(true, std::memory_order_release);
@@ -35,7 +35,7 @@ static bool try_load_file_to_memory_with_dialog(
     open_dialog_arguments.filterList = filters;
     open_dialog_arguments.filterCount = 1;
 
-    nfdchar_t *rom_path = nullptr;
+    nfdchar_t* rom_path = nullptr;
     NFD_GetNativeWindowFromSDLWindow(sdl_window, &open_dialog_arguments.parentWindow);
 
     nfdresult_t result = NFD_OpenDialogU8_With(&rom_path, &open_dialog_arguments);
@@ -81,17 +81,17 @@ static bool try_load_file_to_memory_with_dialog(
 }
 
 static void handle_sdl_events(
-    bool &stop_emulating,
-    bool &did_rom_loading_error_occur,
-    bool &is_emulation_paused_before_rom_loading,
-    bool &was_fast_forward_key_previously_pressed,
-    bool &was_pause_key_previously_pressed,
-    bool &was_reset_key_previously_pressed,
-    std::atomic<bool> &is_emulation_paused_atomic,
-    std::atomic<bool> &is_fast_forward_enabled_atomic,
-    GameBoyCore::Emulator &game_boy_emulator,
-    SDL_Window *sdl_window,
-    std::string &error_message)
+    bool& stop_emulating,
+    bool& did_rom_loading_error_occur,
+    bool& is_emulation_paused_before_rom_loading,
+    bool& was_fast_forward_key_previously_pressed,
+    bool& was_pause_key_previously_pressed,
+    bool& was_reset_key_previously_pressed,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    std::atomic<bool>& is_fast_forward_enabled_atomic,
+    GameBoyCore::Emulator& game_boy_emulator,
+    SDL_Window* sdl_window,
+    std::string& error_message)
 {
     SDL_Event sdl_event;
     while (SDL_PollEvent(&sdl_event))
@@ -181,7 +181,7 @@ static void handle_sdl_events(
     }
 }
 
-static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer *sdl_renderer)
+static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer* sdl_renderer)
 {
     int renderer_output_width, renderer_output_height;
     SDL_GetRenderOutputSize(sdl_renderer, &renderer_output_width, &renderer_output_height);
@@ -196,7 +196,7 @@ static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer *sdl_renderer)
     return SDL_FRect {0.0f, menu_bar_logical_height, static_cast<float>(DISPLAY_WIDTH_PIXELS), static_cast<float>(DISPLAY_HEIGHT_PIXELS) - menu_bar_logical_height};
 }
 
-static void set_emulation_screen_blank(const uint32_t *active_colour_palette, uint32_t *abgr_pixel_buffer, SDL_Texture *sdl_texture)
+static void set_emulation_screen_blank(const uint32_t* active_colour_palette, uint32_t* abgr_pixel_buffer, SDL_Texture* sdl_texture)
 {
     for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
     {
@@ -272,7 +272,7 @@ static ImVec4 get_imvec4_from_abgr(uint32_t abgr)
     return ImVec4(red / 255.0f, green / 255.0f, blue / 255.0f, alpha / 255.0f);
 }
 
-static const char *colour_palette_names[] =
+static const char* colour_palette_names[] =
 {
     "Sage",
     "Greyscale",
@@ -280,7 +280,7 @@ static const char *colour_palette_names[] =
     "Custom"
 };
 
-static const char *fast_forward_speed_names[] =
+static const char* fast_forward_speed_names[] =
 {
     "1.50x",
     "1.75x",
@@ -296,15 +296,15 @@ static const char *fast_forward_speed_names[] =
 };
 
 static void update_colour_palette(
-    GameBoyCore::Emulator &game_boy_emulator,
-    const uint32_t *&active_colour_palette,
+    GameBoyCore::Emulator& game_boy_emulator,
+    const uint32_t*& active_colour_palette,
     const uint8_t currently_published_frame_buffer_index,
-    uint32_t *abgr_pixel_buffer,
-    SDL_Texture *sdl_texture)
+    uint32_t* abgr_pixel_buffer,
+    SDL_Texture* sdl_texture)
 {
     if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
     {
-        auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+        auto const& pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
         for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
         {
@@ -317,22 +317,22 @@ static void update_colour_palette(
 }
 
 static void render_main_menu_bar(
-    bool &stop_emulating,
-    bool &is_emulation_paused_before_rom_loading,
-    bool &did_rom_loading_error_occur,
-    bool &is_custom_palette_editor_open,
-    int &selected_colour_palette_index,
-    int &selected_fast_emulation_speed_index,
-    const uint32_t *&active_colour_palette,
+    bool& stop_emulating,
+    bool& is_emulation_paused_before_rom_loading,
+    bool& did_rom_loading_error_occur,
+    bool& is_custom_palette_editor_open,
+    int& selected_colour_palette_index,
+    int& selected_fast_emulation_speed_index,
+    const uint32_t*& active_colour_palette,
     const uint8_t currently_published_frame_buffer_index,
-    uint32_t *abgr_pixel_buffer,
-    std::atomic<bool> &is_emulation_paused_atomic,
-    std::atomic<bool> &is_fast_forward_enabled_atomic,
-    std::atomic<double> &target_fast_emulation_speed_atomic,
-    SDL_Window *sdl_window,
-    SDL_Texture *sdl_texture,
-    GameBoyCore::Emulator &game_boy_emulator,
-    std::string &error_message)
+    uint32_t* abgr_pixel_buffer,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    std::atomic<bool>& is_fast_forward_enabled_atomic,
+    std::atomic<double>& target_fast_emulation_speed_atomic,
+    SDL_Window* sdl_window,
+    SDL_Texture* sdl_texture,
+    GameBoyCore::Emulator& game_boy_emulator,
+    std::string& error_message)
 {
     const bool is_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
     const bool is_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
@@ -490,13 +490,13 @@ static void render_main_menu_bar(
 }
 
 static void render_custom_colour_palette_editor(
-    GameBoyCore::Emulator &game_boy_emulator,
-    bool &is_custom_palette_editor_open,
+    GameBoyCore::Emulator& game_boy_emulator,
+    bool& is_custom_palette_editor_open,
     const uint8_t currently_published_frame_buffer_index,
-    const uint32_t *active_colour_palette,
-    int &selected_colour_palette_index,
-    uint32_t *abgr_pixel_buffer,
-    SDL_Texture *sdl_texture)
+    const uint32_t* active_colour_palette,
+    int& selected_colour_palette_index,
+    uint32_t* abgr_pixel_buffer,
+    SDL_Texture* sdl_texture)
 {
     if (is_custom_palette_editor_open)
     {
@@ -518,7 +518,7 @@ static void render_custom_colour_palette_editor(
                     sdl_texture
                 );
             }
-            auto &colour = selected_custom_colour_palette_colours[i];
+            auto& colour = selected_custom_colour_palette_colours[i];
             uint8_t alpha = static_cast<uint8_t>(colour.w * 255.0f + 0.5f);
             uint8_t blue = static_cast<uint8_t>(colour.z * 255.0f + 0.5f);
             uint8_t green = static_cast<uint8_t>(colour.y * 255.0f + 0.5f);
@@ -535,10 +535,10 @@ static void render_custom_colour_palette_editor(
 }
 
 static void render_error_message_popup(
-    bool &did_rom_loading_error_occur,
-    bool &is_emulation_paused_before_rom_loading,
-    std::atomic<bool> &is_emulation_paused_atomic,
-    std::string &error_message
+    bool& did_rom_loading_error_occur,
+    bool& is_emulation_paused_before_rom_loading,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    std::string& error_message
 )
 {
     if (did_rom_loading_error_occur)
@@ -577,7 +577,7 @@ struct sdl_logical_presentation_imgui_workaround_t
 };
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339
-static sdl_logical_presentation_imgui_workaround_t sdl_logical_presentation_imgui_workaround_pre_frame(SDL_Renderer *sdl_renderer)
+static sdl_logical_presentation_imgui_workaround_t sdl_logical_presentation_imgui_workaround_pre_frame(SDL_Renderer* sdl_renderer)
 {
     sdl_logical_presentation_imgui_workaround_t logical_values{};
     SDL_GetRenderLogicalPresentation(sdl_renderer, &logical_values.sdl_renderer_logical_width, &logical_values.sdl_renderer_logical_height, &logical_values.sdl_renderer_logical_presentation_mode);
@@ -586,7 +586,7 @@ static sdl_logical_presentation_imgui_workaround_t sdl_logical_presentation_imgu
 }
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339
-static void sdl_logical_presentation_imgui_workaround_post_frame(SDL_Renderer *sdl_renderer, sdl_logical_presentation_imgui_workaround_t logical_values)
+static void sdl_logical_presentation_imgui_workaround_post_frame(SDL_Renderer* sdl_renderer, sdl_logical_presentation_imgui_workaround_t logical_values)
 {
     SDL_SetRenderLogicalPresentation(sdl_renderer, logical_values.sdl_renderer_logical_width, logical_values.sdl_renderer_logical_height, logical_values.sdl_renderer_logical_presentation_mode);
 }

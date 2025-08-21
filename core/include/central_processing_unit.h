@@ -25,19 +25,19 @@ enum class InterruptMasterEnableState
 class CentralProcessingUnit
 {
 public:
-    CentralProcessingUnit(std::function<void()> emulator_step_single_machine_cycle, MemoryManagementUnit &memory_management_unit_reference);
+    CentralProcessingUnit(std::function<void()> emulator_step_single_machine_cycle, MemoryManagementUnit& memory_management_unit_reference);
 
     void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();
 
     RegisterFile<std::endian::native> get_register_file() const;
-    void set_register_file_state(const RegisterFile<std::endian::native> &new_register_values);
+    void set_register_file_state(const RegisterFile<std::endian::native>& new_register_values);
 
     void step_single_instruction();
 
 private:
     std::function<void()> emulator_step_single_machine_cycle_callback;
-    MemoryManagementUnit &memory_management_unit;
+    MemoryManagementUnit& memory_management_unit;
     RegisterFile<std::endian::native> register_file;
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
     uint8_t instruction_register_ir{};
@@ -52,18 +52,18 @@ private:
     uint8_t fetch_immediate8_and_step_emulator_components();
     uint16_t fetch_immediate16_and_step_emulator_components();
 
-    uint8_t &get_register_by_index(uint8_t index);
+    uint8_t& get_register_by_index(uint8_t index);
     void decode_current_unprefixed_opcode_and_execute();
     void decode_current_prefixed_opcode_and_execute();
 
     // Generic Instructions
     template <typename T>
-    void load(T &destination_register, T value);
+    void load(T& destination_register, T value);
     void load_memory(uint16_t address, uint8_t value);
-    void increment(uint8_t &register8);
-    void increment_and_step_emulator_components(uint16_t &register16);
-    void decrement(uint8_t &register8);
-    void decrement_and_step_emulator_components(uint16_t &register16);
+    void increment(uint8_t& register8);
+    void increment_and_step_emulator_components(uint16_t& register16);
+    void decrement(uint8_t& register8);
+    void decrement_and_step_emulator_components(uint16_t& register16);
     void add_hl(uint16_t value);
     void add_a(uint8_t value);
     void add_with_carry_a(uint8_t value);
@@ -75,27 +75,27 @@ private:
     void compare_a(uint8_t value);
     void jump_relative_conditional_signed_immediate8(bool is_condition_met);
     void jump_conditional_immediate16(bool is_condition_met);
-    void pop_stack(uint16_t &destination_register16);
+    void pop_stack(uint16_t& destination_register16);
     void push_stack(uint16_t value);
     void call_conditional_immediate16(bool is_condition_met);
     void return_conditional(bool is_condition_met);
     void restart_at_address(uint16_t address);
 
-    void rotate_left_circular(uint8_t &register8);
-    void rotate_right_circular(uint8_t &register8);
-    void rotate_left_through_carry(uint8_t &register8);
-    void rotate_right_through_carry(uint8_t &register8);
-    void shift_left_arithmetic(uint8_t &register8);
-    void shift_right_arithmetic(uint8_t &register8);
-    void swap_nibbles(uint8_t &register8);
-    void shift_right_logical(uint8_t &register8);
-    void test_bit(uint8_t bit_position_to_test, uint8_t &register8);
-    void reset_bit(uint8_t bit_position_to_reset, uint8_t &register8);
-    void set_bit(uint8_t bit_position_to_set, uint8_t &register8);
+    void rotate_left_circular(uint8_t& register8);
+    void rotate_right_circular(uint8_t& register8);
+    void rotate_left_through_carry(uint8_t& register8);
+    void rotate_right_through_carry(uint8_t& register8);
+    void shift_left_arithmetic(uint8_t& register8);
+    void shift_right_arithmetic(uint8_t& register8);
+    void swap_nibbles(uint8_t& register8);
+    void shift_right_logical(uint8_t& register8);
+    void test_bit(uint8_t bit_position_to_test, uint8_t& register8);
+    void reset_bit(uint8_t bit_position_to_reset, uint8_t& register8);
+    void set_bit(uint8_t bit_position_to_set, uint8_t& register8);
 
-    void operate_on_register_hl(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position);
-    void operate_on_register_hl_and_write(void (CentralProcessingUnit:: *operation)(uint8_t, uint8_t &), uint8_t bit_position);
-    void operate_on_register_hl_and_write(void (CentralProcessingUnit:: *operation)(uint8_t &));
+    void operate_on_register_hl(void (CentralProcessingUnit::* operation)(uint8_t, uint8_t&), uint8_t bit_position);
+    void operate_on_register_hl_and_write(void (CentralProcessingUnit::* operation)(uint8_t, uint8_t&), uint8_t bit_position);
+    void operate_on_register_hl_and_write(void (CentralProcessingUnit::* operation)(uint8_t&));
 
     // Miscellaneous Instructions
     void unused_opcode() const;

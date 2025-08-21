@@ -154,7 +154,7 @@ public:
         entries.fill(T{});
     }
 
-    T &operator[](uint8_t index)
+    T& operator[](uint8_t index)
     {
         return entries[index];
     }
@@ -191,7 +191,7 @@ public:
     void set_post_boot_state();
 
     uint8_t get_published_frame_buffer_index_thread_safe() const;
-    std::unique_ptr<uint8_t[]> &get_pixel_frame_buffer(uint8_t index);
+    std::unique_ptr<uint8_t[]>& get_pixel_frame_buffer(uint8_t index);
 
     uint8_t read_lcd_control_lcdc() const;
     void write_lcd_control_lcdc(uint8_t value);
@@ -273,7 +273,7 @@ private:
 
     bool is_object_display_enabled() const;
     bool is_next_object_hit() const;
-    ObjectAttributes &get_current_object();
+    ObjectAttributes& get_current_object();
     uint8_t get_pixel_colour_id(PixelSliceFetcher pixel_slice_fetcher, uint8_t bit_position) const;
 };
 

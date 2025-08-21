@@ -37,14 +37,14 @@ class MemoryBankControllerBase
 public:
     static constexpr uint16_t ROM_ONLY_WITH_NO_MBC_FILE_SIZE = 0x8000;
 
-    MemoryBankControllerBase(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
+    MemoryBankControllerBase(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram);
 
     virtual uint8_t read_byte(uint16_t address);
     virtual void write_byte(uint16_t address, uint8_t value);
 
 protected:
-    const std::vector<uint8_t> &cartridge_rom;
-    std::vector<uint8_t> &cartridge_ram;
+    const std::vector<uint8_t>& cartridge_rom;
+    std::vector<uint8_t>& cartridge_ram;
 };
 
 class MBC1 : public MemoryBankControllerBase
@@ -57,7 +57,7 @@ public:
 
     static constexpr uint32_t MAX_RAM_SIZE_IN_LARGE_CONFIGURATION = 0x2000;
 
-    MBC1(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
+    MBC1(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram);
 
     uint8_t read_byte(uint16_t address) override;
     void write_byte(uint16_t address, uint8_t value) override;
@@ -80,7 +80,7 @@ public:
     static constexpr uint32_t MAX_NUMBER_OF_ROM_BANKS = 0x10;
     static constexpr uint16_t BUILT_IN_RAM_SIZE = 0x200;
 
-    MBC2(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
+    MBC2(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram);
 
     uint8_t read_byte(uint16_t address) override;
     void write_byte(uint16_t address, uint8_t value) override;
@@ -97,7 +97,7 @@ public:
     static constexpr uint32_t MAX_ROM_SIZE = 0x200000;
     static constexpr uint32_t MAX_RAM_SIZE = 0x8000;
 
-    MBC3(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
+    MBC3(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram);
 
     uint8_t read_byte(uint16_t address) override;
     void write_byte(uint16_t address, uint8_t value) override;
@@ -129,7 +129,7 @@ public:
     static constexpr uint32_t MAX_ROM_SIZE = 0x800000;
     static constexpr uint32_t MAX_RAM_SIZE = 0x20000;
 
-    MBC5(std::vector<uint8_t> &rom, std::vector<uint8_t> &ram);
+    MBC5(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram);
 
     uint8_t read_byte(uint16_t address) override;
     void write_byte(uint16_t address, uint8_t value) override;

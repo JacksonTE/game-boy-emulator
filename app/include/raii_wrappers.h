@@ -25,17 +25,17 @@ public:
         SDL_Quit();
     }
 
-    SdlInitializerRaii(const SdlInitializerRaii &) = delete;
-    SdlInitializerRaii &operator=(const SdlInitializerRaii &) = delete;
+    SdlInitializerRaii(const SdlInitializerRaii&) = delete;
+    SdlInitializerRaii& operator=(const SdlInitializerRaii&) = delete;
 
-    SdlInitializerRaii(SdlInitializerRaii &&) = delete;
-    SdlInitializerRaii &operator=(SdlInitializerRaii &&) = delete;
+    SdlInitializerRaii(SdlInitializerRaii&&) = delete;
+    SdlInitializerRaii& operator=(SdlInitializerRaii&&) = delete;
 };
 
 class SdlWindowRaii
 {
 public:
-    SdlWindowRaii(const char *title, int width, int height, uint32_t flags)
+    SdlWindowRaii(const char* title, int width, int height, uint32_t flags)
         : window{SDL_CreateWindow(title, width, height, flags)}
     {
         if (!window)
@@ -48,25 +48,25 @@ public:
             SDL_DestroyWindow(window);
     }
 
-    SDL_Window *get() const
+    SDL_Window* get() const
     {
         return window;
     }
 
-    SdlWindowRaii(const SdlWindowRaii &) = delete;
-    SdlWindowRaii &operator=(const SdlWindowRaii &) = delete;
+    SdlWindowRaii(const SdlWindowRaii&) = delete;
+    SdlWindowRaii& operator=(const SdlWindowRaii&) = delete;
 
-    SdlWindowRaii(SdlWindowRaii &&) = delete;
-    SdlWindowRaii &operator=(SdlWindowRaii &&) = delete;
+    SdlWindowRaii(SdlWindowRaii&&) = delete;
+    SdlWindowRaii& operator=(SdlWindowRaii&&) = delete;
 
 private:
-    SDL_Window *window{};
+    SDL_Window* window{};
 };
 
 class SdlRendererRaii
 {
 public:
-    SdlRendererRaii(SdlWindowRaii &window, const char *rendering_driver_name = nullptr)
+    SdlRendererRaii(SdlWindowRaii& window, const char* rendering_driver_name = nullptr)
         : renderer{SDL_CreateRenderer(window.get(), rendering_driver_name)}
     {
         if (!renderer)
@@ -92,25 +92,25 @@ public:
             SDL_DestroyRenderer(renderer);
     }
 
-    SDL_Renderer *get() const
+    SDL_Renderer* get() const
     {
         return renderer;
     }
 
-    SdlRendererRaii(const SdlRendererRaii &) = delete;
-    SdlRendererRaii &operator=(const SdlRendererRaii &) = delete;
+    SdlRendererRaii(const SdlRendererRaii&) = delete;
+    SdlRendererRaii& operator=(const SdlRendererRaii&) = delete;
 
-    SdlRendererRaii(SdlRendererRaii &&) = delete;
-    SdlRendererRaii &operator=(SdlRendererRaii &&) = delete;
+    SdlRendererRaii(SdlRendererRaii&&) = delete;
+    SdlRendererRaii& operator=(SdlRendererRaii&&) = delete;
 
 private:
-    SDL_Renderer *renderer{};
+    SDL_Renderer* renderer{};
 };
 
 class SdlTextureRaii
 {
 public:
-    SdlTextureRaii(SdlRendererRaii &renderer, SDL_PixelFormat format, SDL_TextureAccess access, int width, int height)
+    SdlTextureRaii(SdlRendererRaii& renderer, SDL_PixelFormat format, SDL_TextureAccess access, int width, int height)
         : texture{SDL_CreateTexture(renderer.get(), format, access, width, height)}
     {
         if (!texture)
@@ -126,35 +126,35 @@ public:
             SDL_DestroyTexture(texture);
     }
 
-    SDL_Texture *get() const
+    SDL_Texture* get() const
     {
         return texture;
     }
 
-    SdlTextureRaii(const SdlTextureRaii &) = delete;
-    SdlTextureRaii &operator=(const SdlTextureRaii &) = delete;
+    SdlTextureRaii(const SdlTextureRaii&) = delete;
+    SdlTextureRaii& operator=(const SdlTextureRaii&) = delete;
 
-    SdlTextureRaii(SdlTextureRaii &&) = delete;
-    SdlTextureRaii &operator=(SdlTextureRaii &&) = delete;
+    SdlTextureRaii(SdlTextureRaii&&) = delete;
+    SdlTextureRaii& operator=(SdlTextureRaii&&) = delete;
 
 private:
-    SDL_Texture *texture;
+    SDL_Texture* texture;
 };
 
 class ImGuiContextRaii
 {
 public:
-    ImGuiContextRaii(SDL_Window *window, SDL_Renderer *renderer)
+    ImGuiContextRaii(SDL_Window* window, SDL_Renderer* renderer)
     {
         IMGUI_CHECKVERSION();
 
-        ImGuiContext *context = ImGui::CreateContext();
+        ImGuiContext* context = ImGui::CreateContext();
 
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.FontDefault = io.Fonts->AddFontFromFileTTF(std::string(PROJECT_ROOT + std::string("/fonts/calibri-regular.ttf")).c_str(), 18);
 
-        ImGuiStyle &style = ImGui::GetStyle();
+        ImGuiStyle& style = ImGui::GetStyle();
         style.ItemSpacing.x = 11.0f;
         style.FramePadding.y += 5.0f;
 
@@ -183,14 +183,14 @@ public:
         ImGui::DestroyContext(imgui_context);
     }
 
-    ImGuiContextRaii(const ImGuiContextRaii &) = delete;
-    ImGuiContextRaii &operator=(const ImGuiContextRaii &) = delete;
+    ImGuiContextRaii(const ImGuiContextRaii&) = delete;
+    ImGuiContextRaii& operator=(const ImGuiContextRaii&) = delete;
 
-    ImGuiContextRaii(ImGuiContextRaii &&) = delete;
-    ImGuiContextRaii &operator=(ImGuiContextRaii &&) = delete;
+    ImGuiContextRaii(ImGuiContextRaii&&) = delete;
+    ImGuiContextRaii& operator=(ImGuiContextRaii&&) = delete;
 
 private:
-    ImGuiContext *imgui_context{};
+    ImGuiContext* imgui_context{};
 };
 
 } // namespace ResourceAcquisitionIsInitialization

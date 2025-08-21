@@ -21,7 +21,7 @@ public:
 
     void reset_state();
 
-    bool try_load_file(const std::filesystem::path &file_path, std::ifstream &file, std::streamsize file_length_in_bytes, std::string &error_message);
+    bool try_load_file(const std::filesystem::path& file_path, std::ifstream& file, std::streamsize file_length_in_bytes, std::string& error_message);
 
     uint8_t read_byte(uint16_t address) const;
     void write_byte(uint16_t address, uint8_t value);

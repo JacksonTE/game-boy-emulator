@@ -22,12 +22,12 @@
 
 static void run_emulator_core(
     std::stop_token stop_token,
-    GameBoyCore::Emulator &game_boy_emulator,
-    std::atomic<bool> &is_emulation_paused_atomic,
-    std::atomic<bool> &is_fast_emulation_enabled_atomic,
-    std::atomic<double> &target_fast_emulation_speed_atomic,
-    std::atomic<bool> &did_exception_occur_atomic,
-    std::exception_ptr &exception_pointer)
+    GameBoyCore::Emulator& game_boy_emulator,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    std::atomic<bool>& is_fast_emulation_enabled_atomic,
+    std::atomic<double>& target_fast_emulation_speed_atomic,
+    std::atomic<bool>& did_exception_occur_atomic,
+    std::exception_ptr& exception_pointer)
 {
     try
     {
@@ -128,7 +128,7 @@ int main()
             std::ref(emulator_core_exception_pointer),
         };
 
-        const uint32_t *active_colour_palette = sage_colour_palette;
+        const uint32_t* active_colour_palette = sage_colour_palette;
         int selected_colour_palette_index = 0;
 
         uint8_t previously_published_frame_buffer_index = 0;
@@ -172,7 +172,7 @@ int main()
 
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
-                auto const &pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+                auto const& pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
                 for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                 {
@@ -234,7 +234,7 @@ int main()
         NFD_Quit();
         return 0;
     }
-    catch (const std::exception &exception)
+    catch (const std::exception& exception)
     {
         std::cerr << "Error: " << exception.what() << ", exiting.\n";
         NFD_Quit();

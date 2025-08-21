@@ -111,7 +111,7 @@ uint8_t PixelProcessingUnit::get_published_frame_buffer_index_thread_safe() cons
     return published_frame_index_atomic.load(std::memory_order_acquire);
 }
 
-std::unique_ptr<uint8_t[]> &PixelProcessingUnit::get_pixel_frame_buffer(uint8_t index)
+std::unique_ptr<uint8_t[]>& PixelProcessingUnit::get_pixel_frame_buffer(uint8_t index)
 {
     return pixel_frame_buffers[index];
 }
@@ -318,7 +318,7 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_single_dot()
     if (current_scanline_dot_number == OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS)
     {
         std::stable_sort(scanline_selected_objects.begin(), scanline_selected_objects.end(), 
-            [](const ObjectAttributes &a, const ObjectAttributes &b)
+            [](const ObjectAttributes& a, const ObjectAttributes& b)
             {
                 return a.x_position < b.x_position; 
             });
@@ -338,7 +338,7 @@ void PixelProcessingUnit::step_pixel_transfer_single_dot()
     }
     else if (current_scanline_dot_number == dot_number_for_dummy_push)
     {
-        const auto &tile_row_to_discard = background_fetcher.tile_row;
+        const auto& tile_row_to_discard = background_fetcher.tile_row;
         background_pixel_shift_register.load_new_tile_row(tile_row_to_discard);
     }
 
@@ -766,7 +766,7 @@ bool PixelProcessingUnit::is_next_object_hit() const
            scanline_selected_objects[current_object_index].x_position == internal_lcd_x_coordinate_plus_8_lx;
 }
 
-ObjectAttributes &PixelProcessingUnit::get_current_object()
+ObjectAttributes& PixelProcessingUnit::get_current_object()
 {
     return scanline_selected_objects[current_object_index];
 }

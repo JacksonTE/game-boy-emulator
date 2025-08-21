@@ -12,7 +12,7 @@
 namespace GameBoyCore
 {
 
-MemoryManagementUnit::MemoryManagementUnit(GameCartridgeSlot &game_cartridge_slot_reference, InternalTimer &internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference)
+MemoryManagementUnit::MemoryManagementUnit(GameCartridgeSlot& game_cartridge_slot_reference, InternalTimer& internal_timer_reference, PixelProcessingUnit& pixel_processing_unit_reference)
     : game_cartridge_slot{game_cartridge_slot_reference},
       internal_timer{internal_timer_reference},
       pixel_processing_unit{pixel_processing_unit_reference}
@@ -79,7 +79,7 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file_to_read_only_memory(const std::filesystem::path &file_path, FileType file_type, std::string &error_message)
+bool MemoryManagementUnit::try_load_file_to_read_only_memory(const std::filesystem::path& file_path, FileType file_type, std::string& error_message)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)

@@ -10,14 +10,14 @@ static std::filesystem::path get_test_directory_path()
     return std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1";
 }
 
-static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const std::filesystem::path &directory)
+static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const std::filesystem::path& directory)
 {
     if (!std::filesystem::exists(directory))
         return { directory };
 
     std::vector<std::filesystem::path> test_rom_paths;
 
-    for (const auto &entry : std::filesystem::directory_iterator(directory))
+    for (const auto& entry : std::filesystem::directory_iterator(directory))
     {
         // Skip tests that are specific to other Game Boy models than DMG
         if (entry.is_regular_file() && entry.path().extension() == ".gb" &&

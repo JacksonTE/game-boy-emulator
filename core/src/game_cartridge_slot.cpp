@@ -21,7 +21,7 @@ void GameCartridgeSlot::reset_state()
     memory_bank_controller = std::make_unique<MemoryBankControllerBase>(rom, ram);
 }
 
-bool GameCartridgeSlot::try_load_file(const std::filesystem::path &file_path, std::ifstream &file, std::streamsize file_length_in_bytes, std::string &error_message)
+bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, std::ifstream& file, std::streamsize file_length_in_bytes, std::string& error_message)
 {
     if (file_length_in_bytes < MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE)
     {

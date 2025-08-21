@@ -63,11 +63,11 @@ enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
 class MemoryManagementUnit
 {
 public:
-    MemoryManagementUnit(GameCartridgeSlot &game_cartridge_slot_reference, InternalTimer &internal_timer_reference, PixelProcessingUnit &pixel_processing_unit_reference);
+    MemoryManagementUnit(GameCartridgeSlot& game_cartridge_slot_reference, InternalTimer& internal_timer_reference, PixelProcessingUnit& pixel_processing_unit_reference);
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file_to_read_only_memory(const std::filesystem::path &file_path, FileType file_type, std::string &error_message);
+    bool try_load_file_to_read_only_memory(const std::filesystem::path& file_path, FileType file_type, std::string& error_message);
     void unload_boot_rom_thread_safe();
     void unload_game_rom_thread_safe();
     bool is_game_rom_loaded_thread_safe() const;
@@ -92,9 +92,9 @@ private:
     std::unique_ptr<uint8_t[]> unmapped_input_output_registers{};
     std::unique_ptr<uint8_t[]> high_ram{};
 
-    GameCartridgeSlot &game_cartridge_slot;
-    InternalTimer &internal_timer;
-    PixelProcessingUnit &pixel_processing_unit;
+    GameCartridgeSlot& game_cartridge_slot;
+    InternalTimer& internal_timer;
+    PixelProcessingUnit& pixel_processing_unit;
 
     std::atomic<bool> is_boot_rom_loaded_in_memory_atomic{};
     std::atomic<bool> is_game_rom_loaded_in_memory_atomic{};
