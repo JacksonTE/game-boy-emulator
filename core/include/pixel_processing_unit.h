@@ -212,7 +212,7 @@ public:
 private:
     std::function<void(uint8_t)> request_interrupt_callback;
 
-    std::atomic<uint8_t> atomic_published_frame_index{};
+    std::atomic<uint8_t> published_frame_index_atomic{};
     uint8_t in_progress_frame_index{1};
     std::unique_ptr<uint8_t[]> pixel_frame_buffers[2];
 

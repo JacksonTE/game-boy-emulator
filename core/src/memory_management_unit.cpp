@@ -101,7 +101,7 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
         {
             return set_error_message_and_fail(std::string("Could not read bootrom file ") + file_path.string(), error_message);
         }
-        atomic_is_bootrom_loaded_in_memory.store(true, std::memory_order_release);
+        is_bootrom_loaded_in_memory_atomic.store(true, std::memory_order_release);
     }
     else
     {
@@ -109,7 +109,7 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
         {
             return false;
         }
-        atomic_is_game_rom_loaded_in_memory.store(true, std::memory_order_release);
+        is_game_rom_loaded_in_memory_atomic.store(true, std::memory_order_release);
     }
     return true;
 }
@@ -117,23 +117,23 @@ bool MemoryManagementUnit::try_load_file(const std::filesystem::path &file_path,
 void MemoryManagementUnit::unload_bootrom_thread_safe()
 {
     std::fill_n(bootrom.get(), BOOTROM_SIZE, 0);
-    atomic_is_bootrom_loaded_in_memory.store(false, std::memory_order_release);
+    is_bootrom_loaded_in_memory_atomic.store(false, std::memory_order_release);
 }
 
 void MemoryManagementUnit::unload_game_rom_thread_safe()
 {
     game_cartridge_slot.reset_state();
-    atomic_is_game_rom_loaded_in_memory.store(false, std::memory_order_release);
+    is_game_rom_loaded_in_memory_atomic.store(false, std::memory_order_release);
 }
 
 bool MemoryManagementUnit::is_game_rom_loaded_thread_safe() const
 {
-    return atomic_is_game_rom_loaded_in_memory.load(std::memory_order_acquire);
+    return is_game_rom_loaded_in_memory_atomic.load(std::memory_order_acquire);
 }
 
 bool MemoryManagementUnit::is_bootrom_loaded_thread_safe() const
 {
-    return atomic_is_bootrom_loaded_in_memory.load(std::memory_order_acquire);
+    return is_bootrom_loaded_in_memory_atomic.load(std::memory_order_acquire);
 }
 
 bool MemoryManagementUnit::is_bootrom_mapped() const
@@ -197,17 +197,17 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
 
                 if (is_select_directional_pad_enabled)
                 {
-                    const uint8_t most_recent_direction_pad_states = atomic_most_recent_currently_pressed_vertical_direction.load(std::memory_order_acquire) &
-                                                                     atomic_most_recent_currently_pressed_horizontal_direction.load(std::memory_order_acquire);
+                    const uint8_t most_recent_direction_pad_states = most_recent_currently_pressed_vertical_direction_atomic.load(std::memory_order_acquire) &
+                                                                     most_recent_currently_pressed_horizontal_direction_atomic.load(std::memory_order_acquire);
                     if (is_select_buttons_enabled)
                     {
-                        return (joypad_p1_joyp & 0xF0) | ((atomic_button_pressed_states.load(std::memory_order_acquire) | most_recent_direction_pad_states) & 0x0F);
+                        return (joypad_p1_joyp & 0xF0) | ((button_pressed_states_atomic.load(std::memory_order_acquire) | most_recent_direction_pad_states) & 0x0F);
                     }
                     return (joypad_p1_joyp & 0xF0) | (most_recent_direction_pad_states & 0x0F);
                 }
                 else if (is_select_buttons_enabled)
                 {
-                    return (joypad_p1_joyp & 0xF0) | (atomic_button_pressed_states.load(std::memory_order_acquire) & 0x0F);
+                    return (joypad_p1_joyp & 0xF0) | (button_pressed_states_atomic.load(std::memory_order_acquire) & 0x0F);
                 }
                 return joypad_p1_joyp;
             }
@@ -432,11 +432,11 @@ void MemoryManagementUnit::update_button_pressed_state_thread_safe(uint8_t butto
 {
     if (is_button_pressed)
     {
-        atomic_button_pressed_states.fetch_and(~button_flag_mask, std::memory_order_release);
+        button_pressed_states_atomic.fetch_and(~button_flag_mask, std::memory_order_release);
     }
     else
     {
-        atomic_button_pressed_states.fetch_or(button_flag_mask, std::memory_order_release);
+        button_pressed_states_atomic.fetch_or(button_flag_mask, std::memory_order_release);
     }
 }
 
@@ -446,46 +446,46 @@ void MemoryManagementUnit::update_dpad_direction_pressed_state_thread_safe(uint8
     {
         if (direction_flag_mask == RIGHT_DPAD_DIRECTION_FLAG_MASK || direction_flag_mask == LEFT_DPAD_DIRECTION_FLAG_MASK)
         {
-            atomic_most_recent_currently_pressed_horizontal_direction.store(~direction_flag_mask, std::memory_order_release);
+            most_recent_currently_pressed_horizontal_direction_atomic.store(~direction_flag_mask, std::memory_order_release);
         }
         else
         {
-            atomic_most_recent_currently_pressed_vertical_direction.store(~direction_flag_mask, std::memory_order_release);
+            most_recent_currently_pressed_vertical_direction_atomic.store(~direction_flag_mask, std::memory_order_release);
         }
-        atomic_dpad_direction_pressed_states.fetch_and(~direction_flag_mask, std::memory_order_release);
+        dpad_direction_pressed_states_atomic.fetch_and(~direction_flag_mask, std::memory_order_release);
     }
     else
     {
-        const uint8_t direction_pad_bits = atomic_dpad_direction_pressed_states.load(std::memory_order_acquire);
+        const uint8_t direction_pad_bits = dpad_direction_pressed_states_atomic.load(std::memory_order_acquire);
 
         switch (direction_flag_mask)
         {
             case RIGHT_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_left_direction_pressed = !is_flag_set(direction_pad_bits, LEFT_DPAD_DIRECTION_FLAG_MASK);
-                atomic_most_recent_currently_pressed_horizontal_direction.store(is_left_direction_pressed ? ~LEFT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_horizontal_direction_atomic.store(is_left_direction_pressed ? ~LEFT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
             case LEFT_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_right_direction_pressed = !is_flag_set(direction_pad_bits, RIGHT_DPAD_DIRECTION_FLAG_MASK);
-                atomic_most_recent_currently_pressed_horizontal_direction.store(is_right_direction_pressed ? ~RIGHT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_horizontal_direction_atomic.store(is_right_direction_pressed ? ~RIGHT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
             case UP_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_down_direction_pressed = !is_flag_set(direction_pad_bits, DOWN_DPAD_DIRECTION_FLAG_MASK);
-                atomic_most_recent_currently_pressed_vertical_direction.store(is_down_direction_pressed ? ~DOWN_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_vertical_direction_atomic.store(is_down_direction_pressed ? ~DOWN_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
             case DOWN_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_up_direction_pressed = !is_flag_set(direction_pad_bits, UP_DPAD_DIRECTION_FLAG_MASK);
-                atomic_most_recent_currently_pressed_vertical_direction.store(is_up_direction_pressed ? ~UP_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_vertical_direction_atomic.store(is_up_direction_pressed ? ~UP_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
         }
-        atomic_dpad_direction_pressed_states.fetch_or(direction_flag_mask, std::memory_order_release);
+        dpad_direction_pressed_states_atomic.fetch_or(direction_flag_mask, std::memory_order_release);
     }
 }
 

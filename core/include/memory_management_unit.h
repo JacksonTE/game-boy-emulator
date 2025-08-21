@@ -96,13 +96,13 @@ private:
     InternalTimer &internal_timer;
     PixelProcessingUnit &pixel_processing_unit;
 
-    std::atomic<bool> atomic_is_bootrom_loaded_in_memory{};
-    std::atomic<bool> atomic_is_game_rom_loaded_in_memory{};
+    std::atomic<bool> is_bootrom_loaded_in_memory_atomic{};
+    std::atomic<bool> is_game_rom_loaded_in_memory_atomic{};
 
-    std::atomic<uint8_t> atomic_button_pressed_states{0b11111111};
-    std::atomic<uint8_t> atomic_dpad_direction_pressed_states{0b11111111};
-    std::atomic<uint8_t> atomic_most_recent_currently_pressed_vertical_direction{0b11111111};
-    std::atomic<uint8_t> atomic_most_recent_currently_pressed_horizontal_direction{0b11111111};
+    std::atomic<uint8_t> button_pressed_states_atomic{0b11111111};
+    std::atomic<uint8_t> dpad_direction_pressed_states_atomic{0b11111111};
+    std::atomic<uint8_t> most_recent_currently_pressed_vertical_direction_atomic{0b11111111};
+    std::atomic<uint8_t> most_recent_currently_pressed_horizontal_direction_atomic{0b11111111};
     uint8_t joypad_p1_joyp{0b11111111};
     uint8_t interrupt_flag_if{0b11100000};
     uint8_t bootrom_status{};
