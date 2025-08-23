@@ -25,7 +25,11 @@ jobs:
             libgtk-3-dev
 
       - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSDL_UNIX_CONSOLE_BUILD=ON
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_UNIX_CONSOLE_BUILD=ON \
+            -DCMAKE_CXX_FLAGS="-Wno-stringop-overflow"
 
       - name: Build Tests and Emulator Core
         run: cmake --build build --target emulate-game-boy-tests -- -j$(nproc)
