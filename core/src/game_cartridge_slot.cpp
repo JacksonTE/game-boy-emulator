@@ -29,7 +29,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
                                           std::string(" bytes does not meet the game ROM size requirement."), error_message);
     }
 
-    static constexpr uint8_t expected_logo[LOGO_SIZE] =
+    static constexpr uint8_t EXPECTED_LOGO[LOGO_SIZE] =
     {
         0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
         0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
@@ -42,7 +42,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
     file.seekg(LOGO_START_POSITION, std::ios::beg);
     file.read(reinterpret_cast<char *>(logo_bytes.data()), logo_bytes.size());
 
-    if (!std::equal(logo_bytes.begin(), logo_bytes.end(), std::begin(expected_logo)))
+    if (!std::equal(logo_bytes.begin(), logo_bytes.end(), std::begin(EXPECTED_LOGO)))
     {
         return set_error_message_and_fail(std::string("Logo in provided ROM does not match the expected pattern."), error_message);
     }
@@ -140,7 +140,7 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
                 const uint32_t rom_bank_0x10_offset = 0x10 * ROM_BANK_SIZE;
                 const bool is_mbc1m_cartridge = std::equal(rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION, 
                                                            rom.begin() + rom_bank_0x10_offset + LOGO_START_POSITION + LOGO_SIZE,
-                                                           std::begin(expected_logo));
+                                                           std::begin(EXPECTED_LOGO));
                 if (is_mbc1m_cartridge)
                 {
                     // Convert into standard MBC1 cartridge so normal indexing can be used to read

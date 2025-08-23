@@ -199,10 +199,10 @@ TEST_P(GbmicroTest, TestRom)
     const std::filesystem::path test_rom_path = GetParam();
     SCOPED_TRACE("Test ROM: " + test_rom_path.string());
 
-    constexpr size_t max_instructions_before_timeout = 1'000'000;
+    constexpr size_t MAX_INSTRUCTIONS_BEFORE_TIMEOUT = 1'000'000;
     bool did_test_succeed = false;
 
-    for (size_t _ = 0; _ < max_instructions_before_timeout; _++)
+    for (size_t _ = 0; _ < MAX_INSTRUCTIONS_BEFORE_TIMEOUT; _++)
     {
         game_boy_emulator.step_central_processing_unit_single_instruction();
 
@@ -220,7 +220,7 @@ TEST_P(GbmicroTest, TestRom)
             break;
         }
     }
-    ASSERT_TRUE(did_test_succeed) << "Test didn't reach a finished state within " << max_instructions_before_timeout << " instructions";
+    ASSERT_TRUE(did_test_succeed) << "Test didn't reach a finished state within " << MAX_INSTRUCTIONS_BEFORE_TIMEOUT << " instructions";
 }
 
 INSTANTIATE_TEST_SUITE_P

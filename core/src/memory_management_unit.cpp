@@ -491,7 +491,7 @@ void MemoryManagementUnit::update_dpad_direction_pressed_state_thread_safe(uint8
 
 bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const
 {
-    static constexpr std::array<std::pair<uint16_t, uint16_t>, 6> memory_buses
+    static constexpr std::array<std::pair<uint16_t, uint16_t>, 6> MEMORY_BUSES
     {
         {
             {ROM_BANK_X0_START, ROM_BANK_SIZE},
@@ -508,7 +508,7 @@ bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uin
         return address >= range_start && address < range_start + range_size;
     };
 
-    for (auto &[range_start, range_size] : memory_buses)
+    for (auto &[range_start, range_size] : MEMORY_BUSES)
     {
         if (in_range(first_address, range_start, range_size) && in_range(second_address, range_start, range_size))
         {

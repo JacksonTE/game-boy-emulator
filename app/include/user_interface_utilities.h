@@ -15,6 +15,8 @@ constexpr int INITIAL_WINDOW_SCALE = 5;
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
+constexpr float MAIN_MENU_BAR_HIDE_DELAY_SECONDS = 2.0f;
+
 static bool try_load_file_to_memory_with_dialog(
     GameBoyCore::FileType file_type,
     SDL_Window* sdl_window,
@@ -30,7 +32,7 @@ static bool try_load_file_to_memory_with_dialog(
     nfdopendialogu8args_t open_dialog_arguments{};
     nfdu8filteritem_t filters[] =
     {
-        {file_type == GameBoyCore::FileType::BootROM ? "Game Boy BootROMs" : "Game Boy ROMs", "gb,gbc,bin,rom"}
+        {file_type == GameBoyCore::FileType::BootROM ? "Game Boy Boot ROMs" : "Game Boy ROMs", "gb,gbc,bin,rom"}
     };
     open_dialog_arguments.filterList = filters;
     open_dialog_arguments.filterCount = 1;
@@ -80,6 +82,27 @@ static bool try_load_file_to_memory_with_dialog(
     return is_operation_successful;
 }
 
+static void toggle_fullscreen_enabled_state(SDL_Window* sdl_window, float& main_menu_bar_seconds_remaining_until_hidden)
+{
+    const bool was_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    SDL_SetWindowFullscreen(sdl_window, !was_window_fullscreen);
+    main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+}
+
+static void toggle_emulation_paused_state(std::atomic<bool>& is_emulation_paused_atomic, float& main_menu_bar_seconds_remaining_until_hidden)
+{
+    const bool was_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
+    is_emulation_paused_atomic.store(!was_emulation_paused, std::memory_order_release);
+    main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+}
+
+static void toggle_fast_forward_enabled_state(std::atomic<bool>& is_fast_forward_enabled_atomic, float& main_menu_bar_seconds_remaining_until_hidden)
+{
+    const bool was_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
+    is_fast_forward_enabled_atomic.store(!was_fast_forward_enabled, std::memory_order_release);
+    main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+}
+
 static void handle_sdl_events(
     bool& stop_emulating,
     bool& did_rom_loading_error_occur,
@@ -87,6 +110,8 @@ static void handle_sdl_events(
     bool& was_fast_forward_key_previously_pressed,
     bool& was_pause_key_previously_pressed,
     bool& was_reset_key_previously_pressed,
+    bool& was_fullscreen_key_previously_pressed,
+    float& main_menu_bar_seconds_remaining_until_hidden,
     std::atomic<bool>& is_emulation_paused_atomic,
     std::atomic<bool>& is_fast_forward_enabled_atomic,
     GameBoyCore::Emulator& game_boy_emulator,
@@ -112,6 +137,32 @@ static void handle_sdl_events(
                 }
                 const bool is_key_pressed = (sdl_event.type == SDL_EVENT_KEY_DOWN);
 
+                switch (sdl_event.key.key)
+                {
+                    case SDLK_F11:
+                    {
+                        if (is_key_pressed && !was_fullscreen_key_previously_pressed)
+                        {
+                            toggle_fullscreen_enabled_state(sdl_window, main_menu_bar_seconds_remaining_until_hidden);
+                        }
+                        was_fullscreen_key_previously_pressed = is_key_pressed;
+                        break;
+                    }
+                    case SDLK_O:
+                        if (is_key_pressed)
+                        {
+                            try_load_file_to_memory_with_dialog(
+                                GameBoyCore::FileType::GameROM,
+                                sdl_window,
+                                game_boy_emulator,
+                                std::ref(is_emulation_paused_atomic),
+                                is_emulation_paused_before_rom_loading,
+                                did_rom_loading_error_occur,
+                                error_message
+                            );
+                        }
+                        break;
+                }
                 if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                 {
                     switch (sdl_event.key.key)
@@ -119,14 +170,14 @@ static void handle_sdl_events(
                         case SDLK_SPACE:
                             if (is_key_pressed && !was_fast_forward_key_previously_pressed)
                             {
-                                is_fast_forward_enabled_atomic.store(!is_fast_forward_enabled_atomic.load(std::memory_order_acquire), std::memory_order_release);
+                                toggle_fast_forward_enabled_state(is_fast_forward_enabled_atomic, main_menu_bar_seconds_remaining_until_hidden);
                             }
                             was_fast_forward_key_previously_pressed = is_key_pressed;
                             break;
                         case SDLK_ESCAPE:
                             if (is_key_pressed && !was_pause_key_previously_pressed)
                             {
-                                is_emulation_paused_atomic.store(!is_emulation_paused_atomic.load(std::memory_order_acquire), std::memory_order_release);
+                                toggle_emulation_paused_state(is_emulation_paused_atomic, main_menu_bar_seconds_remaining_until_hidden);
                             }
                             was_pause_key_previously_pressed = is_key_pressed;
                             break;
@@ -171,29 +222,68 @@ static void handle_sdl_events(
                             break;
                     }
                 }
-                if (sdl_event.key.key == SDLK_O && is_key_pressed)
-                {
-                    try_load_file_to_memory_with_dialog(GameBoyCore::FileType::GameROM, sdl_window, game_boy_emulator, std::ref(is_emulation_paused_atomic), is_emulation_paused_before_rom_loading, did_rom_loading_error_occur, error_message);
-                }
             }
             break;
         }
     }
 }
 
-static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer* sdl_renderer)
+static bool is_main_menu_bar_visible(
+    SDL_Window* sdl_window,
+    bool& is_main_menu_hovered,
+    float& main_menu_bar_seconds_remaining_until_hidden,
+    const std::atomic<bool>& is_emulation_paused_atomic,
+    const GameBoyCore::Emulator& game_boy_emulator
+)
 {
-    int renderer_output_width, renderer_output_height;
-    SDL_GetRenderOutputSize(sdl_renderer, &renderer_output_width, &renderer_output_height);
+    const bool is_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    if (!is_window_fullscreen || !game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() || is_emulation_paused_atomic.load(std::memory_order_acquire))
+    {
+        return true;
+    }
 
-    float current_scale_x = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
-    float current_scale_y = static_cast<float>(renderer_output_height) / static_cast<float>(DISPLAY_HEIGHT_PIXELS);
+    float mouse_y_position_in_window;
+    SDL_GetGlobalMouseState(nullptr, &mouse_y_position_in_window);
+    const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * ImGui::GetIO().DisplayFramebufferScale.y;
 
-    int current_integer_scale = std::max(1, std::min(int(current_scale_x), int(current_scale_y)));
+    if (is_main_menu_hovered || mouse_y_position_in_window <= main_menu_bar_height_pixels)
+    {
+        main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+        return true;
+    }
 
-    float menu_bar_logical_height = ImGui::GetFrameHeight() / static_cast<float>(current_integer_scale);
+    if (main_menu_bar_seconds_remaining_until_hidden > 0.0f)
+    {
+        main_menu_bar_seconds_remaining_until_hidden -= ImGui::GetIO().DeltaTime;
+    }
+    return (main_menu_bar_seconds_remaining_until_hidden > 0.0f);
+}
 
-    return SDL_FRect {0.0f, menu_bar_logical_height, static_cast<float>(DISPLAY_WIDTH_PIXELS), static_cast<float>(DISPLAY_HEIGHT_PIXELS) - menu_bar_logical_height};
+static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer* sdl_renderer, SDL_Window* sdl_window)
+{
+    const bool is_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    float space_reserved_for_menu_bar = 0.0f;
+
+    if (!is_window_fullscreen)
+    {
+        int renderer_output_width, renderer_output_height;
+        SDL_GetRenderOutputSize(sdl_renderer, &renderer_output_width, &renderer_output_height);
+
+        const float current_scale_x = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
+        const float current_scale_y = static_cast<float>(renderer_output_height) / static_cast<float>(DISPLAY_HEIGHT_PIXELS);
+
+        const int renderer_integer_scaling_factor = std::max(1, std::min(int(current_scale_x), int(current_scale_y)));
+
+        space_reserved_for_menu_bar = (ImGui::GetFrameHeight() / static_cast<float>(renderer_integer_scaling_factor));
+    }
+
+    return SDL_FRect
+    {
+        0.0f,
+        space_reserved_for_menu_bar,
+        static_cast<float>(DISPLAY_WIDTH_PIXELS),
+        static_cast<float>(DISPLAY_HEIGHT_PIXELS) - space_reserved_for_menu_bar
+    };
 }
 
 static void set_emulation_screen_blank(const uint32_t* active_colour_palette, uint32_t* abgr_pixel_buffer, SDL_Texture* sdl_texture)
@@ -223,7 +313,7 @@ static constexpr uint32_t get_abgr_value_for_current_endianness(uint8_t alpha, u
     }
 }
 
-static constexpr uint32_t sage_colour_palette[4] =
+static constexpr uint32_t SAGE_COLOUR_PALETTE[4] =
 {
     get_abgr_value_for_current_endianness(0xFF, 0xD0, 0xF8, 0xE0),
     get_abgr_value_for_current_endianness(0xFF, 0x70, 0xC0, 0x88),
@@ -231,7 +321,7 @@ static constexpr uint32_t sage_colour_palette[4] =
     get_abgr_value_for_current_endianness(0xFF, 0x20, 0x18, 0x08)
 };
 
-static constexpr uint32_t greyscale_colour_palette[4] =
+static constexpr uint32_t GREYSCALE_COLOUR_PALETTE[4] =
 {
     get_abgr_value_for_current_endianness(0xFF, 0xFF, 0xFF, 0xFF),
     get_abgr_value_for_current_endianness(0xFF, 0xAA, 0xAA, 0xAA),
@@ -239,7 +329,7 @@ static constexpr uint32_t greyscale_colour_palette[4] =
     get_abgr_value_for_current_endianness(0xFF, 0x00, 0x00, 0x00)
 };
 
-static constexpr uint32_t classic_colour_palette[4] =
+static constexpr uint32_t CLASSIC_COLOUR_PALETTE[4] =
 {
     get_abgr_value_for_current_endianness(0xFF, 0x0F, 0xBC, 0x9B),
     get_abgr_value_for_current_endianness(0xFF, 0x0F, 0xAC, 0x8B),
@@ -272,7 +362,7 @@ static ImVec4 get_imvec4_from_abgr(uint32_t abgr)
     return ImVec4(red / 255.0f, green / 255.0f, blue / 255.0f, alpha / 255.0f);
 }
 
-static const char* colour_palette_names[] =
+static constexpr const char* COLOUR_PALETTE_LABELS[] =
 {
     "Sage",
     "Greyscale",
@@ -280,7 +370,7 @@ static const char* colour_palette_names[] =
     "Custom"
 };
 
-static const char* fast_forward_speed_names[] =
+static constexpr const char* FAST_FORWARD_SPEED_LABELS[] =
 {
     "1.50x",
     "1.75x",
@@ -316,24 +406,34 @@ static void update_colour_palette(
         set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
 }
 
+static void imgui_spaced_separator()
+{
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+}
+
 static void render_main_menu_bar(
     bool& stop_emulating,
     bool& is_emulation_paused_before_rom_loading,
     bool& did_rom_loading_error_occur,
     bool& is_custom_palette_editor_open,
-    int& selected_colour_palette_index,
+    int& selected_colour_palette_combobox_index,
     int& selected_fast_emulation_speed_index,
+    float& main_menu_bar_seconds_remaining_until_hidden,
+    bool& is_main_menu_hovered,
     const uint32_t*& active_colour_palette,
     const uint8_t currently_published_frame_buffer_index,
     uint32_t* abgr_pixel_buffer,
     std::atomic<bool>& is_emulation_paused_atomic,
     std::atomic<bool>& is_fast_forward_enabled_atomic,
-    std::atomic<double>& target_fast_emulation_speed_atomic,
+    std::atomic<double>& target_fast_forward_multiplier_atomic,
     SDL_Window* sdl_window,
     SDL_Texture* sdl_texture,
     GameBoyCore::Emulator& game_boy_emulator,
     std::string& error_message)
 {
+    const bool is_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
     const bool is_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
     const bool is_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
 
@@ -367,9 +467,7 @@ static void render_main_menu_bar(
                     error_message
                 );
             }
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+            imgui_spaced_separator();
             if (ImGui::MenuItem("Unload Game ROM", "", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
@@ -391,9 +489,7 @@ static void render_main_menu_bar(
                 }
                 is_emulation_paused_atomic.store(is_emulation_paused);
             }
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+            imgui_spaced_separator();
             if (ImGui::MenuItem("Quit", "[Alt+F4]"))
             {
                 stop_emulating = true;
@@ -403,18 +499,18 @@ static void render_main_menu_bar(
         if (ImGui::BeginMenu("Video"))
         {
             ImGui::SeparatorText("Colour Palette");
-            if (ImGui::Combo("##Colour Palette", &selected_colour_palette_index, colour_palette_names, IM_ARRAYSIZE(colour_palette_names)))
+            if (ImGui::Combo("##Colour Palette", &selected_colour_palette_combobox_index, COLOUR_PALETTE_LABELS, IM_ARRAYSIZE(COLOUR_PALETTE_LABELS)))
             {
-                switch (selected_colour_palette_index)
+                switch (selected_colour_palette_combobox_index)
                 {
                     case 0:
-                        active_colour_palette = sage_colour_palette;
+                        active_colour_palette = SAGE_COLOUR_PALETTE;
                         break;
                     case 1:
-                        active_colour_palette = greyscale_colour_palette;
+                        active_colour_palette = GREYSCALE_COLOUR_PALETTE;
                         break;
                     case 2:
-                        active_colour_palette = classic_colour_palette;
+                        active_colour_palette = CLASSIC_COLOUR_PALETTE;
                         break;
                     case 3:
                         active_colour_palette = custom_colour_palette;
@@ -428,38 +524,37 @@ static void render_main_menu_bar(
                     sdl_texture
                 );
             }
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+            imgui_spaced_separator();
             if (ImGui::MenuItem("Update Custom Palette"))
             {
                 is_custom_palette_editor_open = true;
+            }
+            imgui_spaced_separator();
+            if (ImGui::MenuItem(is_window_fullscreen ? "Exit Fullscreen" : "Fullscreen", "[F11]"))
+            {
+                toggle_fullscreen_enabled_state(sdl_window, main_menu_bar_seconds_remaining_until_hidden);
             }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Emulation"))
         {
             ImGui::SeparatorText("Fast-Foward Speed");
-            if (ImGui::Combo("##Fast-Foward Speed", &selected_fast_emulation_speed_index, fast_forward_speed_names, IM_ARRAYSIZE(fast_forward_speed_names)))
+            if (ImGui::Combo("##Fast-Foward Speed", &selected_fast_emulation_speed_index, FAST_FORWARD_SPEED_LABELS, IM_ARRAYSIZE(FAST_FORWARD_SPEED_LABELS)))
             {
-                const double emulation_speed_modifier = selected_fast_emulation_speed_index * 0.25 + 1.5;
-                target_fast_emulation_speed_atomic.store(emulation_speed_modifier, std::memory_order_release);
+                const double emulation_speed_multiplier = selected_fast_emulation_speed_index * 0.25 + 1.5;
+                target_fast_forward_multiplier_atomic.store(emulation_speed_multiplier, std::memory_order_release);
             }
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+            imgui_spaced_separator();
             if (ImGui::MenuItem(is_fast_forward_enabled ? "Disable Fast-Forward" : "Enable Fast-Forward", "[Space]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
-                is_fast_forward_enabled_atomic.store(!is_fast_forward_enabled, std::memory_order_release);
+                toggle_fast_forward_enabled_state(is_fast_forward_enabled_atomic, main_menu_bar_seconds_remaining_until_hidden);
             }
             ImGui::Spacing();
             if (ImGui::MenuItem(is_emulation_paused ? "Unpause" : "Pause", "[Esc]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
-                is_emulation_paused_atomic.store(!is_emulation_paused, std::memory_order_release);
+                toggle_emulation_paused_state(is_emulation_paused_atomic, main_menu_bar_seconds_remaining_until_hidden);
             }
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+            imgui_spaced_separator();
             if (ImGui::MenuItem("Reset", "[R]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
@@ -485,6 +580,7 @@ static void render_main_menu_bar(
                 ImGui::TextDisabled("[Fast-Forward Enabled]");
             }
         }
+        is_main_menu_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
         ImGui::EndMainMenuBar();
     }
 }
@@ -494,7 +590,7 @@ static void render_custom_colour_palette_editor(
     bool& is_custom_palette_editor_open,
     const uint8_t currently_published_frame_buffer_index,
     const uint32_t* active_colour_palette,
-    int& selected_colour_palette_index,
+    int& selected_colour_palette_combobox_index,
     uint32_t* abgr_pixel_buffer,
     SDL_Texture* sdl_texture)
 {
