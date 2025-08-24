@@ -22,8 +22,7 @@ class Emulator
 public:
     Emulator();
 
-    void reset_state(bool should_add_startup_machine_cycle);
-    void set_post_boot_state();
+    void reset_state();
 
     void step_central_processing_unit_single_instruction();
     RegisterFile<std::endian::native> get_register_file() const;

@@ -17,20 +17,22 @@ Emulator::Emulator()
 {
 }
 
-void Emulator::reset_state(bool should_add_startup_machine_cycle)
+void Emulator::reset_state()
 {
-    internal_timer.reset_state();
-    pixel_processing_unit.reset_state();
-    memory_management_unit->reset_state();
-    central_processing_unit.reset_state(should_add_startup_machine_cycle);
-}
-
-void Emulator::set_post_boot_state()
-{
-    internal_timer.set_post_boot_state();
-    pixel_processing_unit.set_post_boot_state();
-    memory_management_unit->set_post_boot_state();
-    central_processing_unit.set_post_boot_state();
+    if (is_boot_rom_loaded_in_memory_thread_safe())
+    {
+        internal_timer.reset_state();
+        pixel_processing_unit.reset_state();
+        memory_management_unit->reset_state();
+        central_processing_unit.reset_state(true);
+    }
+    else
+    {
+        internal_timer.set_post_boot_state();
+        pixel_processing_unit.set_post_boot_state();
+        memory_management_unit->set_post_boot_state();
+        central_processing_unit.set_post_boot_state();
+    }
 }
 
 void Emulator::step_central_processing_unit_single_instruction()

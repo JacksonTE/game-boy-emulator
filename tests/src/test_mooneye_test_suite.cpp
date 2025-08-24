@@ -50,7 +50,7 @@ protected:
     {
         ASSERT_TRUE(std::filesystem::exists(GetParam())) << "ROM file not found: " << GetParam();
         game_boy_emulator.try_load_file_to_memory(GetParam(), GameBoyCore::FileType::GameROM, error_message);
-        game_boy_emulator.set_post_boot_state();
+        game_boy_emulator.reset_state();
     }
 };
 

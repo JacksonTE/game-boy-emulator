@@ -49,12 +49,7 @@ static bool try_load_file_to_memory_with_dialog(
         {
             if (file_type == GameBoyCore::FileType::GameROM)
             {
-                if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
-                {
-                    game_boy_emulator.reset_state(true);
-                }
-                else
-                    game_boy_emulator.set_post_boot_state();
+                game_boy_emulator.reset_state();
             }
             is_operation_successful = true;
         }
@@ -184,15 +179,7 @@ static void handle_sdl_events(
                         case SDLK_R:
                             if (is_key_pressed && !was_reset_key_previously_pressed)
                             {
-                                if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
-                                {
-                                    game_boy_emulator.reset_state(true);
-                                }
-                                else
-                                {
-                                    game_boy_emulator.set_post_boot_state();
-                                }
-                                is_emulation_paused_atomic.store(false, std::memory_order_release);
+                                game_boy_emulator.reset_state();
                             }
                             was_reset_key_previously_pressed = is_key_pressed;
                             break;
@@ -473,7 +460,7 @@ static void render_main_menu_bar(
                 set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer, sdl_texture);
                 SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
                 game_boy_emulator.unload_game_rom_from_memory_thread_safe();
-                game_boy_emulator.reset_state(true);
+                game_boy_emulator.reset_state();
                 is_fast_forward_enabled_atomic.store(false, std::memory_order_release);
                 is_emulation_paused_atomic.store(false, std::memory_order_release);
             }
@@ -485,7 +472,7 @@ static void render_main_menu_bar(
 
                 if (game_boy_emulator.is_boot_rom_mapped_in_memory() && game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
                 {
-                    game_boy_emulator.set_post_boot_state();
+                    game_boy_emulator.reset_state();
                 }
                 is_emulation_paused_atomic.store(is_emulation_paused);
             }
@@ -557,14 +544,7 @@ static void render_main_menu_bar(
             imgui_spaced_separator();
             if (ImGui::MenuItem("Reset", "[R]", false, game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
-                if (game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe())
-                {
-                    game_boy_emulator.reset_state(true);
-                }
-                else
-                {
-                    game_boy_emulator.set_post_boot_state();
-                }
+                game_boy_emulator.reset_state();
                 is_emulation_paused_atomic.store(false, std::memory_order_release);
             }
             ImGui::EndMenu();
