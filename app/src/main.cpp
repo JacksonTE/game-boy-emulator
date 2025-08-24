@@ -150,6 +150,7 @@ int main()
 
         bool is_main_menu_hovered = false;
         float main_menu_bar_seconds_remaining_until_hidden = 0.0f;
+        float mouse_cursor_seconds_remaining_until_hidden = 0.0f;
 
         while (!stop_emulating)
         {
@@ -167,6 +168,7 @@ int main()
                 was_reset_key_previously_pressed,
                 was_fullscreen_key_previously_pressed,
                 main_menu_bar_seconds_remaining_until_hidden,
+                mouse_cursor_seconds_remaining_until_hidden,
                 is_emulation_paused_atomic,
                 is_fast_forward_enabled_atomic,
                 game_boy_emulator,
@@ -196,13 +198,38 @@ int main()
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            if (is_main_menu_bar_visible(
-                    sdl_window.get(),
-                    is_main_menu_hovered,
-                    main_menu_bar_seconds_remaining_until_hidden,
-                    is_emulation_paused_atomic,
-                    game_boy_emulator
-                ))
+            const bool will_main_menu_bar_be_visible = should_main_menu_bar_be_visible(
+                                                           sdl_window.get(),
+                                                           is_main_menu_hovered,
+                                                           main_menu_bar_seconds_remaining_until_hidden,
+                                                           is_emulation_paused_atomic,
+                                                           game_boy_emulator
+                                                       );
+
+            const bool will_mouse_cursor_be_visible = should_mouse_cursor_be_visible(
+                                                          sdl_window.get(),
+                                                          will_main_menu_bar_be_visible,
+                                                          mouse_cursor_seconds_remaining_until_hidden,
+                                                          is_emulation_paused_atomic,
+                                                          game_boy_emulator
+                                                      );
+
+            if (will_mouse_cursor_be_visible)
+            {
+                if (!SDL_CursorVisible())
+                {
+                    SDL_ShowCursor();
+                }
+            }
+            else
+            {
+                if (SDL_CursorVisible())
+                {
+                    SDL_HideCursor();
+                }
+            }
+
+            if (will_main_menu_bar_be_visible)
             {
                 render_main_menu_bar(
                     stop_emulating,

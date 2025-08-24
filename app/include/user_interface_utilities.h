@@ -16,6 +16,7 @@ constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
 constexpr float MAIN_MENU_BAR_HIDE_DELAY_SECONDS = 2.0f;
+constexpr float MOUSE_CURSOR_HIDE_DELAY_SECONDS = 1.4f;
 
 static bool try_load_file_to_memory_with_dialog(
     GameBoyCore::FileType file_type,
@@ -79,8 +80,8 @@ static bool try_load_file_to_memory_with_dialog(
 
 static void toggle_fullscreen_enabled_state(SDL_Window* sdl_window, float& main_menu_bar_seconds_remaining_until_hidden)
 {
-    const bool was_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
-    SDL_SetWindowFullscreen(sdl_window, !was_window_fullscreen);
+    const bool was_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    SDL_SetWindowFullscreen(sdl_window, !was_fullscreen_enabled);
     main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
 }
 
@@ -107,6 +108,7 @@ static void handle_sdl_events(
     bool& was_reset_key_previously_pressed,
     bool& was_fullscreen_key_previously_pressed,
     float& main_menu_bar_seconds_remaining_until_hidden,
+    float& mouse_cursor_seconds_remaining_until_hidden,
     std::atomic<bool>& is_emulation_paused_atomic,
     std::atomic<bool>& is_fast_forward_enabled_atomic,
     GameBoyCore::Emulator& game_boy_emulator,
@@ -215,7 +217,7 @@ static void handle_sdl_events(
     }
 }
 
-static bool is_main_menu_bar_visible(
+static bool should_main_menu_bar_be_visible(
     SDL_Window* sdl_window,
     bool& is_main_menu_hovered,
     float& main_menu_bar_seconds_remaining_until_hidden,
@@ -223,8 +225,10 @@ static bool is_main_menu_bar_visible(
     const GameBoyCore::Emulator& game_boy_emulator
 )
 {
-    const bool is_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
-    if (!is_window_fullscreen || !game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() || is_emulation_paused_atomic.load(std::memory_order_acquire))
+    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    if (!is_fullscreen_enabled ||
+        !game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
+        is_emulation_paused_atomic.load(std::memory_order_acquire))
     {
         return true;
     }
@@ -246,12 +250,43 @@ static bool is_main_menu_bar_visible(
     return (main_menu_bar_seconds_remaining_until_hidden > 0.0f);
 }
 
+static bool should_mouse_cursor_be_visible(
+    SDL_Window* sdl_window,
+    bool is_main_menu_bar_visible_now,
+    float& mouse_cursor_seconds_remaining_until_hidden,
+    const std::atomic<bool>& is_emulation_paused_atomic,
+    const GameBoyCore::Emulator& game_boy_emulator)
+{
+    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    if (!is_fullscreen_enabled ||
+        !game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
+        is_emulation_paused_atomic.load(std::memory_order_acquire) ||
+        is_main_menu_bar_visible_now)
+    {
+        mouse_cursor_seconds_remaining_until_hidden = MOUSE_CURSOR_HIDE_DELAY_SECONDS;
+        return true;
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)
+    {
+        mouse_cursor_seconds_remaining_until_hidden = MOUSE_CURSOR_HIDE_DELAY_SECONDS;
+        return true;
+    }
+
+    if (mouse_cursor_seconds_remaining_until_hidden > 0.0f)
+    {
+        mouse_cursor_seconds_remaining_until_hidden -= io.DeltaTime;
+    }
+    return (mouse_cursor_seconds_remaining_until_hidden > 0);
+}
+
 static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer* sdl_renderer, SDL_Window* sdl_window)
 {
-    const bool is_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
     float space_reserved_for_menu_bar = 0.0f;
 
-    if (!is_window_fullscreen)
+    if (!is_fullscreen_enabled)
     {
         int renderer_output_width, renderer_output_height;
         SDL_GetRenderOutputSize(sdl_renderer, &renderer_output_width, &renderer_output_height);
@@ -420,7 +455,7 @@ static void render_main_menu_bar(
     GameBoyCore::Emulator& game_boy_emulator,
     std::string& error_message)
 {
-    const bool is_window_fullscreen = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
     const bool is_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
     const bool is_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
 
@@ -517,7 +552,7 @@ static void render_main_menu_bar(
                 is_custom_palette_editor_open = true;
             }
             imgui_spaced_separator();
-            if (ImGui::MenuItem(is_window_fullscreen ? "Exit Fullscreen" : "Fullscreen", "[F11]"))
+            if (ImGui::MenuItem(is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen", "[F11]"))
             {
                 toggle_fullscreen_enabled_state(sdl_window, main_menu_bar_seconds_remaining_until_hidden);
             }
