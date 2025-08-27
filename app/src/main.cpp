@@ -20,14 +20,13 @@
 #include "user_interface_utilities.h"
 #include "raii_wrappers.h"
 
-static void run_emulator_core(
+static void run_emulator_core
+(
     std::stop_token stop_token,
-    GameBoyCore::Emulator& game_boy_emulator,
-    std::atomic<bool>& is_emulation_paused_atomic,
-    std::atomic<bool>& is_fast_forward_enabled_atomic,
-    std::atomic<double>& target_fast_forward_multiplier_atomic,
+    EmulationController& emulation_controller,
     std::atomic<bool>& did_exception_occur_atomic,
-    std::exception_ptr& exception_pointer)
+    std::exception_ptr& exception_pointer
+)
 {
     try
     {
@@ -36,25 +35,25 @@ static void run_emulator_core(
         const uint64_t counter_ticks_per_frame_rounded = static_cast<uint64_t>(FRAME_DURATION_SECONDS * counter_ticks_per_second + 0.5);
 
         uint64_t next_frame_counter_tick = SDL_GetPerformanceCounter();
-        uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
+        uint8_t previously_published_frame_buffer_index = emulation_controller.game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 
         while (!stop_token.stop_requested())
         {
-            if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
-                is_emulation_paused_atomic.load(std::memory_order_acquire))
+            if (!emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
+                emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
             {
                 continue;
             }
-            game_boy_emulator.step_central_processing_unit_single_instruction();
+            emulation_controller.game_boy_emulator.step_central_processing_unit_single_instruction();
 
-            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
+            const uint8_t currently_published_frame_buffer_index = emulation_controller.game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
 
-                double target_emulation_speed = is_fast_forward_enabled_atomic.load(std::memory_order_acquire)
-                    ? target_fast_forward_multiplier_atomic.load(std::memory_order_acquire)
+                double target_emulation_speed = emulation_controller.is_fast_forward_enabled_atomic.load(std::memory_order_acquire)
+                    ? emulation_controller.target_fast_forward_multiplier_atomic.load(std::memory_order_acquire)
                     : 1.0;
                 next_frame_counter_tick += counter_ticks_per_frame_rounded / target_emulation_speed;
                 const uint64_t current_counter_tick = SDL_GetPerformanceCounter();
@@ -108,51 +107,31 @@ int main()
             return 1;
         }
 
-        GameBoyCore::Emulator game_boy_emulator{};
-        std::atomic<bool> is_emulation_paused_atomic{};
-
-        std::atomic<bool> is_fast_forward_enabled_atomic{};
-        std::atomic<double> target_fast_forward_multiplier_atomic{1.5};
-        int selected_fast_emulation_speed_index = 0;
-
+        EmulationController emulation_controller{};
         std::atomic<bool> did_emulator_core_exception_occur_atomic{};
         std::exception_ptr emulator_core_exception_pointer{};
         std::jthread emulator_thread
         {
             run_emulator_core,
-            std::ref(game_boy_emulator),
-            std::ref(is_emulation_paused_atomic),
-            std::ref(is_fast_forward_enabled_atomic),
-            std::ref(target_fast_forward_multiplier_atomic),
+            std::ref(emulation_controller),
             std::ref(did_emulator_core_exception_occur_atomic),
             std::ref(emulator_core_exception_pointer),
         };
 
-        const uint32_t* active_colour_palette = SAGE_COLOUR_PALETTE;
-        int selected_colour_palette_combobox_index = 0;
-
         uint8_t previously_published_frame_buffer_index = 0;
         uint8_t currently_published_frame_buffer_index = 0;
 
-        std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
-        set_emulation_screen_blank(active_colour_palette, abgr_pixel_buffer.get(), sdl_texture.get());
-
+        FileLoadingStatus file_loading_status{};
+        FullscreenDisplayStatus fullscreen_display_status{};
+        GraphicsController graphics_controller{sdl_texture.get()};
+        KeyPressedStates key_pressed_states{};
+        MenuProperties menu_properties{};
+        
+        set_emulation_screen_blank(graphics_controller);
         std::string error_message = "";
-        bool is_emulation_paused_before_rom_loading = false;
-        bool did_rom_loading_error_occur = false;
-        bool is_custom_palette_editor_open = false;
-        bool stop_emulating = false;
+        bool should_stop_emulation = false;
 
-        bool was_fast_forward_key_previously_pressed = false;
-        bool was_pause_key_previously_pressed = false;
-        bool was_reset_key_previously_pressed = false;
-        bool was_fullscreen_key_previously_pressed = false;
-
-        bool is_main_menu_hovered = false;
-        float main_menu_bar_seconds_remaining_until_hidden = 0.0f;
-        float mouse_cursor_seconds_remaining_until_hidden = 0.0f;
-
-        while (!stop_emulating)
+        while (!should_stop_emulation)
         {
             if (did_emulator_core_exception_occur_atomic.load(std::memory_order_acquire))
             {
@@ -160,32 +139,24 @@ int main()
             }
 
             handle_sdl_events(
-                stop_emulating,
-                did_rom_loading_error_occur,
-                is_emulation_paused_before_rom_loading,
-                was_fast_forward_key_previously_pressed,
-                was_pause_key_previously_pressed,
-                was_reset_key_previously_pressed,
-                was_fullscreen_key_previously_pressed,
-                main_menu_bar_seconds_remaining_until_hidden,
-                mouse_cursor_seconds_remaining_until_hidden,
-                is_emulation_paused_atomic,
-                is_fast_forward_enabled_atomic,
-                game_boy_emulator,
+                emulation_controller,
+                file_loading_status,
+                fullscreen_display_status,
+                key_pressed_states,
                 sdl_window.get(),
-                error_message
-            );
+                should_stop_emulation,
+                error_message);
 
-            currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
+            currently_published_frame_buffer_index = emulation_controller.game_boy_emulator.get_published_frame_buffer_index_thread_safe();
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
-                auto const& pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
+                auto const& pixel_frame_buffer = emulation_controller.game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
                 for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
                 {
-                    abgr_pixel_buffer[i] = active_colour_palette[pixel_frame_buffer[i]];
+                    graphics_controller.abgr_pixel_buffer[i] = graphics_controller.active_colour_palette[pixel_frame_buffer[i]];
                 }
-                SDL_UpdateTexture(sdl_texture.get(), nullptr, abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+                SDL_UpdateTexture(sdl_texture.get(), nullptr, graphics_controller.abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
                 previously_published_frame_buffer_index = currently_published_frame_buffer_index;
             }
 
@@ -198,23 +169,9 @@ int main()
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            const bool will_main_menu_bar_be_visible = should_main_menu_bar_be_visible(
-                                                           sdl_window.get(),
-                                                           is_main_menu_hovered,
-                                                           main_menu_bar_seconds_remaining_until_hidden,
-                                                           is_emulation_paused_atomic,
-                                                           game_boy_emulator
-                                                       );
-
-            const bool will_mouse_cursor_be_visible = should_mouse_cursor_be_visible(
-                                                          sdl_window.get(),
-                                                          will_main_menu_bar_be_visible,
-                                                          mouse_cursor_seconds_remaining_until_hidden,
-                                                          is_emulation_paused_atomic,
-                                                          game_boy_emulator
-                                                      );
-
-            if (will_mouse_cursor_be_visible)
+            fullscreen_display_status.is_main_menu_bar_visible = should_main_menu_bar_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
+            const bool will_cursor_be_visible = should_mouse_cursor_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
+            if (will_cursor_be_visible)
             {
                 if (!SDL_CursorVisible())
                 {
@@ -229,44 +186,30 @@ int main()
                 }
             }
 
-            if (will_main_menu_bar_be_visible)
+            if (fullscreen_display_status.is_main_menu_bar_visible)
             {
                 render_main_menu_bar(
-                    stop_emulating,
-                    is_emulation_paused_before_rom_loading,
-                    did_rom_loading_error_occur,
-                    is_custom_palette_editor_open,
-                    selected_colour_palette_combobox_index,
-                    selected_fast_emulation_speed_index,
-                    main_menu_bar_seconds_remaining_until_hidden,
-                    is_main_menu_hovered,
-                    active_colour_palette,
                     currently_published_frame_buffer_index,
-                    abgr_pixel_buffer.get(),
-                    is_emulation_paused_atomic,
-                    is_fast_forward_enabled_atomic,
-                    target_fast_forward_multiplier_atomic,
+                    emulation_controller,
+                    file_loading_status,
+                    fullscreen_display_status,
+                    graphics_controller,
+                    menu_properties,
                     sdl_window.get(),
-                    sdl_texture.get(),
-                    game_boy_emulator,
-                    error_message
-                );
+                    should_stop_emulation,
+                    error_message);
             }
+
             render_custom_colour_palette_editor(
-                game_boy_emulator,
-                is_custom_palette_editor_open,
                 currently_published_frame_buffer_index,
-                active_colour_palette,
-                selected_colour_palette_combobox_index,
-                abgr_pixel_buffer.get(),
-                sdl_texture.get()
-            );
+                emulation_controller.game_boy_emulator,
+                menu_properties,
+                graphics_controller);
+
             render_error_message_popup(
-                did_rom_loading_error_occur,
-                is_emulation_paused_before_rom_loading,
-                is_emulation_paused_atomic,
-                error_message
-            );
+                file_loading_status,
+                emulation_controller.is_emulation_paused_atomic,
+                error_message);
 
             ImGui::Render();
             ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdl_renderer.get());
