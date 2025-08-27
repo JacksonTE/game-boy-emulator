@@ -63,7 +63,10 @@ enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
 class MemoryManagementUnit
 {
 public:
-    MemoryManagementUnit(GameCartridgeSlot& game_cartridge_slot_reference, InternalTimer& internal_timer_reference, PixelProcessingUnit& pixel_processing_unit_reference);
+    MemoryManagementUnit(
+        GameCartridgeSlot& game_cartridge_slot_reference,
+        InternalTimer& internal_timer_reference,
+        PixelProcessingUnit& pixel_processing_unit_reference);
 
     virtual void reset_state();
     void set_post_boot_state();

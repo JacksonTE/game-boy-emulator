@@ -25,7 +25,9 @@ enum class InterruptMasterEnableState
 class CentralProcessingUnit
 {
 public:
-    CentralProcessingUnit(std::function<void()> emulator_step_single_machine_cycle, MemoryManagementUnit& memory_management_unit_reference);
+    CentralProcessingUnit(
+        std::function<void()> emulator_step_single_machine_cycle,
+        MemoryManagementUnit& memory_management_unit_reference);
 
     void reset_state(bool should_add_startup_machine_cycle);
     void set_post_boot_state();

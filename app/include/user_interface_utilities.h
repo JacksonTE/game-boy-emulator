@@ -107,7 +107,8 @@ struct GraphicsController
 
     SDL_Texture* sdl_texture;
     const uint32_t* active_colour_palette = SAGE_COLOUR_PALETTE;
-    std::unique_ptr<uint32_t[]> abgr_pixel_buffer = std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
+    std::unique_ptr<uint32_t[]> abgr_pixel_buffer =
+        std::make_unique<uint32_t[]>(static_cast<uint16_t>(DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS));
 };
 
 struct KeyPressedStates
@@ -132,7 +133,8 @@ static bool try_load_file_to_memory_with_dialog(
     SDL_Window* sdl_window,
     std::string& error_message)
 {
-    file_loading_status.is_emulation_paused_before_rom_loading = emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire);
+    file_loading_status.is_emulation_paused_before_rom_loading =
+        emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire);
     emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
 
     nfdopendialogu8args_t open_dialog_arguments{};
@@ -185,21 +187,27 @@ static bool try_load_file_to_memory_with_dialog(
     return is_operation_successful;
 }
 
-static void toggle_fullscreen_enabled_state(float& main_menu_bar_seconds_remaining_until_hidden, SDL_Window* sdl_window)
+static void toggle_fullscreen_enabled_state(
+    float& main_menu_bar_seconds_remaining_until_hidden,
+    SDL_Window* sdl_window)
 {
     const bool was_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
     SDL_SetWindowFullscreen(sdl_window, !was_fullscreen_enabled);
     main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
 }
 
-static void toggle_emulation_paused_state(float& main_menu_bar_seconds_remaining_until_hidden, std::atomic<bool>& is_emulation_paused_atomic)
+static void toggle_emulation_paused_state(
+    float& main_menu_bar_seconds_remaining_until_hidden,
+    std::atomic<bool>& is_emulation_paused_atomic)
 {
     const bool was_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
     is_emulation_paused_atomic.store(!was_emulation_paused, std::memory_order_release);
     main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
 }
 
-static void toggle_fast_forward_enabled_state(float& main_menu_bar_seconds_remaining_until_hidden, std::atomic<bool>& is_fast_forward_enabled_atomic)
+static void toggle_fast_forward_enabled_state(
+    float& main_menu_bar_seconds_remaining_until_hidden,
+    std::atomic<bool>& is_fast_forward_enabled_atomic)
 {
     const bool was_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
     is_fast_forward_enabled_atomic.store(!was_fast_forward_enabled, std::memory_order_release);
@@ -240,7 +248,9 @@ static void handle_sdl_events(
                     {
                         if (is_key_pressed && !key_pressed_states.was_fullscreen_key_previously_pressed)
                         {
-                            toggle_fullscreen_enabled_state(fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden, sdl_window);
+                            toggle_fullscreen_enabled_state(
+                                fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
+                                sdl_window);
                         }
                         key_pressed_states.was_fullscreen_key_previously_pressed = is_key_pressed;
                         break;
@@ -651,7 +661,11 @@ static void render_main_menu_bar(
                     emulation_controller.is_emulation_paused_atomic);
             }
             imgui_spaced_separator();
-            if (ImGui::MenuItem("Reset", "[R]", false, emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+            if (ImGui::MenuItem(
+                    "Reset",
+                    "[R]",
+                    false,
+                    emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 emulation_controller.game_boy_emulator.reset_state();
                 emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
@@ -727,9 +741,13 @@ static void render_error_message_popup(
         is_emulation_paused_atomic.store(true, std::memory_order_release);
         const float maximum_error_popup_width = ImGui::GetIO().DisplaySize.x * 0.4f;
         const float error_message_width = ImGui::CalcTextSize(error_message.c_str()).x;
-        const float minimum_error_popup_width = std::min(maximum_error_popup_width, error_message_width + ImGui::GetStyle().WindowPadding.x * 2.0f);
+        const float minimum_error_popup_width = 
+            std::min(maximum_error_popup_width, error_message_width + ImGui::GetStyle().WindowPadding.x * 2.0f);
         ImGui::SetNextWindowSizeConstraints(ImVec2(minimum_error_popup_width, 0), ImVec2(maximum_error_popup_width, FLT_MAX));
-        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowPos(
+            ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f),
+            ImGuiCond_Always,
+            ImVec2(0.5f, 0.5f));
         ImGui::OpenPopup("Error");
     }
     if (ImGui::BeginPopupModal("Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))

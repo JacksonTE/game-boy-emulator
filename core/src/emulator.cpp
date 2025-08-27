@@ -13,7 +13,10 @@ Emulator::Emulator()
     : internal_timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
       memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
-      central_processing_unit{[this]() { this->step_components_single_machine_cycle_to_sync_with_central_processing_unit(); }, *memory_management_unit}
+      central_processing_unit{[this]()
+                              {
+                                  this->step_components_single_machine_cycle_to_sync_with_central_processing_unit();
+                              }, *memory_management_unit}
 {
 }
 
@@ -92,7 +95,10 @@ void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    GameBoyCore::print_bytes_in_range([&](uint16_t address, bool is_access_for_oam_dma) { return memory_management_unit->read_byte(address, is_access_for_oam_dma); },
+    GameBoyCore::print_bytes_in_range([&](uint16_t address, bool is_access_for_oam_dma) 
+                                      {
+                                          return memory_management_unit->read_byte(address, is_access_for_oam_dma);
+                                      },
                                       start_address,
                                       end_address);
 }

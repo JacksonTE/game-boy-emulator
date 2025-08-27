@@ -21,12 +21,18 @@ void GameCartridgeSlot::reset_state()
     memory_bank_controller = std::make_unique<MemoryBankControllerBase>(rom, ram);
 }
 
-bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, std::ifstream& file, std::streamsize file_length_in_bytes, std::string& error_message)
+bool GameCartridgeSlot::try_load_file(
+    const std::filesystem::path& file_path,
+    std::ifstream& file,
+    std::streamsize file_length_in_bytes,
+    std::string& error_message)
 {
     if (file_length_in_bytes < MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE)
     {
-        return set_error_message_and_fail(std::string("Provided file of size ") + std::to_string(file_length_in_bytes) +
-                                          std::string(" bytes does not meet the game ROM size requirement."), error_message);
+        return set_error_message_and_fail(
+            std::string("Provided file of size ") + std::to_string(file_length_in_bytes) + 
+                std::string(" bytes does not meet the game ROM size requirement."),
+            error_message);
     }
 
     static constexpr uint8_t EXPECTED_LOGO[LOGO_SIZE] =
@@ -44,7 +50,9 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
 
     if (!std::equal(logo_bytes.begin(), logo_bytes.end(), std::begin(EXPECTED_LOGO)))
     {
-        return set_error_message_and_fail(std::string("Logo in provided ROM does not match the expected pattern."), error_message);
+        return set_error_message_and_fail(
+            std::string("Logo in provided ROM does not match the expected pattern."),
+            error_message);
     }
 
     uint8_t color_game_boy_required_flag = 0xC0;
@@ -53,7 +61,9 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
 
     if (color_game_boy_required_flag == 0xC0)
     {
-        return set_error_message_and_fail(std::string("Provided game ROM requires Game Boy Color functionality to run."), error_message);
+        return set_error_message_and_fail(
+            std::string("Provided game ROM requires Game Boy Color functionality to run."),
+            error_message);
     }
 
     uint8_t cartridge_type = 0x00;
@@ -65,12 +75,16 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
     file.read(reinterpret_cast<char *>(&cartridge_rom_size_byte), 1);
     if (cartridge_rom_size_byte > 0x08)
     {
-        return set_error_message_and_fail(std::string("Provided game ROM contains an invalid ROM size byte."), error_message);
+        return set_error_message_and_fail(
+            std::string("Provided game ROM contains an invalid ROM size byte."),
+            error_message);
     }
     const uint32_t expected_cartridge_rom_size = 0x8000 * (1 << cartridge_rom_size_byte);
     if (file_length_in_bytes != expected_cartridge_rom_size)
     {
-        return set_error_message_and_fail(std::string("Provided file's size does not match the size specified in its header."), error_message);
+        return set_error_message_and_fail(
+            std::string("Provided file's size does not match the size specified in its header."),
+            error_message);
     }
 
     uint8_t cartridge_ram_size_byte = 0x00;
@@ -78,7 +92,9 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
     file.read(reinterpret_cast<char *>(&cartridge_ram_size_byte), 1);
     if (cartridge_ram_size_byte == 0x01 || cartridge_ram_size_byte > 0x05)
     {
-        return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte."), error_message);
+        return set_error_message_and_fail(
+            std::string("Provided game ROM contains an invalid RAM size byte."),
+            error_message);
     }
     uint32_t cartridge_ram_size = 0;
     switch (cartridge_ram_size_byte)
@@ -106,11 +122,15 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
         {
             if (file_length_in_bytes > MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided file does not meet the size requirement for a ROM-only game."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided file does not meet the size requirement for a ROM-only game."),
+                    error_message);
             }
             if (cartridge_ram_size != 0)
             {
-                return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte for a ROM-only game."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided game ROM contains an invalid RAM size byte for a ROM-only game."),
+                    error_message);
             }
             rom.resize(MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE, 0);
             ram.resize(0);
@@ -124,12 +144,17 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
         {
             if (file_length_in_bytes > MBC1::MAX_ROM_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided file does not meet the size requirement for an MBC1 game."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided file does not meet the size requirement for an MBC1 game."),
+                    error_message);
             }
             if ((cartridge_type == MBC1_BYTE && cartridge_ram_size != 0) ||
-                (file_length_in_bytes > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION && cartridge_ram_size > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION))
+                (file_length_in_bytes > MBC1::MAX_ROM_SIZE_IN_DEFAULT_CONFIGURATION &&
+                 cartridge_ram_size > MBC1::MAX_RAM_SIZE_IN_LARGE_CONFIGURATION))
             {
-                return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."),
+                    error_message);
             }
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
             ram.resize(cartridge_ram_size);
@@ -148,19 +173,26 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
                     const uint8_t memory_banks_per_sub_rom = 0x10;
 
                     // ROM contains 4 sub-ROMs taking up 25% of the ROM space
-                    // To convert to normal MBC1-readable format, each sub-ROM needs to be be duplicated once with subsequent sub-ROMs shifted and duplicated accordingly
+                    // To convert to normal MBC1-readable format, each sub-ROM needs to be be 
+                    // duplicated once with subsequent sub-ROMs shifted and duplicated accordingly
                     for (int8_t sub_rom_number = 3; sub_rom_number >= 0; sub_rom_number--)
                     {
                         for (int8_t memory_bank_number = memory_banks_per_sub_rom - 1; memory_bank_number >= 0; memory_bank_number--)
                         {
-                            uint32_t previous_global_memory_bank_number = (sub_rom_number * memory_banks_per_sub_rom) + memory_bank_number;
-                            uint32_t previous_global_memory_bank_offset = static_cast<uint32_t>(previous_global_memory_bank_number) * ROM_BANK_SIZE;
+                            uint32_t previous_global_memory_bank_number =
+                                (sub_rom_number * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t previous_global_memory_bank_offset =
+                                static_cast<uint32_t>(previous_global_memory_bank_number) * ROM_BANK_SIZE;
 
-                            uint32_t new_global_memory_bank_number_for_first_copy = ((2 * sub_rom_number) * memory_banks_per_sub_rom) + memory_bank_number;
-                            uint32_t new_global_memory_bank_number_for_second_copy = ((2 * sub_rom_number + 1) * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t new_global_memory_bank_number_for_first_copy =
+                                ((2 * sub_rom_number) * memory_banks_per_sub_rom) + memory_bank_number;
+                            uint32_t new_global_memory_bank_number_for_second_copy =
+                                ((2 * sub_rom_number + 1) * memory_banks_per_sub_rom) + memory_bank_number;
 
-                            uint32_t new_global_memory_bank_offset_for_first_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_first_copy) * ROM_BANK_SIZE;
-                            uint32_t new_global_memory_bank_offset_for_second_copy = static_cast<uint32_t>(new_global_memory_bank_number_for_second_copy) * ROM_BANK_SIZE;
+                            uint32_t new_global_memory_bank_offset_for_first_copy =
+                                static_cast<uint32_t>(new_global_memory_bank_number_for_first_copy) * ROM_BANK_SIZE;
+                            uint32_t new_global_memory_bank_offset_for_second_copy =
+                                static_cast<uint32_t>(new_global_memory_bank_number_for_second_copy) * ROM_BANK_SIZE;
 
                             std::copy(rom.begin() + previous_global_memory_bank_offset,
                                       rom.begin() + previous_global_memory_bank_offset + ROM_BANK_SIZE,
@@ -180,11 +212,15 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
         {
             if (file_length_in_bytes > MBC2::MAX_ROM_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided file does not meet the size requirement for an MBC2 game."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided file does not meet the size requirement for an MBC2 game."),
+                    error_message);
             }
             if (cartridge_ram_size != 0)
             {
-                return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."),\
+                    error_message);
             }
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
             ram.resize(MBC2::BUILT_IN_RAM_SIZE, 0xF0);
@@ -200,12 +236,16 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
         {
             if (file_length_in_bytes > MBC3::MAX_ROM_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided file does not meet the size requirement for an MBC3 game."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided file does not meet the size requirement for an MBC3 game."),
+                    error_message);
             }
             if (((cartridge_type == MBC3_BYTE || cartridge_ram_size == MBC3_WITH_TIMER_AND_BATTERY_BYTE) && cartridge_ram_size != 0) ||
                 cartridge_ram_size > MBC3::MAX_RAM_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."),
+                    error_message);
             }
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
             ram.resize(cartridge_ram_size);
@@ -221,12 +261,16 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
         {
             if (file_length_in_bytes > MBC5::MAX_ROM_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided file does not meet the size requirement for an MBC5 game."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided file does not meet the size requirement for an MBC5 game."),
+                    error_message);
             }
             if ((cartridge_type == MBC5_BYTE && cartridge_ram_size != 0) ||
                 cartridge_ram_size > MBC5::MAX_RAM_SIZE)
             {
-                return set_error_message_and_fail(std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."), error_message);
+                return set_error_message_and_fail(
+                    std::string("Provided game ROM contains an invalid RAM size byte for its selected memory bank controller."),
+                    error_message);
             }
             rom.resize(std::bit_ceil(static_cast<uint32_t>(file_length_in_bytes)), 0);
             ram.resize(cartridge_ram_size);
@@ -236,13 +280,17 @@ bool GameCartridgeSlot::try_load_file(const std::filesystem::path& file_path, st
         }
         default:
         {
-            return set_error_message_and_fail(std::format("Game ROM with cartridge type 0x{:02x} is not currently supported.", static_cast<int>(cartridge_type)), error_message);
+            return set_error_message_and_fail(
+                std::format("Game ROM with cartridge type 0x{:02x} is not currently supported.", static_cast<int>(cartridge_type)),
+                error_message);
         }
     }
 
     if (!was_file_load_successful)
     {
-        return set_error_message_and_fail(std::string("Could not read game rom file ") + file_path.string(), error_message);
+        return set_error_message_and_fail(
+            std::string("Could not read game rom file ") + file_path.string(),
+            error_message);
     }
     return true;
 }

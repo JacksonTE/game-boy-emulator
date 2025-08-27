@@ -12,7 +12,10 @@
 namespace GameBoyCore
 {
 
-MemoryManagementUnit::MemoryManagementUnit(GameCartridgeSlot& game_cartridge_slot_reference, InternalTimer& internal_timer_reference, PixelProcessingUnit& pixel_processing_unit_reference)
+MemoryManagementUnit::MemoryManagementUnit(
+    GameCartridgeSlot& game_cartridge_slot_reference,
+    InternalTimer& internal_timer_reference,
+    PixelProcessingUnit& pixel_processing_unit_reference)
     : game_cartridge_slot{game_cartridge_slot_reference},
       internal_timer{internal_timer_reference},
       pixel_processing_unit{pixel_processing_unit_reference}
@@ -79,12 +82,17 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file_to_read_only_memory(const std::filesystem::path& file_path, FileType file_type, std::string& error_message)
+bool MemoryManagementUnit::try_load_file_to_read_only_memory(
+    const std::filesystem::path& file_path,
+    FileType file_type,
+    std::string& error_message)
 {
     std::ifstream file(file_path, std::ios::binary | std::ios::ate);
     if (!file)
     {
-        return set_error_message_and_fail(std::string("File not found at ") + file_path.string(), error_message);
+        return set_error_message_and_fail(
+            std::string("File not found at ") + file_path.string(),
+            error_message);
     }
     std::streamsize file_length_in_bytes = file.tellg();
     file.seekg(0, std::ios::beg);
@@ -93,13 +101,16 @@ bool MemoryManagementUnit::try_load_file_to_read_only_memory(const std::filesyst
     {
         if (file_length_in_bytes != BOOTROM_SIZE)
         {
-            return set_error_message_and_fail(std::string("Provided file of size ") + std::to_string(file_length_in_bytes) +
-                                              std::string(" bytes does not meet the boot ROM size requirement."), error_message);
+            return set_error_message_and_fail(
+                std::string("Provided file of size ") + std::to_string(file_length_in_bytes) +
+                    std::string(" bytes does not meet the boot ROM size requirement."), error_message);
         }
 
         if (!file.read(reinterpret_cast<char *>(boot_rom.get()), file_length_in_bytes))
         {
-            return set_error_message_and_fail(std::string("Could not read boot_rom file ") + file_path.string(), error_message);
+            return set_error_message_and_fail(
+                std::string("Could not read boot_rom file ") + file_path.string(),
+                error_message);
         }
         is_boot_rom_loaded_in_memory_atomic.store(true, std::memory_order_release);
     }
@@ -197,8 +208,9 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
 
                 if (is_select_directional_pad_enabled)
                 {
-                    const uint8_t most_recent_direction_pad_states = most_recent_currently_pressed_vertical_direction_atomic.load(std::memory_order_acquire) &
-                                                                     most_recent_currently_pressed_horizontal_direction_atomic.load(std::memory_order_acquire);
+                    const uint8_t most_recent_direction_pad_states = 
+                        most_recent_currently_pressed_vertical_direction_atomic.load(std::memory_order_acquire) &
+                        most_recent_currently_pressed_horizontal_direction_atomic.load(std::memory_order_acquire);
                     if (is_select_buttons_enabled)
                     {
                         return (joypad_p1_joyp & 0xF0) | ((button_pressed_states_atomic.load(std::memory_order_acquire) | most_recent_direction_pad_states) & 0x0F);
@@ -291,7 +303,8 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
     else if (address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
     {
-        std::cout << std::hex << std::setfill('0') << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
+        std::cout << std::hex << std::setfill('0') 
+                  << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
     }
     else if (address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
     {
@@ -328,7 +341,8 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 pixel_processing_unit.viewport_x_position_scx = value;
                 return;
             case 0xFF44:
-                std::cout << std::hex << std::setfill('0') << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
+                std::cout << std::hex << std::setfill('0') 
+                          << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
                 return;
             case 0xFF45:
                 pixel_processing_unit.lcd_y_coordinate_compare_lyc = value;
@@ -463,25 +477,29 @@ void MemoryManagementUnit::update_dpad_direction_pressed_state_thread_safe(uint8
             case RIGHT_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_left_direction_pressed = !is_flag_set(direction_pad_bits, LEFT_DPAD_DIRECTION_FLAG_MASK);
-                most_recent_currently_pressed_horizontal_direction_atomic.store(is_left_direction_pressed ? ~LEFT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_horizontal_direction_atomic.store(
+                    is_left_direction_pressed ? ~LEFT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
             case LEFT_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_right_direction_pressed = !is_flag_set(direction_pad_bits, RIGHT_DPAD_DIRECTION_FLAG_MASK);
-                most_recent_currently_pressed_horizontal_direction_atomic.store(is_right_direction_pressed ? ~RIGHT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_horizontal_direction_atomic.store(
+                    is_right_direction_pressed ? ~RIGHT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
             case UP_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_down_direction_pressed = !is_flag_set(direction_pad_bits, DOWN_DPAD_DIRECTION_FLAG_MASK);
-                most_recent_currently_pressed_vertical_direction_atomic.store(is_down_direction_pressed ? ~DOWN_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_vertical_direction_atomic.store(
+                    is_down_direction_pressed ? ~DOWN_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
             case DOWN_DPAD_DIRECTION_FLAG_MASK:
             {
                 const bool is_up_direction_pressed = !is_flag_set(direction_pad_bits, UP_DPAD_DIRECTION_FLAG_MASK);
-                most_recent_currently_pressed_vertical_direction_atomic.store(is_up_direction_pressed ? ~UP_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                most_recent_currently_pressed_vertical_direction_atomic.store(
+                    is_up_direction_pressed ? ~UP_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
                 break;
             }
         }
