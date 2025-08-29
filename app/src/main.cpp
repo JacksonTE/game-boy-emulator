@@ -169,25 +169,13 @@ int main()
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            fullscreen_display_status.is_main_menu_bar_visible = should_main_menu_bar_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
-            const bool will_cursor_be_visible = should_mouse_cursor_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
-            if (will_cursor_be_visible)
+            fullscreen_display_status.are_main_menu_bar_and_cursor_visible = should_main_menu_bar_and_cursor_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
+            if (fullscreen_display_status.are_main_menu_bar_and_cursor_visible)
             {
                 if (!SDL_CursorVisible())
                 {
                     SDL_ShowCursor();
                 }
-            }
-            else
-            {
-                if (SDL_CursorVisible())
-                {
-                    SDL_HideCursor();
-                }
-            }
-
-            if (fullscreen_display_status.is_main_menu_bar_visible)
-            {
                 render_main_menu_bar(
                     currently_published_frame_buffer_index,
                     emulation_controller,
@@ -198,6 +186,10 @@ int main()
                     sdl_window.get(),
                     should_stop_emulation,
                     error_message);
+            }
+            else if (SDL_CursorVisible())
+            {
+                SDL_HideCursor();
             }
 
             render_custom_colour_palette_editor(

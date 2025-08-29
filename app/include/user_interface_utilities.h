@@ -15,8 +15,7 @@ constexpr int INITIAL_WINDOW_SCALE = 5;
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
-constexpr float MAIN_MENU_BAR_HIDE_DELAY_SECONDS = 2.0f;
-constexpr float MOUSE_CURSOR_HIDE_DELAY_SECONDS = 1.4f;
+constexpr float MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS = 2.5f;
 
 static constexpr uint32_t get_abgr_value_for_current_endianness(uint8_t alpha, uint8_t blue, uint8_t green, uint8_t red)
 {
@@ -92,10 +91,9 @@ struct FileLoadingStatus
 
 struct FullscreenDisplayStatus
 {
-    bool is_main_menu_bar_visible{};
+    bool are_main_menu_bar_and_cursor_visible{};
     bool is_main_menu_bar_hovered{};
-    float main_menu_bar_seconds_remaining_until_hidden{};
-    float mouse_cursor_seconds_remaining_until_hidden{};
+    float seconds_remaining_until_main_menu_bar_and_cursor_hidden{};
 };
 
 struct GraphicsController
@@ -182,36 +180,38 @@ static bool try_load_file_to_memory_with_dialog(
     else
     {
         file_loading_status.did_rom_loading_error_occur = (error_message != "");
-        emulation_controller.is_emulation_paused_atomic.store(file_loading_status.is_emulation_paused_before_rom_loading, std::memory_order_release);
+        emulation_controller.is_emulation_paused_atomic.store(
+            file_loading_status.is_emulation_paused_before_rom_loading,
+            std::memory_order_release);
     }
     return is_operation_successful;
 }
 
 static void toggle_fullscreen_enabled_state(
-    float& main_menu_bar_seconds_remaining_until_hidden,
+    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden,
     SDL_Window* sdl_window)
 {
     const bool was_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
     SDL_SetWindowFullscreen(sdl_window, !was_fullscreen_enabled);
-    main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+    seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
 }
 
 static void toggle_emulation_paused_state(
-    float& main_menu_bar_seconds_remaining_until_hidden,
-    std::atomic<bool>& is_emulation_paused_atomic)
+    std::atomic<bool>& is_emulation_paused_atomic,
+    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden)
 {
     const bool was_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
     is_emulation_paused_atomic.store(!was_emulation_paused, std::memory_order_release);
-    main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+    seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
 }
 
 static void toggle_fast_forward_enabled_state(
-    float& main_menu_bar_seconds_remaining_until_hidden,
-    std::atomic<bool>& is_fast_forward_enabled_atomic)
+    std::atomic<bool>& is_fast_forward_enabled_atomic,
+    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden)
 {
     const bool was_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
     is_fast_forward_enabled_atomic.store(!was_fast_forward_enabled, std::memory_order_release);
-    main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
+    seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
 }
 
 static void handle_sdl_events(
@@ -249,7 +249,7 @@ static void handle_sdl_events(
                         if (is_key_pressed && !key_pressed_states.was_fullscreen_key_previously_pressed)
                         {
                             toggle_fullscreen_enabled_state(
-                                fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
+                                fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden,
                                 sdl_window);
                         }
                         key_pressed_states.was_fullscreen_key_previously_pressed = is_key_pressed;
@@ -275,8 +275,8 @@ static void handle_sdl_events(
                             if (is_key_pressed && !key_pressed_states.was_fast_forward_key_previously_pressed)
                             {
                                 toggle_fast_forward_enabled_state(
-                                    fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
-                                    emulation_controller.is_fast_forward_enabled_atomic);
+                                    emulation_controller.is_fast_forward_enabled_atomic,
+                                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
                             }
                             key_pressed_states.was_fast_forward_key_previously_pressed = is_key_pressed;
                             break;
@@ -284,8 +284,8 @@ static void handle_sdl_events(
                             if (is_key_pressed && !key_pressed_states.was_pause_key_previously_pressed)
                             {
                                 toggle_emulation_paused_state(
-                                    fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
-                                    emulation_controller.is_emulation_paused_atomic);
+                                    emulation_controller.is_emulation_paused_atomic,
+                                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
                             }
                             key_pressed_states.was_pause_key_previously_pressed = is_key_pressed;
                             break;
@@ -344,7 +344,7 @@ static void handle_sdl_events(
     }
 }
 
-static bool should_main_menu_bar_be_visible(
+static bool should_main_menu_bar_and_cursor_be_visible(
     const EmulationController& emulation_controller,
     FullscreenDisplayStatus& fullscreen_display_status,
     SDL_Window* sdl_window)
@@ -360,47 +360,24 @@ static bool should_main_menu_bar_be_visible(
     float mouse_y_position_in_window;
     SDL_GetGlobalMouseState(nullptr, &mouse_y_position_in_window);
     const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * ImGui::GetIO().DisplayFramebufferScale.y;
-
-    if (fullscreen_display_status.is_main_menu_bar_hovered || mouse_y_position_in_window <= main_menu_bar_height_pixels)
-    {
-        fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden = MAIN_MENU_BAR_HIDE_DELAY_SECONDS;
-        return true;
-    }
-
-    if (fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden > 0.0f)
-    {
-        fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden -= ImGui::GetIO().DeltaTime;
-    }
-    return (fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden > 0.0f);
-}
-
-static bool should_mouse_cursor_be_visible(
-    const EmulationController& emulation_controller,
-    FullscreenDisplayStatus& fullscreen_display_status,
-    SDL_Window* sdl_window)
-{
-    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
-    if (!is_fullscreen_enabled ||
-        fullscreen_display_status.is_main_menu_bar_visible ||
-        !emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
-        emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
-    {
-        fullscreen_display_status.mouse_cursor_seconds_remaining_until_hidden = MOUSE_CURSOR_HIDE_DELAY_SECONDS;
-        return true;
-    }
-
     ImGuiIO& io = ImGui::GetIO();
-    if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)
+    if (SDL_GetMouseFocus() == sdl_window)
     {
-        fullscreen_display_status.mouse_cursor_seconds_remaining_until_hidden = MOUSE_CURSOR_HIDE_DELAY_SECONDS;
-        return true;
+        if (fullscreen_display_status.is_main_menu_bar_hovered ||
+            mouse_y_position_in_window <= main_menu_bar_height_pixels ||
+            io.MouseDelta.x != 0.0f ||
+            io.MouseDelta.y != 0.0f)
+        {
+            fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
+            return true;
+        }
     }
 
-    if (fullscreen_display_status.mouse_cursor_seconds_remaining_until_hidden > 0.0f)
+    if (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f)
     {
-        fullscreen_display_status.mouse_cursor_seconds_remaining_until_hidden -= io.DeltaTime;
+        fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden -= ImGui::GetIO().DeltaTime;
     }
-    return (fullscreen_display_status.mouse_cursor_seconds_remaining_until_hidden > 0);
+    return (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f);
 }
 
 static SDL_FRect get_sized_emulation_rectangle(SDL_Renderer* sdl_renderer, SDL_Window* sdl_window)
@@ -621,7 +598,7 @@ static void render_main_menu_bar(
             if (ImGui::MenuItem(is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen", "[F11]"))
             {
                 toggle_fullscreen_enabled_state(
-                    fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
+                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden,
                     sdl_window);
             }
             ImGui::EndMenu();
@@ -646,8 +623,8 @@ static void render_main_menu_bar(
                     emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 toggle_fast_forward_enabled_state(
-                    fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
-                    emulation_controller.is_fast_forward_enabled_atomic);
+                    emulation_controller.is_fast_forward_enabled_atomic,
+                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
             }
             ImGui::Spacing();
             if (ImGui::MenuItem(
@@ -657,8 +634,8 @@ static void render_main_menu_bar(
                     emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 toggle_emulation_paused_state(
-                    fullscreen_display_status.main_menu_bar_seconds_remaining_until_hidden,
-                    emulation_controller.is_emulation_paused_atomic);
+                    emulation_controller.is_emulation_paused_atomic,
+                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
             }
             imgui_spaced_separator();
             if (ImGui::MenuItem(
