@@ -42,6 +42,7 @@ static void run_emulator_core
             if (!emulation_controller.game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
                 emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
             {
+                SDL_Delay(0);
                 continue;
             }
             emulation_controller.game_boy_emulator.step_central_processing_unit_single_instruction();
@@ -126,7 +127,7 @@ int main()
         GraphicsController graphics_controller{sdl_texture.get()};
         KeyPressedStates key_pressed_states{};
         MenuProperties menu_properties{};
-        
+
         set_emulation_screen_blank(graphics_controller);
         std::string error_message = "";
         bool should_stop_emulation = false;

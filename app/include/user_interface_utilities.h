@@ -519,8 +519,7 @@ static void render_main_menu_bar(
                     emulation_controller,
                     file_loading_status,
                     sdl_window,
-                    error_message
-                );
+                    error_message);
             }
             imgui_spaced_separator();
             if (ImGui::MenuItem(
