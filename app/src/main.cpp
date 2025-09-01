@@ -16,12 +16,13 @@
 #include <gtk/gtk.h>
 #endif
 
+#include "application_utilities.h"
 #include "emulator.h"
-#include "user_interface_utilities.h"
+#include "imgui_utilities.h"
 #include "raii_wrappers.h"
+#include "state_data_types.h"
 
-static void run_emulator_core
-(
+static void run_emulator_core(
     std::stop_token stop_token,
     EmulationController& emulation_controller,
     std::atomic<bool>& did_exception_occur_atomic,
@@ -88,7 +89,12 @@ int main()
             DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE,
             SDL_WINDOW_RESIZABLE
         };
-        ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer{sdl_window};
+        ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer
+        {
+            sdl_window,
+            DISPLAY_WIDTH_PIXELS,
+            DISPLAY_HEIGHT_PIXELS
+        };
         ResourceAcquisitionIsInitialization::SdlTextureRaii sdl_texture
         {
             sdl_renderer,
@@ -119,16 +125,27 @@ int main()
             std::ref(emulator_core_exception_pointer),
         };
 
-        uint8_t previously_published_frame_buffer_index = 0;
-        uint8_t currently_published_frame_buffer_index = 0;
-
         FileLoadingStatus file_loading_status{};
         FullscreenDisplayStatus fullscreen_display_status{};
-        GraphicsController graphics_controller{sdl_texture.get()};
+        constexpr uint32_t initial_custom_colour_palette[4] =
+        {
+            get_abgr_value_for_current_endianness(0xFF, 0xEF, 0xE0, 0x90),
+            get_abgr_value_for_current_endianness(0xFF, 0xD8, 0xB4, 0x00),
+            get_abgr_value_for_current_endianness(0xFF, 0xB6, 0x77, 0x00),
+            get_abgr_value_for_current_endianness(0xFF, 0x5E, 0x04, 0x03)
+        };
+        GraphicsController graphics_controller{
+            SAGE_COLOUR_PALETTE,
+            DISPLAY_WIDTH_PIXELS,
+            DISPLAY_HEIGHT_PIXELS,
+            initial_custom_colour_palette,
+            sdl_texture.get(),
+        };
         KeyPressedStates key_pressed_states{};
         MenuProperties menu_properties{};
-
         set_emulation_screen_blank(graphics_controller);
+
+        uint8_t previously_published_frame_buffer_index = 0;
         std::string error_message = "";
         bool should_stop_emulation = false;
 
@@ -148,7 +165,7 @@ int main()
                 should_stop_emulation,
                 error_message);
 
-            currently_published_frame_buffer_index = emulation_controller.game_boy_emulator.get_published_frame_buffer_index_thread_safe();
+            const uint8_t currently_published_frame_buffer_index = emulation_controller.game_boy_emulator.get_published_frame_buffer_index_thread_safe();
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
             {
                 auto const& pixel_frame_buffer = emulation_controller.game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
@@ -170,7 +187,8 @@ int main()
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            fullscreen_display_status.are_main_menu_bar_and_cursor_visible = should_main_menu_bar_and_cursor_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
+            fullscreen_display_status.are_main_menu_bar_and_cursor_visible =
+                should_main_menu_bar_and_cursor_be_visible(emulation_controller, fullscreen_display_status, sdl_window.get());
             if (fullscreen_display_status.are_main_menu_bar_and_cursor_visible)
             {
                 if (!SDL_CursorVisible())

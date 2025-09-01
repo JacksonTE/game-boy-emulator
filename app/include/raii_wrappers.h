@@ -66,20 +66,23 @@ private:
 class SdlRendererRaii
 {
 public:
-    SdlRendererRaii(SdlWindowRaii& window, const char* rendering_driver_name = nullptr)
-        : renderer{SDL_CreateRenderer(window.get(), rendering_driver_name)}
+    SdlRendererRaii(
+        SdlWindowRaii& window,
+        uint8_t display_width_pixels,
+        uint8_t display_height_pixels)
+        : renderer{SDL_CreateRenderer(window.get(), nullptr)}
     {
         if (!renderer)
         {
             throw std::runtime_error(std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
         }
-        SDL_SetRenderLogicalPresentation
-        (
+
+        SDL_SetRenderLogicalPresentation(
             renderer,
-            DISPLAY_WIDTH_PIXELS,
-            DISPLAY_HEIGHT_PIXELS,
-            SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
-        );
+            display_width_pixels,
+            display_height_pixels,
+            SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+
         if (!SDL_SetRenderVSync(renderer, 1))
         {
             std::cerr << "VSync unable to be used: " << SDL_GetError() << "\n";
