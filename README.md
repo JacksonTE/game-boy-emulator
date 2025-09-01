@@ -1,6 +1,6 @@
 # Game Boy Emulator
 
-A cross-platform, cycle-accurate Nintendo Game Boy (DMG) emulator written in C++. Game ROMs are not provided with the project but can be found easily online.
+A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game ROMs are not provided with the project but can be found easily online.
 
 ## Gameplay
 | ![Tetris Game Boy Gameplay](https://github.com/user-attachments/assets/23dae5d8-91a8-4843-bf50-9f1a194e72ac) | ![Kirby Gameplay](https://github.com/user-attachments/assets/6bd456a0-53ad-4fef-9dcf-ecd0b2504eca) | ![Super Mario Land Gameplay](https://github.com/user-attachments/assets/86acf98d-a079-49a3-92b6-7070b0591d3f) |
