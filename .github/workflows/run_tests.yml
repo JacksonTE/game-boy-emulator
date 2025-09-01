@@ -1,0 +1,38 @@
+name: Run Tests
+run-name: "Run Tests: ${{ github.event_name == 'pull_request' && github.event.pull_request.title || github.event.head_commit.message }}"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            pkg-config \
+            libgtk-3-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_UNIX_CONSOLE_BUILD=ON \
+            -DCMAKE_CXX_FLAGS="-Wno-stringop-overflow"
+
+      - name: Build Test Harnesses and Emulator
+        run: cmake --build build --parallel --target game-boy-tests
+
+      - name: Run Tests
+        run: ctest --test-dir build --parallel $(nproc) --output-on-failure

@@ -1,0 +1,1505 @@
+#include <bit>
+#include <iomanip>
+#include <iostream>
+
+#include "central_processing_unit.h"
+#include "bitwise_utilities.h"
+
+namespace GameBoyEmulator
+{
+
+CentralProcessingUnit::CentralProcessingUnit(
+    std::function<void()> emulator_step_single_machine_cycle,
+    MemoryManagementUnit& memory_management_unit_reference)
+    : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
+      memory_management_unit{memory_management_unit_reference}
+{
+    emulator_step_single_machine_cycle_callback();
+}
+
+void CentralProcessingUnit::reset_state(bool should_add_startup_machine_cycle)
+{
+    if (should_add_startup_machine_cycle)
+    {
+        emulator_step_single_machine_cycle_callback();
+    }
+    set_register_file_state(RegisterFile<std::endian::native>{});
+    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
+    instruction_register_ir = 0x00;
+    is_current_instruction_prefixed = false;
+    is_halted = false;
+}
+
+void CentralProcessingUnit::set_post_boot_state()
+{
+    reset_state(false);
+    register_file.A = 0x01;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, true);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    uint8_t header_checksum = 0;
+    for (uint16_t address = CARTRIDGE_HEADER_START; address <= CARTRIDGE_HEADER_END; address++)
+    {
+        header_checksum -= memory_management_unit.read_byte(BOOTROM_SIZE + address, false) - 1;
+    }
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, header_checksum != 0);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, header_checksum != 0);
+    register_file.B = 0x00;
+    register_file.C = 0x13;
+    register_file.D = 0x00;
+    register_file.E = 0xD8;
+    register_file.H = 0x01;
+    register_file.L = 0x4D;
+    register_file.program_counter = 0x100;
+    register_file.stack_pointer = 0xFFFE;
+}
+
+RegisterFile<std::endian::native> CentralProcessingUnit::get_register_file() const
+{
+    return register_file;
+}
+
+void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endian::native>& new_register_values)
+{
+    register_file.A = new_register_values.A;
+    register_file.flags = new_register_values.flags & 0xF0; // Lower nibble of flags must always be zeroed
+    register_file.BC = new_register_values.BC;
+    register_file.DE = new_register_values.DE;
+    register_file.HL = new_register_values.HL;
+    register_file.program_counter = new_register_values.program_counter;
+    register_file.stack_pointer = new_register_values.stack_pointer;
+}
+
+void CentralProcessingUnit::step_single_instruction()
+{
+    if (is_halted)
+        emulator_step_single_machine_cycle_callback();
+    else
+    {
+        if (is_current_instruction_prefixed)
+        {
+            decode_current_prefixed_opcode_and_execute();
+        }
+        else
+        {
+            decode_current_unprefixed_opcode_and_execute();
+        }
+        fetch_next_instruction();
+    }
+    service_interrupt();
+
+    if (interrupt_master_enable_ime == InterruptMasterEnableState::WillEnable)
+        interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
+}
+
+void CentralProcessingUnit::fetch_next_instruction()
+{
+    const uint8_t immediate8 = fetch_immediate8_and_step_emulator_components();
+    is_current_instruction_prefixed = (immediate8 == INSTRUCTION_PREFIX_BYTE);
+
+    // Produces the halt bug
+    if (is_halted)
+    {
+        const bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
+
+        if (is_interrupt_pending && interrupt_master_enable_ime != InterruptMasterEnableState::Enabled)
+        {
+            register_file.program_counter--;
+            is_halted = false;
+        }
+    }
+    instruction_register_ir = is_current_instruction_prefixed
+        ? fetch_immediate8_and_step_emulator_components()
+        : immediate8;
+}
+
+void CentralProcessingUnit::service_interrupt()
+{
+    bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
+    if (is_interrupt_pending && is_halted)
+    {
+        is_halted = false;
+    }
+    if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
+        return;
+
+    emulator_step_single_machine_cycle_callback();
+    register_file.program_counter -= is_current_instruction_prefixed ? 2 : 1;
+    decrement_and_step_emulator_components(register_file.stack_pointer);
+    write_byte_and_step_emulator_components(register_file.stack_pointer--, register_file.program_counter >> 8);
+    uint8_t interrupt_flag_mask = memory_management_unit.get_pending_interrupt_mask();
+    write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xFF);
+
+    memory_management_unit.clear_interrupt_flag_bit(interrupt_flag_mask);
+    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
+    register_file.program_counter = (interrupt_flag_mask == 0x00)
+        ? 0x00
+        : 0x0040 + 8 * static_cast<uint8_t>(std::countr_zero(interrupt_flag_mask));
+
+    fetch_next_instruction();
+}
+
+uint8_t CentralProcessingUnit::read_byte_and_step_emulator_components(uint16_t address)
+{
+    emulator_step_single_machine_cycle_callback();
+    return memory_management_unit.read_byte(address, false);
+}
+
+void CentralProcessingUnit::write_byte_and_step_emulator_components(uint16_t address, uint8_t value)
+{
+    emulator_step_single_machine_cycle_callback();
+    memory_management_unit.write_byte(address, value, false);
+}
+
+uint8_t CentralProcessingUnit::fetch_immediate8_and_step_emulator_components()
+{
+    uint8_t immediate8 = read_byte_and_step_emulator_components(register_file.program_counter++);
+    return immediate8;
+}
+
+uint16_t CentralProcessingUnit::fetch_immediate16_and_step_emulator_components()
+{
+    const uint8_t low_byte = fetch_immediate8_and_step_emulator_components();
+    return low_byte | static_cast<uint16_t>(fetch_immediate8_and_step_emulator_components() << 8);
+}
+
+uint8_t& CentralProcessingUnit::get_register_by_index(uint8_t index)
+{
+    switch (index)
+    {
+        case 0:
+            return register_file.B;
+        case 1:
+            return register_file.C;
+        case 2:
+            return register_file.D;
+        case 3:
+            return register_file.E;
+        case 4:
+            return register_file.H;
+        case 5:
+            return register_file.L;
+        case 7:
+            return register_file.A;
+        default:
+            throw std::runtime_error{"Error: invalid register index provided to get_register_by_index(uint8_t index)."};
+    }
+}
+
+void CentralProcessingUnit::decode_current_unprefixed_opcode_and_execute()
+{
+    const uint8_t destination_register_index = ((instruction_register_ir >> 3) & 0b111);
+    const uint8_t source_register_index = (instruction_register_ir & 0b111);
+
+    switch (instruction_register_ir)
+    {
+        case 0x00:
+            // no operation instruction - NOP
+            break;
+        case 0x01:
+            load(register_file.BC, fetch_immediate16_and_step_emulator_components());
+            break;
+        case 0x02:
+            load_memory(register_file.BC, register_file.A);
+            break;
+        case 0x03:
+            increment_and_step_emulator_components(register_file.BC);
+            break;
+        case 0x04:
+            increment(register_file.B);
+            break;
+        case 0x05:
+            decrement(register_file.B);
+            break;
+        case 0x06:
+            load(register_file.B, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x07:
+            rotate_left_circular_a_0x07();
+            break;
+        case 0x08:
+            load_memory_immediate16_stack_pointer_0x08();
+            break;
+        case 0x09:
+            add_hl(register_file.BC);
+            break;
+        case 0x0A:
+            load(register_file.A, read_byte_and_step_emulator_components(register_file.BC));
+            break;
+        case 0x0B:
+            decrement_and_step_emulator_components(register_file.BC);
+            break;
+        case 0x0C:
+            increment(register_file.C);
+            break;
+        case 0x0D:
+            decrement(register_file.C);
+            break;
+        case 0x0E:
+            load(register_file.C, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x0F:
+            rotate_right_circular_a_0x0F();
+            break;
+        case 0x10:
+            // stop instruction - STOP - unused until Game Boy Color
+            break;
+        case 0x11:
+            load(register_file.DE, fetch_immediate16_and_step_emulator_components());
+            break;
+        case 0x12:
+            load_memory(register_file.DE, register_file.A);
+            break;
+        case 0x13:
+            increment_and_step_emulator_components(register_file.DE);
+            break;
+        case 0x14:
+            increment(register_file.D);
+            break;
+        case 0x15:
+            decrement(register_file.D);
+            break;
+        case 0x16:
+            load(register_file.D, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x17:
+            rotate_left_through_carry_a_0x17();
+            break;
+        case 0x18:
+            jump_relative_conditional_signed_immediate8(true);
+            break;
+        case 0x19:
+            add_hl(register_file.DE);
+            break;
+        case 0x1A:
+            load(register_file.A, read_byte_and_step_emulator_components(register_file.DE));
+            break;
+        case 0x1B:
+            decrement_and_step_emulator_components(register_file.DE);
+            break;
+        case 0x1C:
+            increment(register_file.E);
+            break;
+        case 0x1D:
+            decrement(register_file.E);
+            break;
+        case 0x1E:
+            load(register_file.E, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x1F:
+            rotate_right_through_carry_a_0x1F();
+            break;
+        case 0x20:
+            jump_relative_conditional_signed_immediate8(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0x21:
+            load(register_file.HL, fetch_immediate16_and_step_emulator_components());
+            break;
+        case 0x22:
+            load_memory(register_file.HL++, register_file.A);
+            break;
+        case 0x23:
+            increment_and_step_emulator_components(register_file.HL);
+            break;
+        case 0x24:
+            increment(register_file.H);
+            break;
+        case 0x25:
+            decrement(register_file.H);
+            break;
+        case 0x26:
+            load(register_file.H, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x27:
+            decimal_adjust_a_0x27();
+            break;
+        case 0x28:
+            jump_relative_conditional_signed_immediate8(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0x29:
+            add_hl(register_file.HL);
+            break;
+        case 0x2A:
+            load(register_file.A, read_byte_and_step_emulator_components(register_file.HL++));
+            break;
+        case 0x2B:
+            decrement_and_step_emulator_components(register_file.HL);
+            break;
+        case 0x2C:
+            increment(register_file.L);
+            break;
+        case 0x2D:
+            decrement(register_file.L);
+            break;
+        case 0x2E:
+            load(register_file.L, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x2F:
+            complement_a_0x2F();
+            break;
+        case 0x30:
+            jump_relative_conditional_signed_immediate8(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0x31:
+            load(register_file.stack_pointer, fetch_immediate16_and_step_emulator_components());
+            break;
+        case 0x32:
+            load_memory(register_file.HL--, register_file.A);
+            break;
+        case 0x33:
+            increment_and_step_emulator_components(register_file.stack_pointer);
+            break;
+        case 0x34:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::increment);
+            break;
+        case 0x35:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::decrement);
+            break;
+        case 0x36:
+            load_memory(register_file.HL, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x37:
+            set_carry_flag_0x37();
+            break;
+        case 0x38:
+            jump_relative_conditional_signed_immediate8(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0x39:
+            add_hl(register_file.stack_pointer);
+            break;
+        case 0x3A:
+            load(register_file.A, read_byte_and_step_emulator_components(register_file.HL--));
+            break;
+        case 0x3B:
+            decrement_and_step_emulator_components(register_file.stack_pointer);
+            break;
+        case 0x3C:
+            increment(register_file.A);
+            break;
+        case 0x3D:
+            decrement(register_file.A);
+            break;
+        case 0x3E:
+            load(register_file.A, fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0x3F:
+            complement_carry_flag_0x3F();
+            break;
+        case 0x40:
+        case 0x41:
+        case 0x42:
+        case 0x43:
+        case 0x44:
+        case 0x45:
+        case 0x47:
+        case 0x48:
+        case 0x49:
+        case 0x4A:
+        case 0x4B:
+        case 0x4C:
+        case 0x4D:
+        case 0x4F:
+        case 0x50:
+        case 0x51:
+        case 0x52:
+        case 0x53:
+        case 0x54:
+        case 0x55:
+        case 0x57:
+        case 0x58:
+        case 0x59:
+        case 0x5A:
+        case 0x5B:
+        case 0x5C:
+        case 0x5D:
+        case 0x5F:
+        case 0x60:
+        case 0x61:
+        case 0x62:
+        case 0x63:
+        case 0x64:
+        case 0x65:
+        case 0x67:
+        case 0x68:
+        case 0x69:
+        case 0x6A:
+        case 0x6B:
+        case 0x6C:
+        case 0x6D:
+        case 0x6F:
+        case 0x78:
+        case 0x79:
+        case 0x7A:
+        case 0x7B:
+        case 0x7C:
+        case 0x7D:
+        case 0x7F:
+            load(get_register_by_index(destination_register_index), get_register_by_index(source_register_index));
+            break;
+        case 0x46:
+        case 0x56:
+        case 0x66:
+        case 0x4E:
+        case 0x5E:
+        case 0x6E:
+        case 0x7E:
+            load(get_register_by_index(destination_register_index), read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0x70:
+        case 0x71:
+        case 0x72:
+        case 0x73:
+        case 0x74:
+        case 0x75:
+        case 0x77:
+            load_memory(register_file.HL, get_register_by_index(source_register_index));
+            break;
+        case 0x76:
+            halt_0x76();
+            break;
+        case 0x80:
+        case 0x81:
+        case 0x82:
+        case 0x83:
+        case 0x84:
+        case 0x85:
+        case 0x87:
+            add_a(get_register_by_index(source_register_index));
+            break;
+        case 0x86:
+            add_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0x88:
+        case 0x89:
+        case 0x8A:
+        case 0x8B:
+        case 0x8C:
+        case 0x8D:
+        case 0x8F:
+            add_with_carry_a(get_register_by_index(source_register_index));
+            break;
+        case 0x8E:
+            add_with_carry_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0x90:
+        case 0x91:
+        case 0x92:
+        case 0x93:
+        case 0x94:
+        case 0x95:
+        case 0x97:
+            subtract_a(get_register_by_index(source_register_index));
+            break;
+        case 0x96:
+            subtract_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0x98:
+        case 0x99:
+        case 0x9A:
+        case 0x9B:
+        case 0x9C:
+        case 0x9D:
+        case 0x9F:
+            subtract_with_carry_a(get_register_by_index(source_register_index));
+            break;
+        case 0x9E:
+            subtract_with_carry_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0xA0:
+        case 0xA1:
+        case 0xA2:
+        case 0xA3:
+        case 0xA4:
+        case 0xA5:
+        case 0xA7:
+            and_a(get_register_by_index(source_register_index));
+            break;
+        case 0xA6:
+            and_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0xA8:
+        case 0xA9:
+        case 0xAA:
+        case 0xAB:
+        case 0xAC:
+        case 0xAD:
+        case 0xAF:
+            xor_a(get_register_by_index(source_register_index));
+            break;
+        case 0xAE:
+            xor_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0xB0:
+        case 0xB1:
+        case 0xB2:
+        case 0xB3:
+        case 0xB4:
+        case 0xB5:
+        case 0xB7:
+            or_a(get_register_by_index(source_register_index));
+            break;
+        case 0xB6:
+            or_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0xB8:
+        case 0xB9:
+        case 0xBA:
+        case 0xBB:
+        case 0xBC:
+        case 0xBD:
+        case 0xBF:
+            compare_a(get_register_by_index(source_register_index));
+            break;
+        case 0xBE:
+            compare_a(read_byte_and_step_emulator_components(register_file.HL));
+            break;
+        case 0xC0:
+            return_conditional(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0xC1:
+            pop_stack(register_file.BC);
+            break;
+        case 0xC2:
+            jump_conditional_immediate16(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0xC3:
+            jump_conditional_immediate16(true);
+            break;
+        case 0xC4:
+            call_conditional_immediate16(!is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0xC5:
+            push_stack(register_file.BC);
+            break;
+        case 0xC6:
+            add_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xC7:
+            restart_at_address(0x00);
+            break;
+        case 0xC8:
+            return_conditional(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0xC9:
+            return_0xC9();
+            break;
+        case 0xCA:
+            jump_conditional_immediate16(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0xCC:
+            call_conditional_immediate16(is_flag_set(register_file.flags, ZERO_FLAG_MASK));
+            break;
+        case 0xCD:
+            call_conditional_immediate16(true);
+            break;
+        case 0xCE:
+            add_with_carry_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xCF:
+            restart_at_address(0x08);
+            break;
+        case 0xD0:
+            return_conditional(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0xD1:
+            pop_stack(register_file.DE);
+            break;
+        case 0xD2:
+            jump_conditional_immediate16(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0xD4:
+            call_conditional_immediate16(!is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0xD5:
+            push_stack(register_file.DE);
+            break;
+        case 0xD6:
+            subtract_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xD7:
+            restart_at_address(0x10);
+            break;
+        case 0xD8:
+            return_conditional(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0xD9:
+            return_from_interrupt_0xD9();
+            break;
+        case 0xDA:
+            jump_conditional_immediate16(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0xDC:
+            call_conditional_immediate16(is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+            break;
+        case 0xDE:
+            subtract_with_carry_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xDF:
+            restart_at_address(0x18);
+            break;
+        case 0xE0:
+            load_memory(INPUT_OUTPUT_REGISTERS_START + fetch_immediate8_and_step_emulator_components(), register_file.A);
+            break;
+        case 0xE1:
+            pop_stack(register_file.HL);
+            break;
+        case 0xE2:
+            load_memory(INPUT_OUTPUT_REGISTERS_START + register_file.C, register_file.A);
+            break;
+        case 0xE5:
+            push_stack(register_file.HL);
+            break;
+        case 0xE6:
+            and_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xE7:
+            restart_at_address(0x20);
+            break;
+        case 0xE8:
+            add_stack_pointer_signed_immediate8_0xE8();
+            break;
+        case 0xE9:
+            jump_hl_0xE9();
+            break;
+        case 0xEA:
+            load_memory(fetch_immediate16_and_step_emulator_components(), register_file.A);
+            break;
+        case 0xEE:
+            xor_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xEF:
+            restart_at_address(0x28);
+            break;
+        case 0xF0:
+            load(register_file.A, read_byte_and_step_emulator_components(INPUT_OUTPUT_REGISTERS_START + fetch_immediate8_and_step_emulator_components()));
+            break;
+        case 0xF1:
+            pop_stack_af_0xF1();
+            break;
+        case 0xF2:
+            load(register_file.A, read_byte_and_step_emulator_components(INPUT_OUTPUT_REGISTERS_START + register_file.C));
+            break;
+        case 0xF3:
+            disable_interrupts_0xF3();
+            break;
+        case 0xF5:
+            push_stack(register_file.AF);
+            break;
+        case 0xF6:
+            or_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xF7:
+            restart_at_address(0x30);
+            break;
+        case 0xF8:
+            load_hl_stack_pointer_with_signed_offset_0xF8();
+            break;
+        case 0xF9:
+            load_stack_pointer_hl_0xF9();
+            break;
+        case 0xFA:
+            load(register_file.A, read_byte_and_step_emulator_components(fetch_immediate16_and_step_emulator_components()));
+            break;
+        case 0xFB:
+            enable_interrupts_0xFB();
+            break;
+        case 0xFE:
+            compare_a(fetch_immediate8_and_step_emulator_components());
+            break;
+        case 0xFF:
+            restart_at_address(0x38);
+            break;
+        default:
+            unused_opcode();
+            break;
+    }
+}
+
+void CentralProcessingUnit::decode_current_prefixed_opcode_and_execute()
+{
+    const uint8_t destination_register_index = (instruction_register_ir & 0b111);
+    const uint8_t bit_position = ((instruction_register_ir >> 3) & 0b111);
+
+    switch (instruction_register_ir)
+    {
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x04:
+        case 0x05:
+        case 0x07:
+            rotate_left_circular(get_register_by_index(destination_register_index));
+            break;
+        case 0x06:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::rotate_left_circular);
+            break;
+        case 0x08:
+        case 0x09:
+        case 0x0A:
+        case 0x0B:
+        case 0x0C:
+        case 0x0D:
+        case 0x0F:
+            rotate_right_circular(get_register_by_index(destination_register_index));
+            break;
+        case 0x0E:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::rotate_right_circular);
+            break;
+        case 0x10:
+        case 0x11:
+        case 0x12:
+        case 0x13:
+        case 0x14:
+        case 0x15:
+        case 0x17:
+            rotate_left_through_carry(get_register_by_index(destination_register_index));
+            break;
+        case 0x16:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::rotate_left_through_carry);
+            break;
+        case 0x18:
+        case 0x19:
+        case 0x1A:
+        case 0x1B:
+        case 0x1C:
+        case 0x1D:
+        case 0x1F:
+            rotate_right_through_carry(get_register_by_index(destination_register_index));
+            break;
+        case 0x1E:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::rotate_right_through_carry);
+            break;
+        case 0x20:
+        case 0x21:
+        case 0x22:
+        case 0x23:
+        case 0x24:
+        case 0x25:
+        case 0x27:
+            shift_left_arithmetic(get_register_by_index(destination_register_index));
+            break;
+        case 0x26:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::shift_left_arithmetic);
+            break;
+        case 0x28:
+        case 0x29:
+        case 0x2A:
+        case 0x2B:
+        case 0x2C:
+        case 0x2D:
+        case 0x2F:
+            shift_right_arithmetic(get_register_by_index(destination_register_index));
+            break;
+        case 0x2E:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::shift_right_arithmetic);
+            break;
+        case 0x30:
+        case 0x31:
+        case 0x32:
+        case 0x33:
+        case 0x34:
+        case 0x35:
+        case 0x37:
+            swap_nibbles(get_register_by_index(destination_register_index));
+            break;
+        case 0x36:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::swap_nibbles);
+            break;
+        case 0x38:
+        case 0x39:
+        case 0x3A:
+        case 0x3B:
+        case 0x3C:
+        case 0x3D:
+        case 0x3F:
+            shift_right_logical(get_register_by_index(destination_register_index));
+            break;
+        case 0x3E:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::shift_right_logical);
+            break;        
+        case 0x40:
+        case 0x41:
+        case 0x42:
+        case 0x43:
+        case 0x44:
+        case 0x45:
+        case 0x47:
+        case 0x48:
+        case 0x49:
+        case 0x4A:
+        case 0x4B:
+        case 0x4C:
+        case 0x4D:
+        case 0x4F:
+        case 0x50:
+        case 0x51:
+        case 0x52:
+        case 0x53:
+        case 0x54:
+        case 0x55:
+        case 0x57:
+        case 0x58:
+        case 0x59:
+        case 0x5A:
+        case 0x5B:
+        case 0x5C:
+        case 0x5D:
+        case 0x5F:
+        case 0x60:
+        case 0x61:
+        case 0x62:
+        case 0x63:
+        case 0x64:
+        case 0x65:
+        case 0x67:
+        case 0x68:
+        case 0x69:
+        case 0x6A:
+        case 0x6B:
+        case 0x6C:
+        case 0x6D:
+        case 0x6F:
+        case 0x70:
+        case 0x71:
+        case 0x72:
+        case 0x73:
+        case 0x74:
+        case 0x75:
+        case 0x77:
+        case 0x78:
+        case 0x79:
+        case 0x7A:
+        case 0x7B:
+        case 0x7C:
+        case 0x7D:
+        case 0x7F:
+            test_bit(bit_position, get_register_by_index(destination_register_index));
+            break;
+        case 0x46:
+        case 0x4E:
+        case 0x56:
+        case 0x5E:
+        case 0x66:
+        case 0x6E:
+        case 0x76:
+        case 0x7E:
+            operate_on_register_hl(&CentralProcessingUnit::test_bit, bit_position);
+            break;
+        case 0x80:
+        case 0x81:
+        case 0x82:
+        case 0x83:
+        case 0x84:
+        case 0x85:
+        case 0x87:
+        case 0x88:
+        case 0x89:
+        case 0x8A:
+        case 0x8B:
+        case 0x8C:
+        case 0x8D:
+        case 0x8F:
+        case 0x90:
+        case 0x91:
+        case 0x92:
+        case 0x93:
+        case 0x94:
+        case 0x95:
+        case 0x97:
+        case 0x98:
+        case 0x99:
+        case 0x9A:
+        case 0x9B:
+        case 0x9C:
+        case 0x9D:
+        case 0x9F:
+        case 0xA0:
+        case 0xA1:
+        case 0xA2:
+        case 0xA3:
+        case 0xA4:
+        case 0xA5:
+        case 0xA7:
+        case 0xA8:
+        case 0xA9:
+        case 0xAA:
+        case 0xAB:
+        case 0xAC:
+        case 0xAD:
+        case 0xAF:
+        case 0xB0:
+        case 0xB1:
+        case 0xB2:
+        case 0xB3:
+        case 0xB4:
+        case 0xB5:
+        case 0xB7:
+        case 0xB8:
+        case 0xB9:
+        case 0xBA:
+        case 0xBB:
+        case 0xBC:
+        case 0xBD:
+        case 0xBF:
+            reset_bit(bit_position, get_register_by_index(destination_register_index));
+            break;
+        case 0x86:
+        case 0x8E:
+        case 0x96:
+        case 0x9E:
+        case 0xA6:
+        case 0xAE:
+        case 0xB6:
+        case 0xBE:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::reset_bit, bit_position);
+            break;
+        case 0xC0:
+        case 0xC1:
+        case 0xC2:
+        case 0xC3:
+        case 0xC4:
+        case 0xC5:
+        case 0xC7:
+        case 0xC8:
+        case 0xC9:
+        case 0xCA:
+        case 0xCB:
+        case 0xCC:
+        case 0xCD:
+        case 0xCF:
+        case 0xD0:
+        case 0xD1:
+        case 0xD2:
+        case 0xD3:
+        case 0xD4:
+        case 0xD5:
+        case 0xD7:
+        case 0xD8:
+        case 0xD9:
+        case 0xDA:
+        case 0xDB:
+        case 0xDC:
+        case 0xDD:
+        case 0xDF:
+        case 0xE0:
+        case 0xE1:
+        case 0xE2:
+        case 0xE3:
+        case 0xE4:
+        case 0xE5:
+        case 0xE7:
+        case 0xE8:
+        case 0xE9:
+        case 0xEA:
+        case 0xEB:
+        case 0xEC:
+        case 0xED:
+        case 0xEF:
+        case 0xF0:
+        case 0xF1:
+        case 0xF2:
+        case 0xF3:
+        case 0xF4:
+        case 0xF5:
+        case 0xF7:
+        case 0xF8:
+        case 0xF9:
+        case 0xFA:
+        case 0xFB:
+        case 0xFC:
+        case 0xFD:
+        case 0xFF:
+            set_bit(bit_position, get_register_by_index(destination_register_index));
+            break;
+        case 0xC6:
+        case 0xCE:
+        case 0xD6:
+        case 0xDE:
+        case 0xE6:
+        case 0xEE:
+        case 0xF6:
+        case 0xFE:
+            operate_on_register_hl_and_write(&CentralProcessingUnit::set_bit, bit_position);
+            break;
+    }
+}
+
+// ================================
+// ===== Generic Instructions =====
+// ================================
+
+template <typename T>
+void CentralProcessingUnit::load(T& destination_register, T value)
+{
+    destination_register = value;
+}
+
+void CentralProcessingUnit::load_memory(uint16_t address, uint8_t value)
+{
+    write_byte_and_step_emulator_components(address, value);
+}
+
+void CentralProcessingUnit::increment(uint8_t& register8)
+{
+    const bool does_half_carry_occur = (register8 & 0x0F) == 0x0F;
+    register8++;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+}
+
+void CentralProcessingUnit::increment_and_step_emulator_components(uint16_t& register16)
+{
+    emulator_step_single_machine_cycle_callback();
+    register16++;
+}
+
+void CentralProcessingUnit::decrement(uint8_t& register8)
+{
+    const bool does_half_carry_occur = (register8 & 0x0F) == 0x00;
+    register8--;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+}
+
+void CentralProcessingUnit::decrement_and_step_emulator_components(uint16_t& register16)
+{
+    emulator_step_single_machine_cycle_callback();
+    register16--;
+}
+
+void CentralProcessingUnit::add_hl(uint16_t value)
+{
+    emulator_step_single_machine_cycle_callback();
+    const bool does_half_carry_occur = (register_file.HL & 0x0FFF) + (value & 0x0FFF) > 0x0FFF;
+    const bool does_carry_occur = static_cast<uint32_t>(register_file.HL) + value > 0xFFFF;
+    register_file.HL += value;
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::add_a(uint8_t value)
+{
+    const bool does_half_carry_occur = (register_file.A & 0x0F) + (value & 0x0F) > 0x0F;
+    const bool does_carry_occur = static_cast<uint16_t>(register_file.A) + value > 0xFF;
+    register_file.A += value;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::add_with_carry_a(uint8_t value)
+{
+    const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
+    const bool does_half_carry_occur = (register_file.A & 0x0F) + (value & 0x0F) + carry_in > 0x0F;
+    const bool does_carry_occur = static_cast<uint16_t>(register_file.A) + value + carry_in > 0xFF;
+    register_file.A += value + carry_in;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::subtract_a(uint8_t value)
+{
+    const bool does_half_carry_occur = (register_file.A & 0x0F) < (value & 0x0F);
+    const bool does_carry_occur = register_file.A < value;
+    register_file.A -= value;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::subtract_with_carry_a(uint8_t value)
+{
+    const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
+    const bool does_half_carry_occur = (register_file.A & 0x0F) < (value & 0x0F) + carry_in;
+    const bool does_carry_occur = register_file.A < value + carry_in;
+    register_file.A -= value + carry_in;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::and_a(uint8_t value)
+{
+    register_file.A &= value;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, true);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::xor_a(uint8_t value)
+{
+    register_file.A ^= value;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::or_a(uint8_t value)
+{
+    register_file.A |= value;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::compare_a(uint8_t value)
+{
+    const bool does_half_carry_occur = (register_file.A & 0x0F) < (value & 0x0F);
+    const bool does_carry_occur = register_file.A < value;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == value);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::jump_relative_conditional_signed_immediate8(bool is_condition_met)
+{
+    const int8_t signed_offset = static_cast<int8_t>(fetch_immediate8_and_step_emulator_components());
+    if (is_condition_met)
+    {
+        emulator_step_single_machine_cycle_callback();
+        register_file.program_counter += signed_offset;
+    }
+}
+
+void CentralProcessingUnit::jump_conditional_immediate16(bool is_condition_met)
+{
+    const uint16_t jump_address = fetch_immediate16_and_step_emulator_components();
+    if (is_condition_met)
+    {
+        emulator_step_single_machine_cycle_callback();
+        register_file.program_counter = jump_address;
+    }
+}
+
+void CentralProcessingUnit::pop_stack(uint16_t& destination_register16)
+{
+    uint8_t low_byte = read_byte_and_step_emulator_components(register_file.stack_pointer++);
+    destination_register16 = low_byte | static_cast<uint16_t>(read_byte_and_step_emulator_components(register_file.stack_pointer++) << 8);
+}
+
+void CentralProcessingUnit::push_stack(uint16_t value)
+{
+    decrement_and_step_emulator_components(register_file.stack_pointer);
+    write_byte_and_step_emulator_components(register_file.stack_pointer--, value >> 8);
+    write_byte_and_step_emulator_components(register_file.stack_pointer, value & 0xFF);
+}
+
+void CentralProcessingUnit::call_conditional_immediate16(bool is_condition_met)
+{
+    const uint16_t subroutine_address = fetch_immediate16_and_step_emulator_components();
+    if (is_condition_met)
+        restart_at_address(subroutine_address);
+}
+
+void CentralProcessingUnit::return_conditional(bool is_condition_met)
+{
+    emulator_step_single_machine_cycle_callback();
+    if (is_condition_met)
+        return_0xC9();
+}
+
+void CentralProcessingUnit::restart_at_address(uint16_t address)
+{
+    push_stack(register_file.program_counter);
+    register_file.program_counter = address;
+}
+
+void CentralProcessingUnit::rotate_left_circular(uint8_t& register8)
+{
+    const bool does_carry_occur = (register8 & 0b10000000) != 0;
+    register8 = (register8 << 1) | (register8 >> 7);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::rotate_right_circular(uint8_t& register8)
+{
+    const bool does_carry_occur = (register8 & 0b00000001) != 0;
+    register8 = (register8 << 7) | (register8 >> 1);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::rotate_left_through_carry(uint8_t& register8)
+{
+    const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
+    const bool does_carry_occur = (register8 & 0b10000000) != 0;
+    register8 = (register8 << 1) | carry_in;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::rotate_right_through_carry(uint8_t& register8)
+{
+    const uint8_t carry_in = is_flag_set(register_file.flags, CARRY_FLAG_MASK) ? 1 : 0;
+    const bool does_carry_occur = (register8 & 0b00000001) != 0;
+    register8 = (carry_in << 7) | (register8 >> 1);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::shift_left_arithmetic(uint8_t& register8)
+{
+    const bool does_carry_occur = (register8 & 0b10000000) != 0;
+    register8 <<= 1;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::shift_right_arithmetic(uint8_t& register8)
+{
+    const bool does_carry_occur = (register8 & 0b00000001) != 0;
+    const uint8_t preserved_sign_bit = register8 & 0b10000000;
+    register8 = preserved_sign_bit | (register8 >> 1);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::swap_nibbles(uint8_t& register8)
+{
+    register8 = ((register8 & 0x0F) << 4) | ((register8 & 0xF0) >> 4);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::shift_right_logical(uint8_t& register8)
+{
+    const bool does_carry_occur = (register8 & 0b00000001) != 0;
+    register8 >>= 1;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register8 == 0);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::test_bit(uint8_t bit_position_to_test, uint8_t& register8)
+{
+    const bool is_bit_set = (register8 & (1 << bit_position_to_test)) != 0;
+    update_flag(register_file.flags, ZERO_FLAG_MASK, !is_bit_set);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, true);
+}
+
+void CentralProcessingUnit::reset_bit(uint8_t bit_position_to_reset, uint8_t& register8)
+{
+    register8 &= ~(1 << bit_position_to_reset);
+}
+
+void CentralProcessingUnit::set_bit(uint8_t bit_position_to_set, uint8_t& register8)
+{
+    register8 |= (1 << bit_position_to_set);
+}
+
+void CentralProcessingUnit::operate_on_register_hl(void (CentralProcessingUnit::* operation)(uint8_t, uint8_t&), uint8_t bit_position)
+{
+    uint8_t memory_hl = read_byte_and_step_emulator_components(register_file.HL);
+    (this->*operation)(bit_position, memory_hl);
+}
+
+void CentralProcessingUnit::operate_on_register_hl_and_write(void (CentralProcessingUnit::* operation)(uint8_t, uint8_t&), uint8_t bit_position)
+{
+    uint8_t memory_hl = read_byte_and_step_emulator_components(register_file.HL);
+    (this->*operation)(bit_position, memory_hl);
+    write_byte_and_step_emulator_components(register_file.HL, memory_hl);
+}
+
+void CentralProcessingUnit::operate_on_register_hl_and_write(void (CentralProcessingUnit::* operation)(uint8_t&))
+{
+    uint8_t memory_hl = read_byte_and_step_emulator_components(register_file.HL);
+    (this->*operation)(memory_hl);
+    write_byte_and_step_emulator_components(register_file.HL, memory_hl);
+}
+
+// ======================================
+// ===== Miscellaneous Instructions =====
+// ======================================
+
+void CentralProcessingUnit::unused_opcode() const
+{
+    std::cerr << std::hex << std::setfill('0');
+    std::cerr << "Warning: Unused opcode 0x" << std::setw(2) 
+              << static_cast<int>(instruction_register_ir) << " "
+              << "encountered at memory address 0x" << std::setw(4) 
+              << static_cast<int>(register_file.program_counter - 1) << "\n";
+}
+
+void CentralProcessingUnit::rotate_left_circular_a_0x07()
+{
+    rotate_left_circular(register_file.A);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::load_memory_immediate16_stack_pointer_0x08()
+{
+    uint16_t immediate16 = fetch_immediate16_and_step_emulator_components();
+    const uint8_t stack_pointer_low_byte = static_cast<uint8_t>(register_file.stack_pointer & 0xFF);
+    const uint8_t stack_pointer_high_byte = static_cast<uint8_t>(register_file.stack_pointer >> 8);
+    write_byte_and_step_emulator_components(immediate16, stack_pointer_low_byte);
+    write_byte_and_step_emulator_components(immediate16 + 1, stack_pointer_high_byte);
+}
+
+void CentralProcessingUnit::rotate_right_circular_a_0x0F()
+{
+    rotate_right_circular(register_file.A);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::rotate_left_through_carry_a_0x17()
+{
+    rotate_left_through_carry(register_file.A);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::rotate_right_through_carry_a_0x1F()
+{
+    rotate_right_through_carry(register_file.A);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, false);
+}
+
+void CentralProcessingUnit::decimal_adjust_a_0x27()
+{
+    const bool was_addition_most_recent = !is_flag_set(register_file.flags, SUBTRACT_FLAG_MASK);
+    bool does_carry_occur = false;
+    uint8_t adjustment = 0;
+    // Previous operation was between two binary coded decimals (BCDs) and this corrects register A back to BCD format
+    if (is_flag_set(register_file.flags, HALF_CARRY_FLAG_MASK) || (was_addition_most_recent && (register_file.A & 0x0F) > 0x09))
+    {
+        adjustment |= 0x06;
+    }
+    if (is_flag_set(register_file.flags, CARRY_FLAG_MASK) || (was_addition_most_recent && register_file.A > 0x99))
+    {
+        adjustment |= 0x60;
+        does_carry_occur = true;
+    }
+    register_file.A = was_addition_most_recent
+        ? (register_file.A + adjustment)
+        : (register_file.A - adjustment);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, register_file.A == 0);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::complement_a_0x2F()
+{
+    register_file.A = ~register_file.A;
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, true);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, true);
+}
+
+void CentralProcessingUnit::set_carry_flag_0x37()
+{
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, true);
+}
+
+void CentralProcessingUnit::complement_carry_flag_0x3F()
+{
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, false);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, !is_flag_set(register_file.flags, CARRY_FLAG_MASK));
+}
+
+void CentralProcessingUnit::halt_0x76()
+{
+    is_halted = true;
+}
+
+void CentralProcessingUnit::return_0xC9()
+{
+    uint16_t stack_top = 0;
+    pop_stack(stack_top);
+    emulator_step_single_machine_cycle_callback();
+    register_file.program_counter = stack_top;
+}
+
+void CentralProcessingUnit::return_from_interrupt_0xD9()
+{
+    return_0xC9();
+    interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
+}
+
+void CentralProcessingUnit::add_stack_pointer_signed_immediate8_0xE8()
+{
+    // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
+    const uint8_t unsigned_offset = fetch_immediate8_and_step_emulator_components();
+    emulator_step_single_machine_cycle_callback();
+    emulator_step_single_machine_cycle_callback();
+    const bool does_half_carry_occur = (register_file.stack_pointer & 0x0F) + (unsigned_offset & 0x0F) > 0x0F;
+    const bool does_carry_occur = (register_file.stack_pointer & 0xFF) + (unsigned_offset & 0xFF) > 0xFF;
+    register_file.stack_pointer += static_cast<int8_t>(unsigned_offset);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, false);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+ }
+
+void CentralProcessingUnit::jump_hl_0xE9()
+{
+    register_file.program_counter = register_file.HL;
+}
+
+void CentralProcessingUnit::pop_stack_af_0xF1()
+{
+    pop_stack(register_file.AF);
+    register_file.flags &= 0xF0; // Lower nibble of flags must always be zeroed
+}
+
+void CentralProcessingUnit::disable_interrupts_0xF3()
+{
+    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
+}
+
+void CentralProcessingUnit::load_hl_stack_pointer_with_signed_offset_0xF8()
+{
+    // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
+    const uint8_t unsigned_offset = fetch_immediate8_and_step_emulator_components();
+    emulator_step_single_machine_cycle_callback();
+    const bool does_half_carry_occur = (register_file.stack_pointer & 0x0F) + (unsigned_offset & 0x0F) > 0x0F;
+    const bool does_carry_occur = (register_file.stack_pointer & 0xFF) + (unsigned_offset & 0xFF) > 0xFF;
+    register_file.HL = register_file.stack_pointer + static_cast<int8_t>(unsigned_offset);
+    update_flag(register_file.flags, ZERO_FLAG_MASK, false);
+    update_flag(register_file.flags, SUBTRACT_FLAG_MASK, false);
+    update_flag(register_file.flags, HALF_CARRY_FLAG_MASK, does_half_carry_occur);
+    update_flag(register_file.flags, CARRY_FLAG_MASK, does_carry_occur);
+}
+
+void CentralProcessingUnit::load_stack_pointer_hl_0xF9()
+{
+    emulator_step_single_machine_cycle_callback();
+    register_file.stack_pointer = register_file.HL;
+}
+
+void CentralProcessingUnit::enable_interrupts_0xFB()
+{
+    if (interrupt_master_enable_ime == InterruptMasterEnableState::Disabled)
+        interrupt_master_enable_ime = InterruptMasterEnableState::WillEnable;
+}
+
+} // namespace GameBoyEmulator

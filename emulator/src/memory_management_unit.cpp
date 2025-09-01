@@ -1,0 +1,539 @@
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+
+#include "bitwise_utilities.h"
+#include "console_output_utilities.h"
+#include "memory_management_unit.h"
+
+namespace GameBoyEmulator
+{
+
+MemoryManagementUnit::MemoryManagementUnit(
+    GameCartridgeSlot& game_cartridge_slot_reference,
+    InternalTimer& internal_timer_reference,
+    PixelProcessingUnit& pixel_processing_unit_reference)
+    : game_cartridge_slot{game_cartridge_slot_reference},
+      internal_timer{internal_timer_reference},
+      pixel_processing_unit{pixel_processing_unit_reference}
+{
+    boot_rom = std::make_unique<uint8_t[]>(BOOTROM_SIZE);
+    work_ram = std::make_unique<uint8_t[]>(WORK_RAM_SIZE);
+    unmapped_input_output_registers = std::make_unique<uint8_t[]>(INPUT_OUTPUT_REGISTERS_SIZE);
+    high_ram = std::make_unique<uint8_t[]>(HIGH_RAM_SIZE);
+
+    std::fill_n(boot_rom.get(), BOOTROM_SIZE, 0);
+    std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
+    std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
+    std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
+}
+
+void MemoryManagementUnit::reset_state()
+{
+    std::fill_n(work_ram.get(), WORK_RAM_SIZE, 0);
+    std::fill_n(unmapped_input_output_registers.get(), INPUT_OUTPUT_REGISTERS_SIZE, 0);
+    std::fill_n(high_ram.get(), HIGH_RAM_SIZE, 0);
+
+    joypad_p1_joyp = 0b11111111;
+    interrupt_flag_if = 0b11100000;
+    boot_rom_status = 0x00;
+    interrupt_enable_ie = 0b00000000;
+
+    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+    oam_dma_source_address_base = 0x0000;
+    oam_dma_machine_cycles_elapsed = 0;
+}
+
+void MemoryManagementUnit::set_post_boot_state()
+{
+    boot_rom_status = 0x01;
+    joypad_p1_joyp = 0b11001111;
+    write_byte(0xFF01, 0x00, false);
+    write_byte(0xFF02, 0x7E, false);
+    interrupt_flag_if = 0b11100001;
+    write_byte(0xFF10, 0x80, false);
+    write_byte(0xFF11, 0xBF, false);
+    write_byte(0xFF12, 0xF3, false);
+    write_byte(0xFF13, 0xFF, false);
+    write_byte(0xFF14, 0xBF, false);
+    write_byte(0xFF16, 0x3F, false);
+    write_byte(0xFF17, 0x00, false);
+    write_byte(0xFF18, 0xFF, false);
+    write_byte(0xFF19, 0xBF, false);
+    write_byte(0xFF1A, 0x7F, false);
+    write_byte(0xFF1B, 0xFF, false);
+    write_byte(0xFF1C, 0x9F, false);
+    write_byte(0xFF1D, 0xFF, false);
+    write_byte(0xFF1E, 0xBF, false);
+    write_byte(0xFF20, 0xFF, false);
+    write_byte(0xFF21, 0x00, false);
+    write_byte(0xFF22, 0x00, false);
+    write_byte(0xFF23, 0xBF, false);
+    write_byte(0xFF24, 0x77, false);
+    write_byte(0xFF25, 0xF3, false);
+    write_byte(0xFF26, 0xF1, false);
+    interrupt_enable_ie = 0b00000000;
+
+    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+    oam_dma_source_address_base = 0x0000;
+    oam_dma_machine_cycles_elapsed = 0;
+}
+
+bool MemoryManagementUnit::try_load_file_to_read_only_memory(
+    const std::filesystem::path& file_path,
+    FileType file_type,
+    std::string& error_message)
+{
+    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
+    if (!file)
+    {
+        return set_error_message_and_fail(
+            std::string("File not found at ") + file_path.string(),
+            error_message);
+    }
+    std::streamsize file_length_in_bytes = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (file_type == FileType::BootROM)
+    {
+        if (file_length_in_bytes != BOOTROM_SIZE)
+        {
+            return set_error_message_and_fail(
+                std::string("Provided file of size ") + std::to_string(file_length_in_bytes) +
+                    std::string(" bytes does not meet the boot ROM size requirement."), error_message);
+        }
+
+        if (!file.read(reinterpret_cast<char *>(boot_rom.get()), file_length_in_bytes))
+        {
+            return set_error_message_and_fail(
+                std::string("Could not read boot_rom file ") + file_path.string(),
+                error_message);
+        }
+        is_boot_rom_loaded_in_memory_atomic.store(true, std::memory_order_release);
+    }
+    else
+    {
+        if (!game_cartridge_slot.try_load_file(file_path, file, file_length_in_bytes, error_message))
+        {
+            return false;
+        }
+        is_game_rom_loaded_in_memory_atomic.store(true, std::memory_order_release);
+    }
+    return true;
+}
+
+void MemoryManagementUnit::unload_boot_rom_thread_safe()
+{
+    std::fill_n(boot_rom.get(), BOOTROM_SIZE, 0);
+    is_boot_rom_loaded_in_memory_atomic.store(false, std::memory_order_release);
+}
+
+void MemoryManagementUnit::unload_game_rom_thread_safe()
+{
+    game_cartridge_slot.reset_state();
+    is_game_rom_loaded_in_memory_atomic.store(false, std::memory_order_release);
+}
+
+bool MemoryManagementUnit::is_game_rom_loaded_thread_safe() const
+{
+    return is_game_rom_loaded_in_memory_atomic.load(std::memory_order_acquire);
+}
+
+bool MemoryManagementUnit::is_boot_rom_loaded_thread_safe() const
+{
+    return is_boot_rom_loaded_in_memory_atomic.load(std::memory_order_acquire);
+}
+
+bool MemoryManagementUnit::is_boot_rom_mapped() const
+{
+    return (boot_rom_status == 0);
+}
+
+uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestricted) const
+{
+    const bool does_dma_bus_conflict_occur = !is_access_unrestricted &&
+                                             pixel_processing_unit.is_oam_dma_in_progress &&
+                                             are_addresses_on_same_bus(address, oam_dma_source_address_base);
+    if (does_dma_bus_conflict_occur)
+    {
+        const uint16_t address_of_byte_being_transferred_by_oam_dma = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
+        address = address_of_byte_being_transferred_by_oam_dma;
+    }
+
+    if (boot_rom_status == 0 && address < BOOTROM_SIZE)
+    {
+        return boot_rom[address];
+    }
+    else if (address < ROM_BANK_0X_START + ROM_BANK_SIZE)
+    {
+        return game_cartridge_slot.read_byte(address);
+    }
+    else if (address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
+    {
+        return pixel_processing_unit.read_byte_video_ram(address);
+    }
+    else if (address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
+    {
+        return game_cartridge_slot.read_byte(address);
+    }
+    else if (address < WORK_RAM_START + WORK_RAM_SIZE)
+    {
+        const uint16_t local_address = address - WORK_RAM_START;
+        return work_ram[local_address];
+    }
+    else if (address < ECHO_RAM_START + ECHO_RAM_SIZE)
+    {
+        const uint16_t local_address = address - ECHO_RAM_START;
+        return work_ram[local_address];
+    }
+    else if (address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
+    {
+        return pixel_processing_unit.read_byte_object_attribute_memory(address, is_access_unrestricted);
+    }
+    else if (address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
+    {
+        return 0x00;
+    }
+    else if (address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
+    {
+        switch (address)
+        {
+            case 0xFF00:
+            {
+                const bool is_select_buttons_enabled = !is_bit_set(joypad_p1_joyp, 5);
+                const bool is_select_directional_pad_enabled = !is_bit_set(joypad_p1_joyp, 4);
+
+                if (is_select_directional_pad_enabled)
+                {
+                    const uint8_t most_recent_direction_pad_states = 
+                        most_recent_currently_pressed_vertical_direction_atomic.load(std::memory_order_acquire) &
+                        most_recent_currently_pressed_horizontal_direction_atomic.load(std::memory_order_acquire);
+                    if (is_select_buttons_enabled)
+                    {
+                        return (joypad_p1_joyp & 0xF0) | ((button_pressed_states_atomic.load(std::memory_order_acquire) | most_recent_direction_pad_states) & 0x0F);
+                    }
+                    return (joypad_p1_joyp & 0xF0) | (most_recent_direction_pad_states & 0x0F);
+                }
+                else if (is_select_buttons_enabled)
+                {
+                    return (joypad_p1_joyp & 0xF0) | (button_pressed_states_atomic.load(std::memory_order_acquire) & 0x0F);
+                }
+                return joypad_p1_joyp;
+            }
+            case 0xFF04:
+                return internal_timer.read_div();
+            case 0xFF05:
+                return internal_timer.read_tima();
+            case 0xFF06:
+                return internal_timer.read_tma();
+            case 0xFF07:
+                return internal_timer.read_tac();
+            case 0xFF0F:
+                return interrupt_flag_if | 0b11100000;
+            case 0xFF40:
+                return pixel_processing_unit.read_lcd_control_lcdc();
+            case 0xFF41:
+                return pixel_processing_unit.read_lcd_status_stat();
+            case 0xFF42:
+                return pixel_processing_unit.viewport_y_position_scy;
+            case 0xFF43:
+                return pixel_processing_unit.viewport_x_position_scx;
+            case 0xFF44:
+                return pixel_processing_unit.read_lcd_y_coordinate_ly();
+            case 0xFF45:
+                return pixel_processing_unit.lcd_y_coordinate_compare_lyc;
+            case 0xFF46:
+                return pixel_processing_unit.object_attribute_memory_direct_memory_access_dma;
+            case 0xFF47:
+                return pixel_processing_unit.background_palette_bgp;
+            case 0xFF48:
+                return pixel_processing_unit.object_palette_0_obp0;
+            case 0xFF49:
+                return pixel_processing_unit.object_palette_1_obp1;
+            case 0xFF4A:
+                return pixel_processing_unit.window_y_position_wy;
+            case 0xFF4B:
+                return pixel_processing_unit.window_x_position_plus_7_wx;
+            case 0xFF50:
+                return boot_rom_status;
+            default:
+                const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;
+                return unmapped_input_output_registers[local_address];
+        }
+    }
+    else if (address < HIGH_RAM_START + HIGH_RAM_SIZE)
+    {
+        const uint16_t local_address = address - HIGH_RAM_START;
+        return high_ram[local_address];
+    }
+    else
+        return interrupt_enable_ie;
+}
+
+void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted)
+{
+    if (address < ROM_BANK_0X_START + ROM_BANK_SIZE)
+    {
+        game_cartridge_slot.write_byte(address, value);
+    }
+    else if (address < VIDEO_RAM_START + VIDEO_RAM_SIZE)
+    {
+        pixel_processing_unit.write_byte_video_ram(address, value);
+    }
+    else if (address < EXTERNAL_RAM_START + EXTERNAL_RAM_SIZE)
+    {
+        game_cartridge_slot.write_byte(address, value);
+    }
+    else if (address < WORK_RAM_START + WORK_RAM_SIZE)
+    {
+        const uint16_t local_address = address - WORK_RAM_START;
+        work_ram[local_address] = value;
+    }
+    else if (address < ECHO_RAM_START + ECHO_RAM_SIZE)
+    {
+        const uint16_t local_address = address - ECHO_RAM_START;
+        work_ram[local_address] = value;
+    }
+    else if (address < OBJECT_ATTRIBUTE_MEMORY_START + OBJECT_ATTRIBUTE_MEMORY_SIZE)
+    {
+        pixel_processing_unit.write_byte_object_attribute_memory(address, value, is_access_unrestricted);
+    }
+    else if (address < UNUSABLE_MEMORY_START + UNUSABLE_MEMORY_SIZE)
+    {
+        std::cout << std::hex << std::setfill('0') 
+                  << "Attempted to write to unusable address 0x" << std::setw(4) << address << ". No write will occur.\n";
+    }
+    else if (address < INPUT_OUTPUT_REGISTERS_START + INPUT_OUTPUT_REGISTERS_SIZE)
+    {
+        switch (address)
+        {
+            case 0xFF00:
+                joypad_p1_joyp = value | 0b11001111;
+                return;
+            case 0xFF04:
+                internal_timer.write_div(value);
+                return;
+            case 0xFF05:
+                internal_timer.write_tima(value);
+                return;
+            case 0xFF06:
+                internal_timer.write_tma(value);
+                return;
+            case 0xFF07:
+                internal_timer.write_tac(value);
+                return;
+            case 0xFF0F:
+                interrupt_flag_if = value | 0b11100000;
+                return;
+            case 0xFF40:
+                pixel_processing_unit.write_lcd_control_lcdc(value);
+                return;
+            case 0xFF41:
+                pixel_processing_unit.write_lcd_status_stat(value);
+                return;
+            case 0xFF42:
+                pixel_processing_unit.viewport_y_position_scy = value;
+                return;
+            case 0xFF43:
+                pixel_processing_unit.viewport_x_position_scx = value;
+                return;
+            case 0xFF44:
+                std::cout << std::hex << std::setfill('0') 
+                          << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
+                return;
+            case 0xFF45:
+                pixel_processing_unit.lcd_y_coordinate_compare_lyc = value;
+                return;
+            case 0xFF46:
+                pixel_processing_unit.object_attribute_memory_direct_memory_access_dma = value;
+                oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo;
+                return;
+            case 0xFF47:
+                pixel_processing_unit.background_palette_bgp = value;
+                return;
+            case 0xFF48:
+                pixel_processing_unit.object_palette_0_obp0 = value;
+                return;
+            case 0xFF49:
+                pixel_processing_unit.object_palette_1_obp1 = value;
+                return;
+            case 0xFF4A:
+                pixel_processing_unit.window_y_position_wy = value;
+                return;
+            case 0xFF4B:
+                pixel_processing_unit.window_x_position_plus_7_wx = value;
+                return;
+            case 0xFF50:
+                boot_rom_status = value;
+                return;
+            default:
+                const uint16_t local_address = address - INPUT_OUTPUT_REGISTERS_START;
+                unmapped_input_output_registers[local_address] = value;
+                return;
+        }
+    }
+    else if (address < HIGH_RAM_START + HIGH_RAM_SIZE)
+    {
+        const uint16_t local_address = address - HIGH_RAM_START;
+        high_ram[local_address] = value;
+    }
+    else
+        interrupt_enable_ie = value;
+}
+
+void MemoryManagementUnit::step_single_machine_cycle()
+{
+    if (pixel_processing_unit.is_oam_dma_in_progress)
+    {
+        const uint16_t source_address = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
+        const uint8_t byte_to_copy = read_byte(source_address, true);
+
+        const uint16_t destination_address = OBJECT_ATTRIBUTE_MEMORY_START + oam_dma_machine_cycles_elapsed;
+        write_byte(destination_address, byte_to_copy, true);
+
+        if (++oam_dma_machine_cycles_elapsed == OAM_DMA_MACHINE_CYCLE_DURATION)
+        {
+            pixel_processing_unit.is_oam_dma_in_progress = false;
+        }
+    }
+
+    if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo)
+    {
+        oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting;
+    }
+    else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
+    {
+        oam_dma_source_address_base = ((pixel_processing_unit.object_attribute_memory_direct_memory_access_dma >= 0xFE)
+            ? pixel_processing_unit.object_attribute_memory_direct_memory_access_dma - 0x20
+            : pixel_processing_unit.object_attribute_memory_direct_memory_access_dma) << 8;
+
+        oam_dma_machine_cycles_elapsed = 0;
+        pixel_processing_unit.is_oam_dma_in_progress = true;
+        oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+    }
+}
+
+void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask)
+{
+    update_flag(interrupt_flag_if, interrupt_flag_mask, true);
+}
+
+void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask)
+{
+    update_flag(interrupt_flag_if, interrupt_flag_mask, false);
+}
+
+uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
+{
+    for (uint8_t i = 0; i < NUMBER_OF_INTERRUPT_TYPES; i++)
+    {
+        const uint8_t interrupt_flag_mask = 1 << i;
+        const bool is_interrupt_type_requested = is_flag_set(interrupt_flag_if, interrupt_flag_mask);
+        const bool is_interrupt_type_enabled = is_flag_set(interrupt_enable_ie, interrupt_flag_mask);
+
+        if (is_interrupt_type_requested && is_interrupt_type_enabled)
+        {
+            return interrupt_flag_mask;
+        }
+    }
+    return 0x00;
+}
+
+void MemoryManagementUnit::update_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed)
+{
+    if (is_button_pressed)
+    {
+        button_pressed_states_atomic.fetch_and(~button_flag_mask, std::memory_order_release);
+    }
+    else
+    {
+        button_pressed_states_atomic.fetch_or(button_flag_mask, std::memory_order_release);
+    }
+}
+
+void MemoryManagementUnit::update_dpad_direction_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed)
+{
+    if (is_direction_pressed)
+    {
+        if (direction_flag_mask == RIGHT_DPAD_DIRECTION_FLAG_MASK || direction_flag_mask == LEFT_DPAD_DIRECTION_FLAG_MASK)
+        {
+            most_recent_currently_pressed_horizontal_direction_atomic.store(~direction_flag_mask, std::memory_order_release);
+        }
+        else
+        {
+            most_recent_currently_pressed_vertical_direction_atomic.store(~direction_flag_mask, std::memory_order_release);
+        }
+        dpad_direction_pressed_states_atomic.fetch_and(~direction_flag_mask, std::memory_order_release);
+    }
+    else
+    {
+        const uint8_t direction_pad_bits = dpad_direction_pressed_states_atomic.load(std::memory_order_acquire);
+
+        switch (direction_flag_mask)
+        {
+            case RIGHT_DPAD_DIRECTION_FLAG_MASK:
+            {
+                const bool is_left_direction_pressed = !is_flag_set(direction_pad_bits, LEFT_DPAD_DIRECTION_FLAG_MASK);
+                most_recent_currently_pressed_horizontal_direction_atomic.store(
+                    is_left_direction_pressed ? ~LEFT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                break;
+            }
+            case LEFT_DPAD_DIRECTION_FLAG_MASK:
+            {
+                const bool is_right_direction_pressed = !is_flag_set(direction_pad_bits, RIGHT_DPAD_DIRECTION_FLAG_MASK);
+                most_recent_currently_pressed_horizontal_direction_atomic.store(
+                    is_right_direction_pressed ? ~RIGHT_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                break;
+            }
+            case UP_DPAD_DIRECTION_FLAG_MASK:
+            {
+                const bool is_down_direction_pressed = !is_flag_set(direction_pad_bits, DOWN_DPAD_DIRECTION_FLAG_MASK);
+                most_recent_currently_pressed_vertical_direction_atomic.store(
+                    is_down_direction_pressed ? ~DOWN_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                break;
+            }
+            case DOWN_DPAD_DIRECTION_FLAG_MASK:
+            {
+                const bool is_up_direction_pressed = !is_flag_set(direction_pad_bits, UP_DPAD_DIRECTION_FLAG_MASK);
+                most_recent_currently_pressed_vertical_direction_atomic.store(
+                    is_up_direction_pressed ? ~UP_DPAD_DIRECTION_FLAG_MASK : 0b11111111, std::memory_order_release);
+                break;
+            }
+        }
+        dpad_direction_pressed_states_atomic.fetch_or(direction_flag_mask, std::memory_order_release);
+    }
+}
+
+bool MemoryManagementUnit::are_addresses_on_same_bus(uint16_t first_address, uint16_t second_address) const
+{
+    static constexpr std::array<std::pair<uint16_t, uint16_t>, 6> MEMORY_BUSES
+    {
+        {
+            {ROM_BANK_X0_START, ROM_BANK_SIZE},
+            {ROM_BANK_0X_START, ROM_BANK_SIZE},
+            {VIDEO_RAM_START, VIDEO_RAM_SIZE},
+            {EXTERNAL_RAM_START, EXTERNAL_RAM_SIZE},
+            {WORK_RAM_START, WORK_RAM_SIZE},
+            {ECHO_RAM_START, ECHO_RAM_SIZE},
+        }
+    };
+
+    auto in_range = [](uint16_t address, uint16_t range_start, uint16_t range_size)
+    {
+        return address >= range_start && address < range_start + range_size;
+    };
+
+    for (auto &[range_start, range_size] : MEMORY_BUSES)
+    {
+        if (in_range(first_address, range_start, range_size) && in_range(second_address, range_start, range_size))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace GameBoyEmulator
