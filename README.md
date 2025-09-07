@@ -9,8 +9,8 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 |-------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
 
 ## Features
-- Interactable GUI for loading game ROMs and adjusting emulation options made with `Dear ImGui`.
-- Frame data rendering using `SDL3`.
+- Interactable GUI for loading game ROMs and adjusting emulation options made with [Dear ImGui](https://github.com/ocornut/imgui).
+- Frame data rendering using [SDL3](https://github.com/libsdl-org/SDL).
 - Support for a majority of available Game Boy and backwards compatible Game Boy Color games.
 - Three preset colour palettes and a custom palette with selectable colours.
 - Pausing emulation and emulating at up to 4x speed, provided that the target hardware can produce frame data fast enough.
@@ -27,7 +27,7 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 2. Install `Visual Studio Community 2022`.
 3. Select the `Desktop development with C++` workload to download and install.
 4. In Visual Studio, click `Open a local folder` and select the cloned `game-boy-emulator` folder.
-5. Two debug targets should populate at the top - select `emulator-gui.exe` for the main `SDL`/`ImGui` application.
+5. Two debug targets should populate at the top - select `emulator-gui.exe` for the main [SDL](https://github.com/libsdl-org/SDL)/[ImGui](https://github.com/ocornut/imgui) application.
 6. Run by clicking the green play button at the top or by pressing `CTRL+F5`.
 
 **Linux**
