@@ -24,11 +24,11 @@ public:
 
     void reset_state();
 
-    void step_central_processing_unit_single_instruction();
+    void execute_next_instruction();
     RegisterFile<std::endian::native> get_register_file() const;
     void print_register_file_state() const;
 
-    bool try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message);
+    bool try_to_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message);
     void unload_boot_rom_from_memory_thread_safe();
     void unload_game_rom_from_memory_thread_safe();
     bool is_game_rom_loaded_in_memory_thread_safe() const;
@@ -54,7 +54,7 @@ private:
     std::unique_ptr<MemoryManagementUnit> memory_management_unit;
     CentralProcessingUnit central_processing_unit;
 
-    void step_components_single_machine_cycle_to_sync_with_central_processing_unit();
+    void step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit();
     void request_interrupt(uint8_t interrupt_flag_mask);
 };
 

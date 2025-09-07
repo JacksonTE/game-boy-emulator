@@ -13,8 +13,9 @@ static std::filesystem::path get_test_directory_path()
 static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const std::filesystem::path& directory)
 {
     if (!std::filesystem::exists(directory))
+    {
         return { directory };
-
+    }
     std::vector<std::filesystem::path> test_rom_paths;
 
     for (const auto& entry : std::filesystem::directory_iterator(directory))
@@ -49,7 +50,7 @@ protected:
     void SetUp() override
     {
         ASSERT_TRUE(std::filesystem::exists(GetParam())) << "ROM file not found: " << GetParam();
-        game_boy_emulator.try_load_file_to_memory(GetParam(), GameBoyEmulator::FileType::GameROM, error_message);
+        game_boy_emulator.try_to_load_file_to_memory(GetParam(), GameBoyEmulator::FileType::GameROM, error_message);
         game_boy_emulator.reset_state();
     }
 };
@@ -64,7 +65,7 @@ TEST_P(MooneyeTest, TestRom)
 
     for (size_t _ = 0; _ < MAX_INSTRUCTIONS_BEFORE_TIMEOUT; _++)
     {
-        game_boy_emulator.step_central_processing_unit_single_instruction();
+        game_boy_emulator.execute_next_instruction();
         auto r = game_boy_emulator.get_register_file();
 
         if (r.B == 0x42 && r.C == 0x42 && r.D == 0x42 && r.E == 0x42 && r.H == 0x42 && r.L == 0x42)

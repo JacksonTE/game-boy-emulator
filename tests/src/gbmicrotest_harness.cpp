@@ -189,7 +189,7 @@ protected:
     void SetUp() override
     {
         ASSERT_TRUE(std::filesystem::exists(GetParam())) << "ROM file not found: " << GetParam();
-        game_boy_emulator.try_load_file_to_memory(GetParam(), GameBoyEmulator::FileType::GameROM, error_message);
+        game_boy_emulator.try_to_load_file_to_memory(GetParam(), GameBoyEmulator::FileType::GameROM, error_message);
         game_boy_emulator.reset_state();
     }
 };
@@ -204,7 +204,7 @@ TEST_P(GbmicroTest, TestRom)
 
     for (size_t _ = 0; _ < MAX_INSTRUCTIONS_BEFORE_TIMEOUT; _++)
     {
-        game_boy_emulator.step_central_processing_unit_single_instruction();
+        game_boy_emulator.execute_next_instruction();
 
         const uint8_t test_result_byte = game_boy_emulator.read_byte_from_memory(0xFF80);
         const uint8_t test_expected_result_byte = game_boy_emulator.read_byte_from_memory(0xFF81);

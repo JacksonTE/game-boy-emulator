@@ -35,7 +35,7 @@ public:
     RegisterFile<std::endian::native> get_register_file() const;
     void set_register_file_state(const RegisterFile<std::endian::native>& new_register_values);
 
-    void step_single_instruction();
+    void execute_next_instruction();
 
 private:
     std::function<void()> emulator_step_single_machine_cycle_callback;

@@ -69,10 +69,12 @@ void CentralProcessingUnit::set_register_file_state(const RegisterFile<std::endi
     register_file.stack_pointer = new_register_values.stack_pointer;
 }
 
-void CentralProcessingUnit::step_single_instruction()
+void CentralProcessingUnit::execute_next_instruction()
 {
     if (is_halted)
+    {
         emulator_step_single_machine_cycle_callback();
+    }
     else
     {
         if (is_current_instruction_prefixed)
@@ -88,7 +90,9 @@ void CentralProcessingUnit::step_single_instruction()
     service_interrupt();
 
     if (interrupt_master_enable_ime == InterruptMasterEnableState::WillEnable)
+    {
         interrupt_master_enable_ime = InterruptMasterEnableState::Enabled;
+    }
 }
 
 void CentralProcessingUnit::fetch_next_instruction()
@@ -120,8 +124,9 @@ void CentralProcessingUnit::service_interrupt()
         is_halted = false;
     }
     if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
+    {
         return;
-
+    }
     emulator_step_single_machine_cycle_callback();
     register_file.program_counter -= is_current_instruction_prefixed ? 2 : 1;
     decrement_and_step_emulator_components(register_file.stack_pointer);
@@ -1200,14 +1205,18 @@ void CentralProcessingUnit::call_conditional_immediate16(bool is_condition_met)
 {
     const uint16_t subroutine_address = fetch_immediate16_and_step_emulator_components();
     if (is_condition_met)
+    {
         restart_at_address(subroutine_address);
+    }
 }
 
 void CentralProcessingUnit::return_conditional(bool is_condition_met)
 {
     emulator_step_single_machine_cycle_callback();
     if (is_condition_met)
+    {
         return_0xC9();
+    }
 }
 
 void CentralProcessingUnit::restart_at_address(uint16_t address)
@@ -1499,7 +1508,9 @@ void CentralProcessingUnit::load_stack_pointer_hl_0xF9()
 void CentralProcessingUnit::enable_interrupts_0xFB()
 {
     if (interrupt_master_enable_ime == InterruptMasterEnableState::Disabled)
+    {
         interrupt_master_enable_ime = InterruptMasterEnableState::WillEnable;
+    }
 }
 
 } // namespace GameBoyEmulator

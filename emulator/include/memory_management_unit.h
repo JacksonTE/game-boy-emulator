@@ -70,7 +70,7 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
-    bool try_load_file_to_read_only_memory(const std::filesystem::path& file_path, FileType file_type, std::string& error_message);
+    bool try_to_load_file_to_read_only_memory(const std::filesystem::path& file_path, FileType file_type, std::string& error_message);
     void unload_boot_rom_thread_safe();
     void unload_game_rom_thread_safe();
     bool is_game_rom_loaded_thread_safe() const;
@@ -80,7 +80,7 @@ public:
     virtual uint8_t read_byte(uint16_t address, bool is_access_unrestricted) const;
     virtual void write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted);
 
-    void step_single_machine_cycle();
+    void step_forward_one_machine_cycle();
 
     void request_interrupt(uint8_t interrupt_flag_mask);
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);

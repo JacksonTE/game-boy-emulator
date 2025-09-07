@@ -332,8 +332,8 @@ TEST_P(SingleStepTest, JsonTestCasesFile)
         SCOPED_TRACE("Test name: " + test_case.test_name);
 
         set_initial_values(test_case);
-        game_boy_central_processing_unit->step_single_instruction(); // Execute initial NOP (no operation) and fetch first instruction
-        game_boy_central_processing_unit->step_single_instruction();
+        game_boy_central_processing_unit->execute_next_instruction(); // Execute initial NOP (no operation) and fetch first instruction
+        game_boy_central_processing_unit->execute_next_instruction();
 
         EXPECT_EQ(game_boy_central_processing_unit->get_register_file().AF, test_case.expected_register_values.AF);
         EXPECT_EQ(game_boy_central_processing_unit->get_register_file().BC, test_case.expected_register_values.BC);

@@ -15,8 +15,9 @@ Emulator::Emulator()
       memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
       central_processing_unit{[this]()
                               {
-                                  this->step_components_single_machine_cycle_to_sync_with_central_processing_unit();
-                              }, *memory_management_unit}
+                                  this->step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit();
+                              },
+                              *memory_management_unit}
 {
 }
 
@@ -38,9 +39,9 @@ void Emulator::reset_state()
     }
 }
 
-void Emulator::step_central_processing_unit_single_instruction()
+void Emulator::execute_next_instruction()
 {
-    central_processing_unit.step_single_instruction();
+    central_processing_unit.execute_next_instruction();
 }
 
 RegisterFile<std::endian::native> Emulator::get_register_file() const
@@ -53,9 +54,9 @@ void Emulator::print_register_file_state() const
     GameBoyEmulator::print_register_file_state(central_processing_unit.get_register_file());
 }
 
-bool Emulator::try_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message)
+bool Emulator::try_to_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message)
 {
-    return memory_management_unit->try_load_file_to_read_only_memory(file_path, file_type, error_message);
+    return memory_management_unit->try_to_load_file_to_read_only_memory(file_path, file_type, error_message);
 }
 
 void Emulator::unload_boot_rom_from_memory_thread_safe()
@@ -144,15 +145,18 @@ std::string Emulator::get_loaded_game_rom_title_thread_safe() const
     return game_rom_title;
 }
 
-void Emulator::step_components_single_machine_cycle_to_sync_with_central_processing_unit()
+void Emulator::step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit()
 {
-    internal_timer.step_single_machine_cycle();
-    memory_management_unit->step_single_machine_cycle();
-    pixel_processing_unit.step_single_machine_cycle();
+    // This function is called from within the central_processing_unit whenever one machine cycle would have elapsed
+    internal_timer.step_forward_one_machine_cycle();
+    memory_management_unit->step_forward_one_machine_cycle();
+    pixel_processing_unit.step_forward_one_machine_cycle();
 }
 
 void Emulator::request_interrupt(uint8_t interrupt_flag_mask)
 {
+    // This function is passed to some of the individual components whenever they need
+    // to raise an interrupt without having access to the entire memory_management_unit
     memory_management_unit->request_interrupt(interrupt_flag_mask);
 }
 

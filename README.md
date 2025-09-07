@@ -27,7 +27,7 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 2. Install `Visual Studio Community 2022`.
 3. Select the `Desktop development with C++` workload to download and install.
 4. In Visual Studio, click `Open a local folder` and select the cloned `game-boy-emulator` folder.
-5. Two debug targets should populate at the top - select `emulator-gui.exe` for the main SDL/ImGui application.
+5. Two debug targets should populate at the top - select `emulator-gui.exe` for the main `SDL`/`ImGui` application.
 6. Run by clicking the green play button at the top or by pressing `CTRL+F5`.
 
 **Linux**

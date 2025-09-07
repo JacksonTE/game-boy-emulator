@@ -47,7 +47,7 @@ static void run_emulator_core(
                 SDL_Delay(0);
                 continue;
             }
-            game_boy_emulator.step_central_processing_unit_single_instruction();
+            game_boy_emulator.execute_next_instruction();
 
             const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 

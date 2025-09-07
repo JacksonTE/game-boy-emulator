@@ -82,7 +82,7 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
-bool MemoryManagementUnit::try_load_file_to_read_only_memory(
+bool MemoryManagementUnit::try_to_load_file_to_read_only_memory(
     const std::filesystem::path& file_path,
     FileType file_type,
     std::string& error_message)
@@ -384,7 +384,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
         interrupt_enable_ie = value;
 }
 
-void MemoryManagementUnit::step_single_machine_cycle()
+void MemoryManagementUnit::step_forward_one_machine_cycle()
 {
     if (pixel_processing_unit.is_oam_dma_in_progress)
     {

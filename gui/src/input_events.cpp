@@ -65,7 +65,7 @@ bool try_load_file_to_memory_with_dialog(
 
     if (result == NFD_OKAY)
     {
-        if (game_boy_emulator.try_load_file_to_memory(rom_path, file_type, error_message))
+        if (game_boy_emulator.try_to_load_file_to_memory(rom_path, file_type, error_message))
         {
             if (file_type == GameBoyEmulator::FileType::GameROM)
             {

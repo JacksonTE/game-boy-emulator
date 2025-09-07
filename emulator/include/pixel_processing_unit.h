@@ -207,7 +207,7 @@ public:
     uint8_t read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_unrestricted) const;
     void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_unrestricted);
 
-    void step_single_machine_cycle();
+    void step_forward_one_machine_cycle();
 
 private:
     std::function<void(uint8_t)> request_interrupt_callback;

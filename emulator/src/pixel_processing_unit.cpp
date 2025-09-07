@@ -237,7 +237,7 @@ void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_add
     object_attribute_memory[local_address] = value;
 }
 
-void PixelProcessingUnit::step_single_machine_cycle()
+void PixelProcessingUnit::step_forward_one_machine_cycle()
 {
     previous_mode = current_mode;
 
