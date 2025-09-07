@@ -137,7 +137,8 @@ int main()
             get_abgr_value_for_current_endianness(0xFF, 0xB6, 0x77, 0x00),
             get_abgr_value_for_current_endianness(0xFF, 0x5E, 0x04, 0x03)
         };
-        GraphicsController graphics_controller{
+        GraphicsController graphics_controller
+        {
             SAGE_COLOUR_PALETTE,
             DISPLAY_WIDTH_PIXELS,
             DISPLAY_HEIGHT_PIXELS,

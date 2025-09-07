@@ -234,29 +234,29 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
             case 0xFF0F:
                 return interrupt_flag_if | 0b11100000;
             case 0xFF40:
-                return pixel_processing_unit.read_lcd_control_lcdc();
+                return pixel_processing_unit.read_lcdc_lcd_control();
             case 0xFF41:
-                return pixel_processing_unit.read_lcd_status_stat();
+                return pixel_processing_unit.read_stat_lcd_status();
             case 0xFF42:
-                return pixel_processing_unit.viewport_y_position_scy;
+                return pixel_processing_unit.scy_viewport_y_position;
             case 0xFF43:
-                return pixel_processing_unit.viewport_x_position_scx;
+                return pixel_processing_unit.scx_viewport_x_position;
             case 0xFF44:
-                return pixel_processing_unit.read_lcd_y_coordinate_ly();
+                return pixel_processing_unit.read_ly_lcd_y_coordinate();
             case 0xFF45:
-                return pixel_processing_unit.lcd_y_coordinate_compare_lyc;
+                return pixel_processing_unit.lyc_lcd_y_coordinate_compare;
             case 0xFF46:
-                return pixel_processing_unit.object_attribute_memory_direct_memory_access_dma;
+                return pixel_processing_unit.dma_object_attribute_memory_direct_memory_access;
             case 0xFF47:
-                return pixel_processing_unit.background_palette_bgp;
+                return pixel_processing_unit.bgp_background_palette;
             case 0xFF48:
-                return pixel_processing_unit.object_palette_0_obp0;
+                return pixel_processing_unit.obp0_object_palette_0;
             case 0xFF49:
-                return pixel_processing_unit.object_palette_1_obp1;
+                return pixel_processing_unit.obp1_object_palette_1;
             case 0xFF4A:
-                return pixel_processing_unit.window_y_position_wy;
+                return pixel_processing_unit.wy_window_y_position;
             case 0xFF4B:
-                return pixel_processing_unit.window_x_position_plus_7_wx;
+                return pixel_processing_unit.wx_window_x_position_plus_7;
             case 0xFF50:
                 return boot_rom_status;
             default:
@@ -329,42 +329,42 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 interrupt_flag_if = value | 0b11100000;
                 return;
             case 0xFF40:
-                pixel_processing_unit.write_lcd_control_lcdc(value);
+                pixel_processing_unit.write_lcdc_lcd_control(value);
                 return;
             case 0xFF41:
-                pixel_processing_unit.write_lcd_status_stat(value);
+                pixel_processing_unit.write_stat_lcd_status(value);
                 return;
             case 0xFF42:
-                pixel_processing_unit.viewport_y_position_scy = value;
+                pixel_processing_unit.scy_viewport_y_position = value;
                 return;
             case 0xFF43:
-                pixel_processing_unit.viewport_x_position_scx = value;
+                pixel_processing_unit.scx_viewport_x_position = value;
                 return;
             case 0xFF44:
                 std::cout << std::hex << std::setfill('0') 
                           << "Attempted to write to read only address 0x" << std::setw(4) << address << ". No write will occur.\n";
                 return;
             case 0xFF45:
-                pixel_processing_unit.lcd_y_coordinate_compare_lyc = value;
+                pixel_processing_unit.lyc_lcd_y_coordinate_compare = value;
                 return;
             case 0xFF46:
-                pixel_processing_unit.object_attribute_memory_direct_memory_access_dma = value;
+                pixel_processing_unit.dma_object_attribute_memory_direct_memory_access = value;
                 oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo;
                 return;
             case 0xFF47:
-                pixel_processing_unit.background_palette_bgp = value;
+                pixel_processing_unit.bgp_background_palette = value;
                 return;
             case 0xFF48:
-                pixel_processing_unit.object_palette_0_obp0 = value;
+                pixel_processing_unit.obp0_object_palette_0 = value;
                 return;
             case 0xFF49:
-                pixel_processing_unit.object_palette_1_obp1 = value;
+                pixel_processing_unit.obp1_object_palette_1 = value;
                 return;
             case 0xFF4A:
-                pixel_processing_unit.window_y_position_wy = value;
+                pixel_processing_unit.wy_window_y_position = value;
                 return;
             case 0xFF4B:
-                pixel_processing_unit.window_x_position_plus_7_wx = value;
+                pixel_processing_unit.wx_window_x_position_plus_7 = value;
                 return;
             case 0xFF50:
                 boot_rom_status = value;
@@ -406,9 +406,9 @@ void MemoryManagementUnit::step_forward_one_machine_cycle()
     }
     else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
     {
-        oam_dma_source_address_base = ((pixel_processing_unit.object_attribute_memory_direct_memory_access_dma >= 0xFE)
-            ? pixel_processing_unit.object_attribute_memory_direct_memory_access_dma - 0x20
-            : pixel_processing_unit.object_attribute_memory_direct_memory_access_dma) << 8;
+        oam_dma_source_address_base = ((pixel_processing_unit.dma_object_attribute_memory_direct_memory_access >= 0xFE)
+            ? pixel_processing_unit.dma_object_attribute_memory_direct_memory_access - 0x20
+            : pixel_processing_unit.dma_object_attribute_memory_direct_memory_access) << 8;
 
         oam_dma_machine_cycles_elapsed = 0;
         pixel_processing_unit.is_oam_dma_in_progress = true;

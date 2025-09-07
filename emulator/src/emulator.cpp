@@ -10,14 +10,23 @@ namespace GameBoyEmulator
 {
 
 Emulator::Emulator()
-    : internal_timer{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-      pixel_processing_unit{[this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }},
-      memory_management_unit{std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)},
-      central_processing_unit{[this]()
-                              {
-                                  this->step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit();
-                              },
-                              *memory_management_unit}
+    : internal_timer
+      {
+          [this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }
+      },
+      pixel_processing_unit
+      {
+          [this](uint8_t interrupt_flag_mask) { this->request_interrupt(interrupt_flag_mask); }
+      },
+      memory_management_unit
+      {
+          std::make_unique<MemoryManagementUnit>(game_cartridge_slot, internal_timer, pixel_processing_unit)
+      },
+      central_processing_unit
+      {
+          [this](){ this->step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit(); },
+          *memory_management_unit
+      }
 {
 }
 
@@ -96,12 +105,10 @@ void Emulator::write_byte_to_memory(uint16_t address, uint8_t value)
 
 void Emulator::print_bytes_in_memory_range(uint16_t start_address, uint16_t end_address) const
 {
-    GameBoyEmulator::print_bytes_in_range([&](uint16_t address, bool is_access_for_oam_dma) 
-                                      {
-                                          return memory_management_unit->read_byte(address, is_access_for_oam_dma);
-                                      },
-                                      start_address,
-                                      end_address);
+    GameBoyEmulator::print_bytes_in_range(
+        [&](uint16_t address, bool is_access_for_oam_dma) { return memory_management_unit->read_byte(address, is_access_for_oam_dma); },
+        start_address,
+        end_address);
 }
 
 void Emulator::update_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed)
@@ -131,11 +138,12 @@ std::string Emulator::get_loaded_game_rom_title_thread_safe() const
     if (is_game_rom_loaded_in_memory_thread_safe())
     {
         game_rom_title.reserve(ROM_TITLE_END - ROM_TITLE_START + 1);
+        constexpr uint8_t TITLE_FINISHED_BYTE = 0x00;
 
         for (uint16_t address = ROM_TITLE_START; address <= ROM_TITLE_END; address++)
         {
             const uint8_t title_byte = read_byte_from_memory(address);
-            if (title_byte == 0x00)
+            if (title_byte == TITLE_FINISHED_BYTE)
             {
                 break;
             }

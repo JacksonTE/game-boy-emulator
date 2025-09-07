@@ -131,7 +131,9 @@ public:
         if (is_tracking_current_size)
         {
             if (current_size == 0)
+            {
                 std::cout << "Warning: attempted to shift out of an empty PISO shift register while tracking its size.\n";
+            }
             else
                 current_size--;
         }
@@ -173,15 +175,15 @@ private:
 class PixelProcessingUnit
 {
 public:
-    uint8_t viewport_y_position_scy{};
-    uint8_t viewport_x_position_scx{};
-    uint8_t lcd_y_coordinate_compare_lyc{};
-    uint8_t object_attribute_memory_direct_memory_access_dma{};
-    uint8_t background_palette_bgp{};
-    uint8_t object_palette_0_obp0{0xFF};
-    uint8_t object_palette_1_obp1{0xFF};
-    uint8_t window_y_position_wy{};
-    uint8_t window_x_position_plus_7_wx{};
+    uint8_t scy_viewport_y_position{};
+    uint8_t scx_viewport_x_position{};
+    uint8_t lyc_lcd_y_coordinate_compare{};
+    uint8_t dma_object_attribute_memory_direct_memory_access{};
+    uint8_t bgp_background_palette{};
+    uint8_t obp0_object_palette_0{0xFF};
+    uint8_t obp1_object_palette_1{0xFF};
+    uint8_t wy_window_y_position{};
+    uint8_t wx_window_x_position_plus_7{};
 
     bool is_oam_dma_in_progress{};
 
@@ -193,13 +195,13 @@ public:
     uint8_t get_published_frame_buffer_index_thread_safe() const;
     std::unique_ptr<uint8_t[]>& get_pixel_frame_buffer(uint8_t index);
 
-    uint8_t read_lcd_control_lcdc() const;
-    void write_lcd_control_lcdc(uint8_t value);
+    uint8_t read_lcdc_lcd_control() const;
+    void write_lcdc_lcd_control(uint8_t value);
 
-    uint8_t read_lcd_status_stat() const;
-    void write_lcd_status_stat(uint8_t value);
+    uint8_t read_stat_lcd_status() const;
+    void write_stat_lcd_status(uint8_t value);
 
-    uint8_t read_lcd_y_coordinate_ly() const;
+    uint8_t read_ly_lcd_y_coordinate() const;
 
     uint8_t read_byte_video_ram(uint16_t memory_address) const;
     void write_byte_video_ram(uint16_t memory_address, uint8_t value);
@@ -219,11 +221,11 @@ private:
     std::unique_ptr<uint8_t[]> video_ram;
     std::unique_ptr<uint8_t[]> object_attribute_memory;
 
-    uint8_t lcd_control_lcdc{};
-    uint8_t lcd_status_stat{0b10000000};
-    uint8_t lcd_y_coordinate_ly{};
-    uint8_t internal_lcd_x_coordinate_plus_8_lx{};
-    uint8_t internal_window_line_counter_wlc{};
+    uint8_t lcdc_lcd_control{};
+    uint8_t stat_lcd_status{0b10000000};
+    uint8_t ly_lcd_y_coordinate{};
+    uint8_t lx_internal_lcd_x_coordinate_plus_8{};
+    uint8_t wlc_internal_window_line_counter{};
 
     PixelProcessingUnitMode previous_mode{PixelProcessingUnitMode::HorizontalBlank};
     PixelProcessingUnitMode current_mode{PixelProcessingUnitMode::HorizontalBlank};
@@ -252,21 +254,21 @@ private:
     ParallelInSerialOutShiftRegister<BackgroundPixel, PIXELS_PER_TILE_ROW> background_pixel_shift_register{true};
     ParallelInSerialOutShiftRegister<ObjectPixel, PIXELS_PER_TILE_ROW> object_pixel_shift_register{false};
 
-    void step_object_attribute_memory_scan_single_dot();
-    void step_pixel_transfer_single_dot();
-    void step_horizontal_blank_single_dot();
-    void step_vertical_blank_single_dot();
+    void step_object_attribute_memory_scan_forward_one_dot();
+    void step_pixel_transfer_forward_one_dot();
+    void step_horizontal_blank_forward_one_dot();
+    void step_vertical_blank_forward_one_dot();
     void trigger_stat_interrupts();
 
     void switch_to_mode(PixelProcessingUnitMode new_mode);
 
-    void step_fetchers_single_dot();
+    void step_fetchers_forward_one_dot();
 
-    void step_background_fetcher_single_dot();
+    void step_background_fetcher_forward_one_dot();
     uint8_t get_background_fetcher_tile_id() const;
     uint8_t get_background_fetcher_tile_row_byte(uint8_t offset) const;
 
-    void step_object_fetcher_single_dot();
+    void step_object_fetcher_forward_one_dot();
     uint8_t get_object_fetcher_tile_row_byte(uint8_t offset);
 
     void publish_new_frame();
