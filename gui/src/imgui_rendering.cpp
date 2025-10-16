@@ -48,10 +48,10 @@ void render_main_menu_bar(
             }
             imgui_spaced_separator();
             if (ImGui::MenuItem(
-                "Unload Game ROM",
-                "",
-                false,
-                game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    "Unload Game ROM",
+                    "",
+                    false,
+                    game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 set_emulation_screen_blank(graphics_controller);
                 SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
@@ -62,10 +62,10 @@ void render_main_menu_bar(
             }
             ImGui::Spacing();
             if (ImGui::MenuItem(
-                "Unload Boot ROM",
-                "",
-                false,
-                game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe()))
+                    "Unload Boot ROM",
+                    "",
+                    false,
+                    game_boy_emulator.is_boot_rom_loaded_in_memory_thread_safe()))
             {
                 emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
                 game_boy_emulator.unload_boot_rom_from_memory_thread_safe();
@@ -88,10 +88,10 @@ void render_main_menu_bar(
         {
             ImGui::SeparatorText("Colour Palette");
             if (ImGui::Combo(
-                "##Colour Palette",
-                &menu_properties.selected_colour_palette_combobox_index,
-                COLOUR_PALETTE_LABELS,
-                IM_ARRAYSIZE(COLOUR_PALETTE_LABELS)))
+                    "##Colour Palette",
+                    &menu_properties.selected_colour_palette_combobox_index,
+                    COLOUR_PALETTE_LABELS,
+                    IM_ARRAYSIZE(COLOUR_PALETTE_LABELS)))
             {
                 switch (menu_properties.selected_colour_palette_combobox_index)
                 {
@@ -131,20 +131,20 @@ void render_main_menu_bar(
         {
             ImGui::SeparatorText("Fast-Foward Speed");
             if (ImGui::Combo(
-                "##Fast-Foward Speed",
-                &menu_properties.selected_fast_emulation_speed_index,
-                FAST_FORWARD_SPEED_LABELS,
-                IM_ARRAYSIZE(FAST_FORWARD_SPEED_LABELS)))
+                    "##Fast-Foward Speed",
+                    &menu_properties.selected_fast_emulation_speed_index,
+                    FAST_FORWARD_SPEED_LABELS,
+                    IM_ARRAYSIZE(FAST_FORWARD_SPEED_LABELS)))
             {
                 const double emulation_speed_multiplier = menu_properties.selected_fast_emulation_speed_index * 0.25 + 1.5;
                 emulation_controller.target_fast_forward_multiplier_atomic.store(emulation_speed_multiplier, std::memory_order_release);
             }
             imgui_spaced_separator();
             if (ImGui::MenuItem(
-                is_fast_forward_enabled ? "Disable Fast-Forward" : "Enable Fast-Forward",
-                "[Space]",
-                false,
-                game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    is_fast_forward_enabled ? "Disable Fast-Forward" : "Enable Fast-Forward",
+                    "[Space]",
+                    false,
+                    game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 toggle_fast_forward_enabled_state(
                     emulation_controller.is_fast_forward_enabled_atomic,
@@ -152,10 +152,10 @@ void render_main_menu_bar(
             }
             ImGui::Spacing();
             if (ImGui::MenuItem(
-                is_emulation_paused ? "Unpause" : "Pause",
-                "[Esc]",
-                false,
-                game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    is_emulation_paused ? "Unpause" : "Pause",
+                    "[Esc]",
+                    false,
+                    game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 toggle_emulation_paused_state(
                     emulation_controller.is_emulation_paused_atomic,
@@ -163,10 +163,10 @@ void render_main_menu_bar(
             }
             imgui_spaced_separator();
             if (ImGui::MenuItem(
-                "Reset",
-                "[R]",
-                false,
-                game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
+                    "Reset",
+                    "[R]",
+                    false,
+                    game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
                 game_boy_emulator.reset_state();
                 emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
@@ -208,9 +208,9 @@ void render_custom_colour_palette_editor(
 
             std::string colour_label = std::string("Colour ") + std::to_string(i);
             if (ImGui::ColorEdit4(
-                colour_label.c_str(),
-                reinterpret_cast<float*>(&menu_properties.selected_custom_colour_palette_colours[i]),
-                ImGuiColorEditFlags_NoInputs))
+                    colour_label.c_str(),
+                    reinterpret_cast<float*>(&menu_properties.selected_custom_colour_palette_colours[i]),
+                    ImGuiColorEditFlags_NoInputs))
             {
                 update_colour_palette(
                     game_boy_emulator,
