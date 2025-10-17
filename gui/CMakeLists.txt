@@ -53,7 +53,9 @@ add_executable(emulator-gui
 target_include_directories(emulator-gui PRIVATE
     "include")
 
-if(LINUX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(STATUS "Building on Linux.")
+
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 
