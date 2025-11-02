@@ -11,7 +11,9 @@ add_executable(emulator-gui
 target_include_directories(emulator-gui PRIVATE
     "include")
 
-if(LINUX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(STATUS "Building emulator-gui on Linux.")
+
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 
@@ -30,3 +32,7 @@ target_link_libraries(emulator-gui PRIVATE
     ImGui
     nfd
     SDL3::SDL3)
+
+install(TARGETS emulator-gui RUNTIME
+        DESTINATION .
+        COMPONENT gui)
