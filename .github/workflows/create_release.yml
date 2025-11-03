@@ -116,7 +116,7 @@ jobs:
           name: Game Boy Emulator v${{ inputs.version }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          body_path: .github/release_template.md
           files: |
             artifacts/windows-packages/*
             artifacts/linux-packages/*
