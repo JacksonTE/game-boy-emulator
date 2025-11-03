@@ -43,26 +43,15 @@ set(CPACK_STRIP_FILES TRUE)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     message(STATUS "Setting up CPack packaging on Windows.")
     set(CPACK_GENERATOR "ZIP")
-    set(CPACK_SOURCE_GENERATOR "ZIP")
     set(CPACK_PACKAGE_FILE_NAME "GameBoyEmulator-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}-Windows-x64")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Setting up CPack packaging on Linux.")
     set(CPACK_GENERATOR "TGZ")
-    set(CPACK_SOURCE_GENERATOR "TGZ")
     set(CPACK_PACKAGE_FILE_NAME "GameBoyEmulator-${PROJECT_VERSION}-Linux-x64")
 endif()
 
 install(FILES "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_SOURCE_DIR}/LICENSE.txt"
         DESTINATION .
         COMPONENT documentation)
-
-set(CPACK_SOURCE_PACKAGE_FILE_NAME "GameBoyEmulator-${PROJECT_VERSION}-Source")
-set(CPACK_SOURCE_IGNORE_FILES
-    ".git/"
-    ".github/"
-    "build/"
-    "out/"
-    ".vs/"
-    "CMakeSettings.json")
 
 include(CPack)
