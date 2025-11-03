@@ -55,28 +55,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup MSVC
+        if: matrix.platform == 'Windows'
+        uses: microsoft/setup-msbuild@v2
+
       - name: Install Linux Dependencies
         if: matrix.platform == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            ninja-build \
+            build-essential \
             libgtk-3-dev \
             pkg-config
 
       - name: Install CMake
         uses: lukka/get-cmake@latest
 
-      - name: Configure CMake
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Configure CMake (Windows)
+        if: matrix.platform == 'Windows'
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Configure CMake (Linux)
+        if: matrix.platform == 'Linux'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build everything
-        run: cmake --build build --parallel
+        run: cmake --build build --config Release --parallel
 
-      - name: Create binary packages with license and readme
+      - name: Create binary packages (Windows)
+        if: matrix.platform == 'Windows'
         working-directory: build
-        run: | 
-          cpack
+        run: cpack -C Release
+
+      - name: Create binary packages (Linux)
+        if: matrix.platform == 'Linux'
+        working-directory: build
+        run: cpack
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
