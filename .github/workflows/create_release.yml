@@ -38,7 +38,7 @@ jobs:
     uses: ./.github/workflows/run_tests.yml
 
   create-packages:
-    needs: run-tests
+    needs: validate-release-version
     strategy:
       matrix:
         include:
@@ -71,13 +71,12 @@ jobs:
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build everything
-        run: cmake --build build
+        run: cmake --build build --parallel
 
-      - name: Create packages
+      - name: Create binary packages with license and readme
         working-directory: build
         run: | 
           cpack
-          cpack --config CPackSourceConfig.cmake
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
@@ -87,7 +86,7 @@ jobs:
           if-no-files-found: error
 
   upload-release-packages:
-    needs: create-packages
+    needs: [run-tests, create-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
