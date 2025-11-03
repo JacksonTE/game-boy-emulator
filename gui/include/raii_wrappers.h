@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "carlito_embedded.h"
+
 namespace ResourceAcquisitionIsInitialization
 {
 
@@ -15,7 +17,9 @@ public:
     SdlInitializerRaii(uint32_t flags)
     {
         if (!SDL_Init(flags))
+        {
             throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
+        }
     }
 
     ~SdlInitializerRaii()
@@ -37,13 +41,17 @@ public:
         : window{SDL_CreateWindow(title, width, height, flags)}
     {
         if (!window)
+        {
             throw std::runtime_error(std::string("SDL_CreateWindow failed: ") + SDL_GetError());
+        }
     }
 
     ~SdlWindowRaii()
     {
         if (window)
+        {
             SDL_DestroyWindow(window);
+        }
     }
 
     SDL_Window* get() const
@@ -90,7 +98,9 @@ public:
     ~SdlRendererRaii()
     {
         if (renderer)
+        {
             SDL_DestroyRenderer(renderer);
+        }
     }
 
     SDL_Renderer* get() const
@@ -124,7 +134,9 @@ public:
     ~SdlTextureRaii()
     {
         if (texture)
+        {
             SDL_DestroyTexture(texture);
+        }
     }
 
     SDL_Texture* get() const
@@ -153,7 +165,14 @@ public:
 
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.FontDefault = io.Fonts->AddFontFromFileTTF(std::string(PROJECT_ROOT + std::string("/fonts/calibri-regular.ttf")).c_str(), 18);
+
+        ImFontConfig font_config;
+        font_config.FontDataOwnedByAtlas = false;
+        io.FontDefault = io.Fonts->AddFontFromMemoryTTF(
+            const_cast<unsigned char*>(carlito_ttf),
+            carlito_ttf_len,
+            18.0f,
+            &font_config);
 
         ImGuiStyle& style = ImGui::GetStyle();
         style.ItemSpacing.x = 11.0f;
