@@ -1,0 +1,123 @@
+name: Create Release
+run-name: "Create Release: v${{ inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (major.minor.patch)'
+        required: true
+        type: string
+
+jobs:
+  validate-release-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Commits/Branches/Tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify input version number matches CMakeLists.txt project version number
+        run: |
+          PROJECT_VERSION=$(grep -oP 'project\(game-boy-emulator-project\s+VERSION\s+\K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          if [ "${{ inputs.version }}" != "$PROJECT_VERSION" ]; then
+            echo "ERROR: Input version (${{ inputs.version }}) does not match CMakeLists.txt project version ($PROJECT_VERSION). Exiting."
+            exit 1
+          fi
+
+      - name: Ensure tag for current release doesn't already exist
+        run: |
+          if git rev-parse "v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "ERROR: tag v${{ inputs.version }} already exists. Exiting."
+            exit 1
+          fi
+
+  run-tests:
+    needs: validate-release-version
+    uses: ./.github/workflows/run_tests.yml
+
+  create-packages:
+    needs: run-tests
+    strategy:
+      matrix:
+        include:
+          - operating-system: windows-latest
+            platform: Windows
+            package-extension: zip
+            artifact-name: windows-packages
+          - operating-system: ubuntu-latest
+            platform: Linux
+            package-extension: tar.gz
+            artifact-name: linux-packages
+    runs-on: ${{ matrix.operating-system }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            libgtk-3-dev \
+            pkg-config
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Configure CMake
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build everything
+        run: cmake --build build
+
+      - name: Create packages
+        working-directory: build
+        run: | 
+          cpack
+          cpack --config CPackSourceConfig.cmake
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: build/GameBoyEmulator-*.${{ matrix.package-extension }}
+          if-no-files-found: error
+
+  upload-release-packages:
+    needs: create-packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display Artifact Structure
+        run: ls -R artifacts
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Game Boy Emulator v${{ inputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/windows-packages/*
+            artifacts/linux-packages/*
