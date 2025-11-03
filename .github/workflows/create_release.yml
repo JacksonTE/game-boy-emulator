@@ -110,6 +110,7 @@ jobs:
           git push origin "v${{ inputs.version }}"
 
       - name: Create GitHub Release
+        id: create-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}
@@ -120,3 +121,10 @@ jobs:
           files: |
             artifacts/windows-packages/*
             artifacts/linux-packages/*
+
+      - name: Add Release Summary
+        run: |
+          echo "**Release Version:** v${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** ${{ steps.create-release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
