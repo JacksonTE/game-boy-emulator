@@ -20,7 +20,7 @@ jobs:
 
       - name: Verify input version number matches CMakeLists.txt project version number
         run: |
-          PROJECT_VERSION=$(grep -oP 'project\(game-boy-emulator-project\s+VERSION\s+\K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          PROJECT_VERSION=$(sed -n '/project(game-boy-emulator-project/,/)/p' CMakeLists.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           if [ "${{ inputs.version }}" != "$PROJECT_VERSION" ]; then
             echo "ERROR: Input version (${{ inputs.version }}) does not match CMakeLists.txt project version ($PROJECT_VERSION). Exiting."
             exit 1
