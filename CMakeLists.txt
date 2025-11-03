@@ -54,4 +54,8 @@ install(FILES "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_SOURCE_DIR}/LICENSE.txt"
         DESTINATION .
         COMPONENT documentation)
 
+install(FILES "${imgui_SOURCE_DIR}/fonts/carlito-license.txt"
+        DESTINATION third_party_licenses
+        COMPONENT documentation)
+
 include(CPack)
