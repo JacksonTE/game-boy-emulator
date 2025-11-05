@@ -39,7 +39,7 @@ jobs:
 
   run-tests:
     needs: validate-release-version
-    uses: .github/workflows/run_tests.yml
+    uses: ./.github/workflows/run_tests.yml
 
   create-packages:
     needs: validate-release-version
