@@ -8,6 +8,32 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 | ![Pokemon Yellow Gameplay](https://github.com/user-attachments/assets/a6dce68c-cbb2-4688-8d13-b7fac0789bbb) | ![Donkey Kong Gameplay](https://github.com/user-attachments/assets/634cb879-4189-4196-b395-6e6e06999298) | ![Zelda Gameplay](https://github.com/user-attachments/assets/fc67733c-b722-44d2-9a22-70717476da85) | 
 |-------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
 
+## Usage Instructions
+1. Acquire a Game Boy game ROM file (not provided with the project but found online easily).
+2. Run the project and in the top menu click `File`->`Load Game ROM`.
+3. Select the ROM file to run.
+4. If the game is currently supported, it will now be running, and will be interactable via the key mappings below.
+
+## Controls
+| Game Boy | Key |
+| --- | --- |
+| A | <kbd>'</kbd> |
+| B | <kbd>.</kbd> |
+| Up | <kbd>W</kbd> |
+| Down | <kbd>S</kbd> |
+| Left | <kbd>A</kbd> |
+| Right | <kbd>D</kbd> |
+| Start | <kbd>Enter</kbd> |
+| Select | <kbd>Shift</kbd> |
+
+| Emulator | Key |
+| --- | --- |
+| Load Game ROM | <kbd>O</kbd> |
+| Quit | <kbd>Alt+F4</kbd> |
+| Fast-Forward | <kbd>Space</kbd> |
+| Pause | <kbd>Escape</kbd> |
+| Reset | <kbd>R</kbd> |
+
 ## Features
 - Interactable GUI for loading game ROMs and adjusting emulation options made with [Dear ImGui](https://github.com/ocornut/imgui).
 - Frame data rendering using [SDL3](https://github.com/libsdl-org/SDL).
@@ -36,28 +62,3 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 3. In a terminal, in the `game-boy-emulator` directory, run `mkdir build && cmake -S . -B build && cmake --build build --parallel --target emulator-gui`.
 4. This creates an executable that can be run with `./build/bin/emulator-gui`.
 
-## Usage Instructions
-1. Acquire a Game Boy game ROM file (not provided with the project but found online easily).
-2. Run the project and in the top menu click `File`->`Load Game ROM`.
-3. Select the ROM file to run.
-4. If the game is currently supported, it will now be running, and will be interactable via the key mappings below.
-
-## Controls
-| Game Boy | Key |
-| --- | --- |
-| A | <kbd>'</kbd> |
-| B | <kbd>.</kbd> |
-| Up | <kbd>W</kbd> |
-| Down | <kbd>S</kbd> |
-| Left | <kbd>A</kbd> |
-| Right | <kbd>D</kbd> |
-| Start | <kbd>Enter</kbd> |
-| Select | <kbd>Shift</kbd> |
-
-| Emulator | Key |
-| --- | --- |
-| Load Game ROM | <kbd>O</kbd> |
-| Quit | <kbd>Alt+F4</kbd> |
-| Fast-Forward | <kbd>Space</kbd> |
-| Pause | <kbd>Escape</kbd> |
-| Reset | <kbd>R</kbd> |
