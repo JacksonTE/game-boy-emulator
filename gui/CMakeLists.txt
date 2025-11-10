@@ -1,6 +1,7 @@
-find_package(ImGui)
-find_package(NativeFileDialogExtended)
-find_package(SDL3)
+find_package(Carlito REQUIRED)
+find_package(ImGui REQUIRED)
+find_package(NativeFileDialogExtended REQUIRED)
+find_package(SDL3 REQUIRED)
 
 add_executable(emulator-gui
     "src/display_utilities.cpp"
@@ -9,7 +10,8 @@ add_executable(emulator-gui
     "src/main.cpp")
 
 target_include_directories(emulator-gui PRIVATE
-    "include")
+    "include"
+    ${CARLITO_INCLUDE_DIR})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Building emulator-gui on Linux.")
