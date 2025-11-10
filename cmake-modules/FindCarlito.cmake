@@ -12,7 +12,7 @@ FetchContent_MakeAvailable(Carlito)
 ###############################################################################
 # Generating header file with byte array representation of Carlito-Regular.ttf
 ###############################################################################
-set(CARLITO_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/carlito" CACHE INTERNAL "")
+set(CARLITO_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/carlito")
 file(MAKE_DIRECTORY ${CARLITO_INCLUDE_DIR})
 
 set(CARLITO_TTF_PATH "${carlito_SOURCE_DIR}/fonts/ttf/Carlito-Regular.ttf")
@@ -32,6 +32,9 @@ constexpr unsigned char carlito_ttf[] = {
 ")
 message(STATUS "Generated carlito_embedded.h at: ${CARLITO_INCLUDE_DIR}")
 
+###############################################################################
+# CPack Packaging Setup
+###############################################################################
 install(FILES "${carlito_SOURCE_DIR}/OFL.txt"
         DESTINATION third-party-licenses
         RENAME carlito_license.txt
