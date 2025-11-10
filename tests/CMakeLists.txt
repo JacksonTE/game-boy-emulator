@@ -1,5 +1,5 @@
-find_package(GoogleTest)
-find_package(NlohmannJson)
+find_package(GoogleTest REQUIRED)
+find_package(NlohmannJson REQUIRED)
 
 add_executable(game-boy-tests
     "src/gbmicrotest_harness.cpp"
