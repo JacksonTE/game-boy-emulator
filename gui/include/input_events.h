@@ -6,14 +6,6 @@
 #include "emulator.h"
 #include "gui_state_types.h"
 
-constexpr float MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS = 2.5f;
-
-bool should_main_menu_bar_and_cursor_be_visible(
-    GameBoyEmulator::Emulator& game_boy_emulator,
-    const EmulationController& emulation_controller,
-    FullscreenDisplayStatus& fullscreen_display_status,
-    SDL_Window* sdl_window);
-
 bool try_load_file_to_memory_with_dialog(
     GameBoyEmulator::FileType file_type,
     GameBoyEmulator::Emulator& game_boy_emulator,

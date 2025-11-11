@@ -213,4 +213,52 @@ private:
     ImGuiContext* imgui_context{};
 };
 
+class SdlEventWatchRaii
+{
+public:
+    SdlEventWatchRaii(SDL_EventFilter filter, void* userdata)
+        : filter_{filter}, userdata_{userdata}
+    {
+        SDL_AddEventWatch(filter_, userdata_);
+    }
+
+    ~SdlEventWatchRaii()
+    {
+        SDL_RemoveEventWatch(filter_, userdata_);
+    }
+
+    SdlEventWatchRaii(const SdlEventWatchRaii&) = delete;
+    SdlEventWatchRaii& operator=(const SdlEventWatchRaii&) = delete;
+
+    SdlEventWatchRaii(SdlEventWatchRaii&&) = delete;
+    SdlEventWatchRaii& operator=(SdlEventWatchRaii&&) = delete;
+
+private:
+    SDL_EventFilter filter_;
+    void* userdata_;
+};
+
+class NfdInitializerRaii
+{
+public:
+    NfdInitializerRaii()
+    {
+        if (NFD_Init() != NFD_OKAY)
+        {
+            throw std::runtime_error(std::string("NFD_Init failed: ") + NFD_GetError());
+        }
+    }
+
+    ~NfdInitializerRaii()
+    {
+        NFD_Quit();
+    }
+
+    NfdInitializerRaii(const NfdInitializerRaii&) = delete;
+    NfdInitializerRaii& operator=(const NfdInitializerRaii&) = delete;
+
+    NfdInitializerRaii(NfdInitializerRaii&&) = delete;
+    NfdInitializerRaii& operator=(NfdInitializerRaii&&) = delete;
+};
+
 } // namespace ResourceAcquisitionIsInitialization
