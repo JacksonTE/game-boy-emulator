@@ -78,6 +78,17 @@ static void run_emulator_core(
     }
 }
 
+// Allows rendering during window resize bypassing the OS's modal resize loop that blocks the main event loop
+static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sdl_event)
+{
+    if (sdl_event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || sdl_event->type == SDL_EVENT_WINDOW_RESIZED)
+    {
+        RenderContext* render_context = static_cast<RenderContext*>(render_context_data);
+        render_frame(*render_context);
+    }
+    return true;
+}
+
 int main()
 {
     try
@@ -109,11 +120,7 @@ int main()
 #ifdef __linux__
         gtk_init(NULL, NULL);
 #endif
-        if (NFD_Init() != NFD_OKAY)
-        {
-            std::cerr << "Error: NativeFileDialogExtended was unable to be initialized, exiting.\n";
-            return 1;
-        }
+        ResourceAcquisitionIsInitialization::NfdInitializerRaii nfd_initializer{};
 
         GameBoyEmulator::Emulator game_boy_emulator{};
         EmulationController emulation_controller{};
@@ -153,6 +160,25 @@ int main()
         std::string error_message = "";
         bool should_stop_emulation = false;
 
+        RenderContext render_context{
+            &game_boy_emulator,
+            &emulation_controller,
+            &file_loading_status,
+            &fullscreen_display_status,
+            &graphics_controller,
+            &menu_properties,
+            sdl_renderer.get(),
+            sdl_texture.get(),
+            sdl_window.get(),
+            &previously_published_frame_buffer_index,
+            &should_stop_emulation,
+            &error_message
+        };
+        ResourceAcquisitionIsInitialization::SdlEventWatchRaii event_watch{
+            resize_event_watch_callback,
+            &render_context
+        };
+
         while (!should_stop_emulation)
         {
             if (did_emulator_core_exception_occur_atomic.load(std::memory_order_acquire))
@@ -170,79 +196,13 @@ int main()
                 should_stop_emulation,
                 error_message);
 
-            const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
-            if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
-            {
-                auto const& pixel_frame_buffer = game_boy_emulator.get_pixel_frame_buffer(currently_published_frame_buffer_index);
-
-                for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
-                {
-                    graphics_controller.abgr_pixel_buffer[i] = graphics_controller.active_colour_palette[pixel_frame_buffer[i]];
-                }
-                SDL_UpdateTexture(sdl_texture.get(), nullptr, graphics_controller.abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
-                previously_published_frame_buffer_index = currently_published_frame_buffer_index;
-            }
-
-            SDL_RenderClear(sdl_renderer.get());
-            SDL_FRect emulation_screen_rectangle = get_sized_emulation_rectangle(sdl_renderer.get(), sdl_window.get());
-            SDL_RenderTexture(sdl_renderer.get(), sdl_texture.get(), nullptr, &emulation_screen_rectangle);
-
-            sdl_logical_presentation_imgui_workaround_t logical_values = sdl_logical_presentation_imgui_workaround_pre_frame(sdl_renderer.get());
-            ImGui_ImplSDLRenderer3_NewFrame();
-            ImGui_ImplSDL3_NewFrame();
-            ImGui::NewFrame();
-
-            if (should_main_menu_bar_and_cursor_be_visible(
-                    game_boy_emulator,
-                    emulation_controller,
-                    fullscreen_display_status,
-                    sdl_window.get()))
-            {
-                if (!SDL_CursorVisible())
-                {
-                    SDL_ShowCursor();
-                }
-                render_main_menu_bar(
-                    currently_published_frame_buffer_index,
-                    game_boy_emulator,
-                    emulation_controller,
-                    file_loading_status,
-                    fullscreen_display_status,
-                    graphics_controller,
-                    menu_properties,
-                    sdl_window.get(),
-                    should_stop_emulation,
-                    error_message);
-            }
-            else if (SDL_CursorVisible())
-            {
-                SDL_HideCursor();
-            }
-
-            render_custom_colour_palette_editor(
-                currently_published_frame_buffer_index,
-                game_boy_emulator,
-                menu_properties,
-                graphics_controller);
-
-            render_error_message_popup(
-                file_loading_status,
-                emulation_controller.is_emulation_paused_atomic,
-                error_message);
-
-            ImGui::Render();
-            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), sdl_renderer.get());
-            sdl_logical_presentation_imgui_workaround_post_frame(sdl_renderer.get(), logical_values);
-
-            SDL_RenderPresent(sdl_renderer.get());
+            render_frame(render_context);
         }
-        NFD_Quit();
         return 0;
     }
     catch (const std::exception& exception)
     {
         std::cerr << "Error: " << exception.what() << ", exiting.\n";
-        NFD_Quit();
         return 1;
     }   
 }

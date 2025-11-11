@@ -1,15 +1,11 @@
 #pragma once
 
-#include <atomic>
-#include <backends/imgui_impl_sdl3.h>
-#include <bit>
 #include <cstdint>
-#include <nfd.h>
-#include <SDL3/SDL.h>
-#include <string>
 
 #include "emulator.h"
 #include "gui_state_types.h"
+
+constexpr float MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS = 2.5f;
 
 constexpr int INITIAL_WINDOW_SCALE = 5;
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
@@ -71,6 +67,14 @@ void update_colour_palette(
     GameBoyEmulator::Emulator& game_boy_emulator,
     GraphicsController& graphics_controller,
     const uint8_t currently_published_frame_buffer_index);
+
+bool should_main_menu_bar_and_cursor_be_visible(
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    const EmulationController& emulation_controller,
+    FullscreenDisplayStatus& fullscreen_display_status,
+    SDL_Window* sdl_window);
+
+void render_frame(RenderContext& context);
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339
 struct sdl_logical_presentation_imgui_workaround_t

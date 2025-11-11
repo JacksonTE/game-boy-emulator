@@ -1,42 +1,6 @@
+#include "display_utilities.h"
 #include "input_events.h"
 #include "nfd_sdl3.h"
-
-bool should_main_menu_bar_and_cursor_be_visible(
-    GameBoyEmulator::Emulator& game_boy_emulator,
-    const EmulationController& emulation_controller,
-    FullscreenDisplayStatus& fullscreen_display_status,
-    SDL_Window* sdl_window)
-{
-    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
-    if (!is_fullscreen_enabled ||
-        !game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
-        emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
-    {
-        return true;
-    }
-
-    float mouse_y_position_in_window;
-    SDL_GetGlobalMouseState(nullptr, &mouse_y_position_in_window);
-    const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * ImGui::GetIO().DisplayFramebufferScale.y;
-    ImGuiIO& io = ImGui::GetIO();
-    if (SDL_GetMouseFocus() == sdl_window)
-    {
-        if (fullscreen_display_status.is_main_menu_bar_hovered ||
-            mouse_y_position_in_window <= main_menu_bar_height_pixels ||
-            io.MouseDelta.x != 0.0f ||
-            io.MouseDelta.y != 0.0f)
-        {
-            fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
-            return true;
-        }
-    }
-
-    if (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f)
-    {
-        fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden -= ImGui::GetIO().DeltaTime;
-    }
-    return (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f);
-}
 
 bool try_load_file_to_memory_with_dialog(
     GameBoyEmulator::FileType file_type,

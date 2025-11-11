@@ -68,3 +68,19 @@ struct MenuProperties
     int selected_colour_palette_combobox_index{};
     int selected_fast_emulation_speed_index{};
 };
+
+struct RenderContext
+{
+    GameBoyEmulator::Emulator* game_boy_emulator;
+    EmulationController* emulation_controller;
+    FileLoadingStatus* file_loading_status;
+    FullscreenDisplayStatus* fullscreen_display_status;
+    GraphicsController* graphics_controller;
+    MenuProperties* menu_properties;
+    SDL_Renderer* sdl_renderer;
+    SDL_Texture* sdl_texture;
+    SDL_Window* sdl_window;
+    uint8_t* previously_published_frame_buffer_index;
+    bool* should_stop_emulation;
+    std::string* error_message;
+};
