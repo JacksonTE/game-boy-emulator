@@ -3,31 +3,6 @@
 #include "display_utilities.h"
 #include "imgui_rendering.h"
 
-SDL_FRect get_sized_emulation_rectangle(
-    SDL_Renderer* sdl_renderer,
-    SDL_Window* sdl_window)
-{
-    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
-    float space_reserved_for_menu_bar = 0.0f;
-
-    if (!is_fullscreen_enabled)
-    {
-        int renderer_output_width, renderer_output_height;
-        SDL_GetRenderOutputSize(sdl_renderer, &renderer_output_width, &renderer_output_height);
-        const float current_scale = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
-        const float menu_bar_height = ImGui::GetFrameHeight();
-        space_reserved_for_menu_bar = menu_bar_height / current_scale;
-    }
-
-    return SDL_FRect
-    {
-        0.0f,
-        space_reserved_for_menu_bar,
-        static_cast<float>(DISPLAY_WIDTH_PIXELS),
-        static_cast<float>(DISPLAY_HEIGHT_PIXELS)
-    };
-}
-
 void set_emulation_screen_blank(GraphicsController& graphics_controller)
 {
     for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
@@ -67,12 +42,10 @@ void update_colour_palette(
 bool should_main_menu_bar_and_cursor_be_visible(
     GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
-    FullscreenDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& fullscreen_display_status,
     SDL_Window* sdl_window)
 {
-    const bool is_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
-    if (!is_fullscreen_enabled ||
-        !game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
+    if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
         emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
     {
         return true;
@@ -101,10 +74,12 @@ bool should_main_menu_bar_and_cursor_be_visible(
     return (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f);
 }
 
-void render_frame(RenderContext& context)
+void render_frame(RenderContext& context, bool should_skip_frame_data_update)
 {
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
-    if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index)
+
+    if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index &&
+        !should_skip_frame_data_update)
     {
         auto const& pixel_frame_buffer = context.game_boy_emulator->get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
@@ -117,7 +92,14 @@ void render_frame(RenderContext& context)
     }
 
     SDL_RenderClear(context.sdl_renderer);
-    SDL_FRect emulation_screen_rectangle = get_sized_emulation_rectangle(context.sdl_renderer, context.sdl_window);
+    SDL_FRect emulation_screen_rectangle =
+        SDL_FRect
+        {
+            0.0f,
+            0.0f,
+            static_cast<float>(DISPLAY_WIDTH_PIXELS),
+            static_cast<float>(DISPLAY_HEIGHT_PIXELS)
+        };
     SDL_RenderTexture(context.sdl_renderer, context.sdl_texture, nullptr, &emulation_screen_rectangle);
 
     sdl_logical_presentation_imgui_workaround_t logical_values = sdl_logical_presentation_imgui_workaround_pre_frame(context.sdl_renderer);
