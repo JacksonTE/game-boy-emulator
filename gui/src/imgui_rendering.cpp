@@ -7,7 +7,7 @@ void render_main_menu_bar(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
-    FullscreenDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& fullscreen_display_status,
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
     SDL_Window* sdl_window,

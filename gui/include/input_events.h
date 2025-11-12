@@ -30,7 +30,7 @@ void handle_sdl_events(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
-    FullscreenDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& fullscreen_display_status,
     KeyPressedStates& key_pressed_states,
     SDL_Window* sdl_window,
     bool& should_stop_emulation,

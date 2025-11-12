@@ -57,10 +57,6 @@ constexpr uint32_t CLASSIC_COLOUR_PALETTE[4] =
     get_abgr_value_for_current_endianness(0xFF, 0x0F, 0x38, 0x0F)
 };
 
-SDL_FRect get_sized_emulation_rectangle(
-    SDL_Renderer* sdl_renderer,
-    SDL_Window* sdl_window);
-
 void set_emulation_screen_blank(GraphicsController& graphics_controller);
 
 void update_colour_palette(
@@ -71,10 +67,10 @@ void update_colour_palette(
 bool should_main_menu_bar_and_cursor_be_visible(
     GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
-    FullscreenDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& fullscreen_display_status,
     SDL_Window* sdl_window);
 
-void render_frame(RenderContext& context);
+void render_frame(RenderContext& context, bool should_skip_frame_data_update);
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339
 struct sdl_logical_presentation_imgui_workaround_t

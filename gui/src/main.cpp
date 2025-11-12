@@ -81,12 +81,14 @@ static void run_emulator_core(
 }
 
 // Allows rendering during window resize bypassing the OS's modal resize loop that blocks the main event loop
+// This also allows the menu bar and the rendering rectangle to resize responsively
 static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sdl_event)
 {
-    if (sdl_event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || sdl_event->type == SDL_EVENT_WINDOW_RESIZED)
+    if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED)
     {
         RenderContext* render_context = static_cast<RenderContext*>(render_context_data);
-        render_frame(*render_context);
+        constexpr bool should_skip_frame_data_update = true;
+        render_frame(*render_context, should_skip_frame_data_update);
     }
     return true;
 }
@@ -100,7 +102,7 @@ int main()
         {
             "Emulate Game Boy",
             DISPLAY_WIDTH_PIXELS * INITIAL_WINDOW_SCALE,
-            DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE,
+            (DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE) + 35,  // +35 for menu bar height
             SDL_WINDOW_RESIZABLE
         };
         ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer
@@ -138,7 +140,7 @@ int main()
         };
 
         FileLoadingStatus file_loading_status{};
-        FullscreenDisplayStatus fullscreen_display_status{};
+        MenuAndCursorDisplayStatus fullscreen_display_status{};
         constexpr uint32_t initial_custom_colour_palette[4] =
         {
             get_abgr_value_for_current_endianness(0xFF, 0xEF, 0xE0, 0x90),
@@ -162,7 +164,8 @@ int main()
         std::string error_message = "";
         bool should_stop_emulation = false;
 
-        RenderContext render_context{
+        RenderContext render_context
+        {
             &game_boy_emulator,
             &emulation_controller,
             &file_loading_status,
@@ -176,7 +179,8 @@ int main()
             &should_stop_emulation,
             &error_message
         };
-        ResourceAcquisitionIsInitialization::SdlEventWatchRaii event_watch{
+        ResourceAcquisitionIsInitialization::SdlEventWatchRaii event_watch
+        {
             resize_event_watch_callback,
             &render_context
         };
@@ -198,7 +202,8 @@ int main()
                 should_stop_emulation,
                 error_message);
 
-            render_frame(render_context);
+            constexpr bool should_skip_frame_data_update = false;
+            render_frame(render_context, should_skip_frame_data_update);
         }
         return 0;
     }

@@ -21,7 +21,7 @@ struct FileLoadingStatus
     bool is_emulation_paused_before_rom_loading{};
 };
 
-struct FullscreenDisplayStatus
+struct MenuAndCursorDisplayStatus
 {
     bool is_main_menu_bar_hovered{};
     float seconds_remaining_until_main_menu_bar_and_cursor_hidden{};
@@ -74,7 +74,7 @@ struct RenderContext
     GameBoyEmulator::Emulator* game_boy_emulator;
     EmulationController* emulation_controller;
     FileLoadingStatus* file_loading_status;
-    FullscreenDisplayStatus* fullscreen_display_status;
+    MenuAndCursorDisplayStatus* fullscreen_display_status;
     GraphicsController* graphics_controller;
     MenuProperties* menu_properties;
     SDL_Renderer* sdl_renderer;
