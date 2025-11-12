@@ -14,17 +14,9 @@ SDL_FRect get_sized_emulation_rectangle(
     {
         int renderer_output_width, renderer_output_height;
         SDL_GetRenderOutputSize(sdl_renderer, &renderer_output_width, &renderer_output_height);
-
+        const float current_scale = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
         const float menu_bar_height = ImGui::GetFrameHeight();
-        const float emulation_height = static_cast<float>(renderer_output_height) - menu_bar_height;
-
-        const float current_scale_x = static_cast<float>(renderer_output_width) / static_cast<float>(DISPLAY_WIDTH_PIXELS);
-        const float current_scale_y = emulation_height / static_cast<float>(DISPLAY_HEIGHT_PIXELS);
-        const int renderer_integer_scaling_factor = std::max(
-            1,
-            std::min(static_cast<int>(current_scale_x), static_cast<int>(current_scale_y)));
-
-        space_reserved_for_menu_bar = menu_bar_height / static_cast<float>(renderer_integer_scaling_factor);
+        space_reserved_for_menu_bar = menu_bar_height / current_scale;
     }
 
     return SDL_FRect
@@ -32,7 +24,7 @@ SDL_FRect get_sized_emulation_rectangle(
         0.0f,
         space_reserved_for_menu_bar,
         static_cast<float>(DISPLAY_WIDTH_PIXELS),
-        static_cast<float>(DISPLAY_HEIGHT_PIXELS) - space_reserved_for_menu_bar
+        static_cast<float>(DISPLAY_HEIGHT_PIXELS)
     };
 }
 

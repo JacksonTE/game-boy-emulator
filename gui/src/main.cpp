@@ -45,6 +45,8 @@ static void run_emulator_core(
                 emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
             {
                 SDL_Delay(0);
+                next_frame_counter_tick = SDL_GetPerformanceCounter();
+                previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
                 continue;
             }
             game_boy_emulator.execute_next_instruction();
