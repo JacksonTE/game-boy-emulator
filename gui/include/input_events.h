@@ -11,19 +11,20 @@ bool try_load_file_to_memory_with_dialog(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window,
     std::string& error_message);
 
 void toggle_emulation_paused_state(
     std::atomic<bool>& is_emulation_paused_atomic,
-    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden);
+    float& seconds_until_main_menu_bar_and_cursor_hidden);
 
 void toggle_fast_forward_enabled_state(
     std::atomic<bool>& is_fast_forward_enabled_atomic,
-    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden);
+    float& seconds_until_main_menu_bar_and_cursor_hidden);
 
 void toggle_fullscreen_enabled_state(
-    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window);
 
 void handle_sdl_events(

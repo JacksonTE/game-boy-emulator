@@ -42,7 +42,7 @@ void update_colour_palette(
 bool should_main_menu_bar_and_cursor_be_visible(
     GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
-    MenuAndCursorDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window)
 {
     if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
@@ -57,21 +57,27 @@ bool should_main_menu_bar_and_cursor_be_visible(
     ImGuiIO& io = ImGui::GetIO();
     if (SDL_GetMouseFocus() == sdl_window)
     {
-        if (fullscreen_display_status.is_main_menu_bar_hovered ||
-            mouse_y_position_in_window <= main_menu_bar_height_pixels ||
-            io.MouseDelta.x != 0.0f ||
-            io.MouseDelta.y != 0.0f)
+        if (menu_and_cursor_display_status.cursor_changes_to_ignore_count != 0)
         {
-            fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
-            return true;
+            menu_and_cursor_display_status.cursor_changes_to_ignore_count--;
+            return false;
+        }
+        else if (menu_and_cursor_display_status.is_main_menu_bar_hovered ||
+                mouse_y_position_in_window <= main_menu_bar_height_pixels ||
+                io.MouseDelta.x != 0.0f ||
+                io.MouseDelta.y != 0.0f)
+        {
+                menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden
+                    = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
+                return true;
         }
     }
 
-    if (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f)
+    if (menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden > 0.0f)
     {
-        fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden -= ImGui::GetIO().DeltaTime;
+        menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden -= ImGui::GetIO().DeltaTime;
     }
-    return (fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden > 0.0f);
+    return (menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden > 0.0f);
 }
 
 void render_frame(RenderContext& context, bool should_skip_frame_data_update)
@@ -87,7 +93,11 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
         {
             context.graphics_controller->abgr_pixel_buffer[i] = context.graphics_controller->active_colour_palette[pixel_frame_buffer[i]];
         }
-        SDL_UpdateTexture(context.sdl_texture, nullptr, context.graphics_controller->abgr_pixel_buffer.get(), DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
+        SDL_UpdateTexture(
+            context.sdl_texture,
+            nullptr,
+            context.graphics_controller->abgr_pixel_buffer.get(),
+            DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
         *context.previously_published_frame_buffer_index = currently_published_frame_buffer_index;
     }
 
@@ -102,15 +112,16 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
         };
     SDL_RenderTexture(context.sdl_renderer, context.sdl_texture, nullptr, &emulation_screen_rectangle);
 
-    sdl_logical_presentation_imgui_workaround_t logical_values = sdl_logical_presentation_imgui_workaround_pre_frame(context.sdl_renderer);
-    ImGui_ImplSDLRenderer3_NewFrame();
+    sdl_logical_presentation_imgui_workaround_t logical_values
+        = sdl_logical_presentation_imgui_workaround_pre_frame(context.sdl_renderer);
     ImGui_ImplSDL3_NewFrame();
+    ImGui_ImplSDLRenderer3_NewFrame();
     ImGui::NewFrame();
 
     if (should_main_menu_bar_and_cursor_be_visible(
         *context.game_boy_emulator,
         *context.emulation_controller,
-        *context.fullscreen_display_status,
+        *context.menu_and_cursor_display_status,
         context.sdl_window))
     {
         if (!SDL_CursorVisible())
@@ -122,7 +133,7 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
             *context.game_boy_emulator,
             *context.emulation_controller,
             *context.file_loading_status,
-            *context.fullscreen_display_status,
+            *context.menu_and_cursor_display_status,
             *context.graphics_controller,
             *context.menu_properties,
             context.sdl_window,
