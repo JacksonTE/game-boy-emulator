@@ -23,8 +23,10 @@ struct FileLoadingStatus
 
 struct MenuAndCursorDisplayStatus
 {
+    static constexpr int MAX_CURSOR_CHANGES_TO_IGNORE = 5;
     bool is_main_menu_bar_hovered{};
-    float seconds_remaining_until_main_menu_bar_and_cursor_hidden{};
+    int cursor_changes_to_ignore_count{};
+    float seconds_until_main_menu_bar_and_cursor_hidden{};
 };
 
 struct GraphicsController
@@ -74,7 +76,7 @@ struct RenderContext
     GameBoyEmulator::Emulator* game_boy_emulator;
     EmulationController* emulation_controller;
     FileLoadingStatus* file_loading_status;
-    MenuAndCursorDisplayStatus* fullscreen_display_status;
+    MenuAndCursorDisplayStatus* menu_and_cursor_display_status;
     GraphicsController* graphics_controller;
     MenuProperties* menu_properties;
     SDL_Renderer* sdl_renderer;

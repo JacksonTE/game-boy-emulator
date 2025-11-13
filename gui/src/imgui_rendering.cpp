@@ -7,7 +7,7 @@ void render_main_menu_bar(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
-    MenuAndCursorDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
     SDL_Window* sdl_window,
@@ -30,6 +30,7 @@ void render_main_menu_bar(
                     game_boy_emulator,
                     emulation_controller,
                     file_loading_status,
+                    menu_and_cursor_display_status,
                     sdl_window,
                     error_message);
             }
@@ -41,6 +42,7 @@ void render_main_menu_bar(
                     game_boy_emulator,
                     emulation_controller,
                     file_loading_status,
+                    menu_and_cursor_display_status,
                     sdl_window,
                     error_message);
             }
@@ -120,7 +122,7 @@ void render_main_menu_bar(
             if (ImGui::MenuItem(is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen", "[F11]"))
             {
                 toggle_fullscreen_enabled_state(
-                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden,
+                    menu_and_cursor_display_status,
                     sdl_window);
             }
             ImGui::EndMenu();
@@ -146,7 +148,7 @@ void render_main_menu_bar(
             {
                 toggle_fast_forward_enabled_state(
                     emulation_controller.is_fast_forward_enabled_atomic,
-                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
+                    menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden);
             }
             ImGui::Spacing();
             if (ImGui::MenuItem(
@@ -157,7 +159,7 @@ void render_main_menu_bar(
             {
                 toggle_emulation_paused_state(
                     emulation_controller.is_emulation_paused_atomic,
-                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
+                    menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden);
             }
             imgui_spaced_separator();
             if (ImGui::MenuItem(
@@ -182,7 +184,9 @@ void render_main_menu_bar(
                 ImGui::TextDisabled("[Fast-Forward Enabled]");
             }
         }
-        fullscreen_display_status.is_main_menu_bar_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+        menu_and_cursor_display_status.is_main_menu_bar_hovered =
+            ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
+            menu_and_cursor_display_status.cursor_changes_to_ignore_count == 0;
         ImGui::EndMainMenuBar();
     }
 }

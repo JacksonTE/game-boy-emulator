@@ -7,6 +7,7 @@ bool try_load_file_to_memory_with_dialog(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window,
     std::string& error_message)
 {
@@ -54,6 +55,9 @@ bool try_load_file_to_memory_with_dialog(
                 std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
         }
         emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
+        menu_and_cursor_display_status.cursor_changes_to_ignore_count =
+            menu_and_cursor_display_status.MAX_CURSOR_CHANGES_TO_IGNORE;
+        menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden = 0.0f;
     }
     else
     {
@@ -67,36 +71,43 @@ bool try_load_file_to_memory_with_dialog(
 
 void toggle_emulation_paused_state(
     std::atomic<bool>& is_emulation_paused_atomic,
-    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden)
+    float& seconds_until_main_menu_bar_and_cursor_hidden)
 {
     const bool was_emulation_paused = is_emulation_paused_atomic.load(std::memory_order_acquire);
     is_emulation_paused_atomic.store(!was_emulation_paused, std::memory_order_release);
-    seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
+    seconds_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
 }
 
 void toggle_fast_forward_enabled_state(
     std::atomic<bool>& is_fast_forward_enabled_atomic,
-    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden)
+    float& seconds_until_main_menu_bar_and_cursor_hidden)
 {
     const bool was_fast_forward_enabled = is_fast_forward_enabled_atomic.load(std::memory_order_acquire);
     is_fast_forward_enabled_atomic.store(!was_fast_forward_enabled, std::memory_order_release);
-    seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
+    seconds_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
 }
 
 void toggle_fullscreen_enabled_state(
-    float& seconds_remaining_until_main_menu_bar_and_cursor_hidden,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window)
 {
+    float mouse_x_monitor_coordinate, mouse_y_monitor_coordinate;
+    SDL_GetGlobalMouseState(&mouse_x_monitor_coordinate, &mouse_y_monitor_coordinate);
+
     const bool was_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
     SDL_SetWindowFullscreen(sdl_window, !was_fullscreen_enabled);
-    seconds_remaining_until_main_menu_bar_and_cursor_hidden = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
+
+    SDL_WarpMouseGlobal(mouse_x_monitor_coordinate, mouse_y_monitor_coordinate);
+
+    menu_and_cursor_display_status.cursor_changes_to_ignore_count =
+        menu_and_cursor_display_status.MAX_CURSOR_CHANGES_TO_IGNORE;
 }
 
 void handle_sdl_events(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
-    MenuAndCursorDisplayStatus& fullscreen_display_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     KeyPressedStates& key_pressed_states,
     SDL_Window* sdl_window,
     bool& should_stop_emulation,
@@ -128,7 +139,7 @@ void handle_sdl_events(
                         if (is_key_pressed && !key_pressed_states.was_fullscreen_key_previously_pressed)
                         {
                             toggle_fullscreen_enabled_state(
-                                fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden,
+                                menu_and_cursor_display_status,
                                 sdl_window);
                         }
                         key_pressed_states.was_fullscreen_key_previously_pressed = is_key_pressed;
@@ -142,6 +153,7 @@ void handle_sdl_events(
                                 game_boy_emulator,
                                 emulation_controller,
                                 file_loading_status,
+                                menu_and_cursor_display_status,
                                 sdl_window,
                                 error_message);
                         }
@@ -156,7 +168,7 @@ void handle_sdl_events(
                             {
                                 toggle_fast_forward_enabled_state(
                                     emulation_controller.is_fast_forward_enabled_atomic,
-                                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
+                                    menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden);
                             }
                             key_pressed_states.was_fast_forward_key_previously_pressed = is_key_pressed;
                             break;
@@ -165,7 +177,7 @@ void handle_sdl_events(
                             {
                                 toggle_emulation_paused_state(
                                     emulation_controller.is_emulation_paused_atomic,
-                                    fullscreen_display_status.seconds_remaining_until_main_menu_bar_and_cursor_hidden);
+                                    menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden);
                             }
                             key_pressed_states.was_pause_key_previously_pressed = is_key_pressed;
                             break;

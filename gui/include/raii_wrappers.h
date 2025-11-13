@@ -164,7 +164,9 @@ public:
         ImGuiContext* context = ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |=
+            ImGuiConfigFlags_NavEnableKeyboard |
+            ImGuiConfigFlags_NoMouseCursorChange;
 
         ImFontConfig font_config;
         font_config.FontDataOwnedByAtlas = false;

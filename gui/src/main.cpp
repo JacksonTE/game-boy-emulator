@@ -80,8 +80,7 @@ static void run_emulator_core(
     }
 }
 
-// Allows rendering during window resize bypassing the OS's modal resize loop that blocks the main event loop
-// This also allows the menu bar and the rendering rectangle to resize responsively
+// Allows menu bar and the rendering rectangle to resize responsively while window size is being changed
 static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sdl_event)
 {
     if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED)
@@ -102,7 +101,7 @@ int main()
         {
             "Emulate Game Boy",
             DISPLAY_WIDTH_PIXELS * INITIAL_WINDOW_SCALE,
-            (DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE) + 35,  // +35 for menu bar height
+            (DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE),
             SDL_WINDOW_RESIZABLE
         };
         ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer
@@ -140,7 +139,7 @@ int main()
         };
 
         FileLoadingStatus file_loading_status{};
-        MenuAndCursorDisplayStatus fullscreen_display_status{};
+        MenuAndCursorDisplayStatus menu_and_cursor_display_status{};
         constexpr uint32_t initial_custom_colour_palette[4] =
         {
             get_abgr_value_for_current_endianness(0xFF, 0xEF, 0xE0, 0x90),
@@ -169,7 +168,7 @@ int main()
             &game_boy_emulator,
             &emulation_controller,
             &file_loading_status,
-            &fullscreen_display_status,
+            &menu_and_cursor_display_status,
             &graphics_controller,
             &menu_properties,
             sdl_renderer.get(),
@@ -196,7 +195,7 @@ int main()
                 game_boy_emulator,
                 emulation_controller,
                 file_loading_status,
-                fullscreen_display_status,
+                menu_and_cursor_display_status,
                 key_pressed_states,
                 sdl_window.get(),
                 should_stop_emulation,
