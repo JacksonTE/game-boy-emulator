@@ -83,9 +83,11 @@ static void run_emulator_core(
 // Allows menu bar and the rendering rectangle to resize responsively while window size is being changed
 static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sdl_event)
 {
-    if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED)
+    if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED ||
+        sdl_event->type == SDL_EVENT_WINDOW_MOVED)
     {
         RenderContext* render_context = static_cast<RenderContext*>(render_context_data);
+        update_imgui_scale_by_resolution(render_context->sdl_window);
         constexpr bool should_skip_frame_data_update = true;
         render_frame(*render_context, should_skip_frame_data_update);
     }
@@ -119,6 +121,8 @@ int main()
             DISPLAY_HEIGHT_PIXELS,
         };
         ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
+
+        update_imgui_scale_by_resolution(sdl_window.get());
 
 #ifdef __linux__
         gtk_init(NULL, NULL);
