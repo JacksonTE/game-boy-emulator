@@ -80,6 +80,37 @@ bool should_main_menu_bar_and_cursor_be_visible(
     return (menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden > 0.0f);
 }
 
+void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
+{
+    SDL_DisplayID display_id = SDL_GetDisplayForWindow(sdl_window);
+    const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(display_id);
+
+    if (display_mode != nullptr)
+    {
+        constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
+
+        const float display_height = static_cast<float>(display_mode->h);
+        float font_scale = (display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING);
+
+        ImGuiStyle& style = ImGui::GetStyle();
+
+        constexpr float BASE_FRAME_PADDING_X = 6.0f;
+        constexpr float BASE_FRAME_PADDING_Y = 6.0f;
+        constexpr float BASE_ITEM_SPACING_X = 8.0f;
+        constexpr float BASE_ITEM_SPACING_Y = 4.0f;
+        constexpr float BASE_ITEM_INNER_SPACING_X = 4.0f;
+        constexpr float BASE_ITEM_INNER_SPACING_Y = 6.0f;
+        constexpr float BASE_WINDOW_PADDING_X = 8.0f;
+        constexpr float BASE_WINDOW_PADDING_Y = 10.0f;
+
+        style.FramePadding = ImVec2(BASE_FRAME_PADDING_X * font_scale, BASE_FRAME_PADDING_Y * font_scale);
+        style.ItemSpacing = ImVec2(BASE_ITEM_SPACING_X * font_scale, BASE_ITEM_SPACING_Y * font_scale);
+        style.ItemInnerSpacing = ImVec2(BASE_ITEM_INNER_SPACING_X * font_scale, BASE_ITEM_INNER_SPACING_Y * font_scale);
+        style.WindowPadding = ImVec2(BASE_WINDOW_PADDING_X * font_scale, BASE_WINDOW_PADDING_Y * font_scale);
+        style.FontScaleMain = font_scale;
+    }
+}
+
 void render_frame(RenderContext& context, bool should_skip_frame_data_update)
 {
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
@@ -114,6 +145,9 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
 
     sdl_logical_presentation_imgui_workaround_t logical_values
         = sdl_logical_presentation_imgui_workaround_pre_frame(context.sdl_renderer);
+
+    update_imgui_scale_by_resolution(context.sdl_window);
+
     ImGui_ImplSDL3_NewFrame();
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui::NewFrame();

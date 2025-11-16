@@ -70,6 +70,8 @@ bool should_main_menu_bar_and_cursor_be_visible(
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     SDL_Window* sdl_window);
 
+void update_imgui_scale_by_resolution(SDL_Window* sdl_window);
+
 void render_frame(RenderContext& context, bool should_skip_frame_data_update);
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339

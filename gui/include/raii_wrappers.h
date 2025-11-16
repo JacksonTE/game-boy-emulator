@@ -173,7 +173,7 @@ public:
         io.FontDefault = io.Fonts->AddFontFromMemoryTTF(
             const_cast<unsigned char*>(carlito_ttf),
             carlito_ttf_len,
-            18.0f,
+            20.0f,
             &font_config);
 
         ImGuiStyle& style = ImGui::GetStyle();
