@@ -7,7 +7,7 @@
 
 constexpr float MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS = 2.5f;
 
-constexpr int INITIAL_WINDOW_SCALE = 5;
+constexpr int DEFAULT_INITIAL_WINDOW_SCALE = 4;
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
 constexpr uint8_t DISPLAY_HEIGHT_PIXELS = 144;
 
@@ -56,6 +56,8 @@ constexpr uint32_t CLASSIC_COLOUR_PALETTE[4] =
     get_abgr_value_for_current_endianness(0xFF, 0x30, 0x62, 0x30),
     get_abgr_value_for_current_endianness(0xFF, 0x0F, 0x38, 0x0F)
 };
+
+int get_initial_window_scale_for_display();
 
 void set_emulation_screen_blank(GraphicsController& graphics_controller);
 

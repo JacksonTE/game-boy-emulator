@@ -10,6 +10,7 @@ void render_main_menu_bar(
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
+    KeyBindings& key_bindings,
     SDL_Window* sdl_window,
     bool& should_stop_emulation,
     std::string& error_message)
@@ -23,7 +24,9 @@ void render_main_menu_bar(
         if (ImGui::BeginMenu("File"))
         {
             ImGui::Spacing();
-            if (ImGui::MenuItem("Load Game ROM", "[O]"))
+            if (ImGui::MenuItem(
+                    "Load Game ROM",
+                    get_keybind_label(key_bindings.load_rom).c_str()))
             {
                 try_load_file_to_memory_with_dialog(
                     GameBoyEmulator::FileType::GameROM,
@@ -119,11 +122,22 @@ void render_main_menu_bar(
                 menu_properties.is_custom_palette_editor_open = true;
             }
             imgui_spaced_separator();
-            if (ImGui::MenuItem(is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen", "[F11]"))
+            if (ImGui::MenuItem(
+                    is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen",
+                    get_keybind_label(key_bindings.fullscreen).c_str()))
             {
                 toggle_fullscreen_enabled_state(
                     menu_and_cursor_display_status,
                     sdl_window);
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Input"))
+        {
+            ImGui::Spacing();
+            if (ImGui::MenuItem("Configure Keybinds"))
+            {
+                menu_properties.keybinds_editor_state.is_open = true;
             }
             ImGui::EndMenu();
         }
@@ -142,7 +156,7 @@ void render_main_menu_bar(
             imgui_spaced_separator();
             if (ImGui::MenuItem(
                     is_fast_forward_enabled ? "Disable Fast-Forward" : "Enable Fast-Forward",
-                    "[Space]",
+                    get_keybind_label(key_bindings.fast_forward).c_str(),
                     false,
                     game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
@@ -153,7 +167,7 @@ void render_main_menu_bar(
             ImGui::Spacing();
             if (ImGui::MenuItem(
                     is_emulation_paused ? "Unpause" : "Pause",
-                    "[Esc]",
+                    get_keybind_label(key_bindings.pause).c_str(),
                     false,
                     game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
@@ -164,7 +178,7 @@ void render_main_menu_bar(
             imgui_spaced_separator();
             if (ImGui::MenuItem(
                     "Reset",
-                    "[R]",
+                    get_keybind_label(key_bindings.reset).c_str(),
                     false,
                     game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
@@ -203,6 +217,11 @@ void render_custom_colour_palette_editor(
     }
     if (ImGui::BeginPopupModal("Custom Palette", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
+        const float font_scale = ImGui::GetStyle().FontScaleMain;
+        const float base_button_width = 160.0f;
+        const float scaled_button_width = base_button_width * font_scale;
+        ImGui::SetNextWindowSizeConstraints(ImVec2(scaled_button_width + ImGui::GetStyle().WindowPadding.x * 2.0f, 0), ImVec2(FLT_MAX, FLT_MAX));
+
         for (int i = 0; i < 4; i++)
         {
             menu_properties.selected_custom_colour_palette_colours[i] =
@@ -230,9 +249,168 @@ void render_custom_colour_palette_editor(
                 new_green,
                 new_red);
         }
-        if (ImGui::Button("OK", ImVec2(160, 0)))
+        if (ImGui::Button("Close", ImVec2(scaled_button_width, 0)))
         {
             menu_properties.is_custom_palette_editor_open = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void render_keybinds_editor(
+    MenuProperties& menu_properties,
+    KeyBindings& key_bindings)
+{
+    constexpr float BASE_COLUMN_WIDTH = 200.0f;
+    const float font_scale = ImGui::GetStyle().FontScaleMain;
+    const float scaled_emulator_controls_column_width = BASE_COLUMN_WIDTH * font_scale;
+    const float scaled_game_boy_controls_column_width = scaled_emulator_controls_column_width * 0.8f;
+
+    if (menu_properties.keybinds_editor_state.is_open)
+    {
+        ImGui::OpenPopup("Configure Keybinds");
+        const float total_width = scaled_game_boy_controls_column_width + scaled_emulator_controls_column_width +
+                                  ImGui::GetStyle().WindowPadding.x * 2.0f +
+                                  ImGui::GetStyle().ItemSpacing.x;
+        ImGui::SetNextWindowSize(ImVec2(0, 0));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(total_width, 0), ImVec2(total_width, FLT_MAX));
+    }
+
+    if (ImGui::BeginPopupModal("Configure Keybinds", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Click a button to rebind, then press a key");
+        imgui_spaced_separator();
+
+        if (ImGui::BeginTable(
+                "KeybindsTable",
+                2,
+                ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Game Boy Controls", ImGuiTableColumnFlags_WidthFixed, scaled_game_boy_controls_column_width);
+            ImGui::TableSetupColumn("Emulator Controls", ImGuiTableColumnFlags_WidthFixed, scaled_emulator_controls_column_width);
+            ImGui::TableNextRow();
+
+            ImGui::TableNextColumn();
+            ImGui::Text("Game Boy Controls");
+            imgui_spaced_separator();
+            ImGui::TableNextColumn();
+            ImGui::Text("Emulator Controls");
+            imgui_spaced_separator();
+            ImGui::TableNextRow();
+
+            const char* gameboy_labels[] =
+            {
+                "Up",
+                "Down",
+                "Left",
+                "Right",
+                "A",
+                "B",
+                "Start",
+                "Select"
+            };
+            SDL_Keycode* gameboy_keys[] =
+            {
+                &key_bindings.button_up,
+                &key_bindings.button_down,
+                &key_bindings.button_left,
+                &key_bindings.button_right,
+                &key_bindings.button_a,
+                &key_bindings.button_b,
+                &key_bindings.button_start,
+                &key_bindings.button_select
+            };
+            const float gameboy_label_width = 57.5f * font_scale;
+            const float emulator_label_width = 105.0f * font_scale;
+
+            ImVec2 original_frame_padding = ImGui::GetStyle().FramePadding;
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(original_frame_padding.x, original_frame_padding.y * 0.5f));
+            ImGui::TableNextColumn();
+
+            for (int i = 0; i < 8; i++)
+            {
+                ImGui::Text("%s:", gameboy_labels[i]);
+                ImGui::SameLine(gameboy_label_width);
+
+                const std::string button_id = std::string("##gb_") + std::to_string(i);
+
+                const char* key_name = (*gameboy_keys[i] == SDLK_UNKNOWN)
+                    ? "[Unbound]"
+                    : SDL_GetKeyName(*gameboy_keys[i]);
+
+                if (menu_properties.keybinds_editor_state.is_waiting_for_key && 
+                    menu_properties.keybinds_editor_state.selected_control_type == KeybindsEditorState::ControlType::GameBoy &&
+                    menu_properties.keybinds_editor_state.editing_index == i)
+                {
+                    ImGui::Button("Press a key...", ImVec2(-FLT_MIN, 0));
+                }
+                else if (ImGui::Button((std::string(key_name) + button_id).c_str(), ImVec2(-FLT_MIN, 0)))
+                {
+                    menu_properties.keybinds_editor_state.is_waiting_for_key = true;
+                    menu_properties.keybinds_editor_state.editing_index = i;
+                    menu_properties.keybinds_editor_state.selected_control_type = KeybindsEditorState::ControlType::GameBoy;
+                }
+            }
+            ImGui::TableNextColumn();
+
+            const char* emulator_labels[] = 
+            {
+                "Load ROM",
+                "Fast-Forward",
+                "Pause", "Reset",
+                "Fullscreen"
+            };
+            SDL_Keycode* emulator_keys[] =
+            {
+                &key_bindings.load_rom,
+                &key_bindings.fast_forward,
+                &key_bindings.pause,
+                &key_bindings.reset,
+                &key_bindings.fullscreen
+            };
+
+            for (int i = 0; i < 5; i++)
+            {
+                ImGui::Text("%s:", emulator_labels[i]);
+                ImGui::SameLine(emulator_label_width);
+
+                std::string button_id = std::string("##emu_") + std::to_string(i);
+
+                const char* key_name = (*emulator_keys[i] == SDLK_UNKNOWN)
+                    ? "[Unbound]"
+                    : SDL_GetKeyName(*emulator_keys[i]);
+
+                if (menu_properties.keybinds_editor_state.is_waiting_for_key && 
+                    menu_properties.keybinds_editor_state.selected_control_type == KeybindsEditorState::ControlType::Emulation &&
+                    menu_properties.keybinds_editor_state.editing_index == i)
+                {
+                    ImGui::Button("Press a key...", ImVec2(-FLT_MIN, 0));
+                }
+                else if (ImGui::Button((std::string(key_name) + button_id).c_str(), ImVec2(-FLT_MIN, 0)))
+                {
+                    menu_properties.keybinds_editor_state.is_waiting_for_key = true;
+                    menu_properties.keybinds_editor_state.editing_index = i;
+                    menu_properties.keybinds_editor_state.selected_control_type = KeybindsEditorState::ControlType::Emulation;
+                }
+            }
+            ImGui::PopStyleVar();
+            ImGui::EndTable();
+        }
+        imgui_spaced_separator();
+        const float available_width = ImGui::GetContentRegionAvail().x;
+        const float button_width = (available_width - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+
+        if (ImGui::Button("Reset to Defaults", ImVec2(button_width, 0)))
+        {
+            menu_properties.keybinds_editor_state.is_waiting_for_key = false;
+            key_bindings.reset_to_defaults();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Close", ImVec2(button_width, 0)))
+        {
+            menu_properties.keybinds_editor_state.is_open = false;
+            menu_properties.keybinds_editor_state.is_waiting_for_key = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -257,7 +435,7 @@ void render_error_message_popup(
             ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f),
             ImGuiCond_Always,
             ImVec2(0.5f, 0.5f));
-        
+
         ImGui::OpenPopup("Error");
     }
     if (ImGui::BeginPopupModal("Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
@@ -275,6 +453,15 @@ void render_error_message_popup(
         }
         ImGui::EndPopup();
     }
+}
+
+std::string get_keybind_label(SDL_Keycode key)
+{
+    if (key == SDLK_UNKNOWN)
+    {
+        return "";
+    }
+    return std::string("[") + SDL_GetKeyName(key) + "]";
 }
 
 ImVec4 get_imvec4_from_abgr(uint32_t abgr)

@@ -63,26 +63,79 @@ struct KeyPressedStates
     bool was_reset_key_previously_pressed{};
 };
 
+struct KeyBindings
+{
+    SDL_Keycode button_up = SDLK_UP;
+    SDL_Keycode button_down = SDLK_DOWN;
+    SDL_Keycode button_left = SDLK_LEFT;
+    SDL_Keycode button_right = SDLK_RIGHT;
+    SDL_Keycode button_a = SDLK_X;
+    SDL_Keycode button_b = SDLK_Z;
+    SDL_Keycode button_start = SDLK_RETURN;
+    SDL_Keycode button_select = SDLK_BACKSPACE;
+
+    SDL_Keycode load_rom = SDLK_O;
+    SDL_Keycode fast_forward = SDLK_SPACE;
+    SDL_Keycode pause = SDLK_ESCAPE;
+    SDL_Keycode reset = SDLK_R;
+    SDL_Keycode fullscreen = SDLK_F11;
+
+    void reset_to_defaults()
+    {
+        button_up = SDLK_UP;
+        button_down = SDLK_DOWN;
+        button_left = SDLK_LEFT;
+        button_right = SDLK_RIGHT;
+        button_a = SDLK_X;
+        button_b = SDLK_Z;
+        button_start = SDLK_RETURN;
+        button_select = SDLK_BACKSPACE;
+
+        load_rom = SDLK_O;
+        fast_forward = SDLK_SPACE;
+        pause = SDLK_ESCAPE;
+        reset = SDLK_R;
+        fullscreen = SDLK_F11;
+    }
+};
+
+struct KeybindsEditorState
+{
+    enum class ControlType
+    {
+        GameBoy,
+        Emulation
+    };
+
+    bool is_open{};
+    bool is_waiting_for_key{};
+    int editing_index = -1;
+    ControlType selected_control_type{};
+};
+
 struct MenuProperties
 {
     ImVec4 selected_custom_colour_palette_colours[4]{};
     bool is_custom_palette_editor_open{};
     int selected_colour_palette_combobox_index{};
     int selected_fast_emulation_speed_index{};
+    KeybindsEditorState keybinds_editor_state{};
 };
 
 struct RenderContext
 {
-    GameBoyEmulator::Emulator* game_boy_emulator;
-    EmulationController* emulation_controller;
-    FileLoadingStatus* file_loading_status;
-    MenuAndCursorDisplayStatus* menu_and_cursor_display_status;
-    GraphicsController* graphics_controller;
-    MenuProperties* menu_properties;
-    SDL_Renderer* sdl_renderer;
-    SDL_Texture* sdl_texture;
-    SDL_Window* sdl_window;
-    uint8_t* previously_published_frame_buffer_index;
-    bool* should_stop_emulation;
-    std::string* error_message;
+    GameBoyEmulator::Emulator* game_boy_emulator{};
+    EmulationController* emulation_controller{};
+    FileLoadingStatus* file_loading_status{};
+    MenuAndCursorDisplayStatus* menu_and_cursor_display_status{};
+    GraphicsController* graphics_controller{};
+    MenuProperties* menu_properties{};
+    KeyBindings* key_bindings{};
+    SDL_Renderer* sdl_renderer{};
+    SDL_Texture* sdl_texture{};
+    SDL_Window* sdl_window{};
+    uint8_t* previously_published_frame_buffer_index{};
+    bool* should_stop_emulation{};
+    std::string* error_message{};
+    bool is_currently_rendering = false;
 };

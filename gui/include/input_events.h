@@ -27,12 +27,19 @@ void toggle_fullscreen_enabled_state(
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window);
 
+void clear_duplicate_keybind(
+    KeyBindings& key_bindings,
+    SDL_Keycode new_key,
+    SDL_Keycode* current_binding);
+
 void handle_sdl_events(
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     KeyPressedStates& key_pressed_states,
+    KeyBindings& key_bindings,
+    MenuProperties& menu_properties,
     SDL_Window* sdl_window,
     bool& should_stop_emulation,
     std::string& error_message);
