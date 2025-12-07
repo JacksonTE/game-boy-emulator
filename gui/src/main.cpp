@@ -1,13 +1,8 @@
 #include <atomic>
-#include <bit>
 #include <exception>
-#include <filesystem>
-#include <iomanip>
 #include <iostream>
-#include <memory>
 #include <nfd.h>
 #include <SDL3/SDL.h>
-#include <sstream>
 #include <stop_token>
 #include <string>
 #include <thread>
@@ -18,7 +13,6 @@
 
 #include "display_utilities.h"
 #include "emulator.h"
-#include "imgui_rendering.h"
 #include "input_events.h"
 #include "raii_wrappers.h"
 #include "gui_state_types.h"
@@ -99,11 +93,13 @@ int main()
     try
     {
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
+
+        const int adaptive_window_scale = get_initial_window_scale_for_display();
         ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window
         {
             "Emulate Game Boy",
-            DISPLAY_WIDTH_PIXELS * INITIAL_WINDOW_SCALE,
-            (DISPLAY_HEIGHT_PIXELS * INITIAL_WINDOW_SCALE),
+            DISPLAY_WIDTH_PIXELS * adaptive_window_scale,
+            DISPLAY_HEIGHT_PIXELS * adaptive_window_scale,
             SDL_WINDOW_RESIZABLE
         };
         ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer
@@ -161,6 +157,7 @@ int main()
         };
         KeyPressedStates key_pressed_states{};
         MenuProperties menu_properties{};
+        KeyBindings key_bindings{};
         set_emulation_screen_blank(graphics_controller);
 
         uint8_t previously_published_frame_buffer_index = 0;
@@ -175,6 +172,7 @@ int main()
             &menu_and_cursor_display_status,
             &graphics_controller,
             &menu_properties,
+            &key_bindings,
             sdl_renderer.get(),
             sdl_texture.get(),
             sdl_window.get(),
@@ -201,6 +199,8 @@ int main()
                 file_loading_status,
                 menu_and_cursor_display_status,
                 key_pressed_states,
+                key_bindings,
+                menu_properties,
                 sdl_window.get(),
                 should_stop_emulation,
                 error_message);

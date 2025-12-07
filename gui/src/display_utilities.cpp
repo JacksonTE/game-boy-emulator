@@ -3,6 +3,20 @@
 #include "display_utilities.h"
 #include "imgui_rendering.h"
 
+int get_initial_window_scale_for_display()
+{
+    const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+    if (display_mode != nullptr)
+    {
+        constexpr float BASE_PIXEL_HEIGHT_FOR_SCALING = 1440.0f;
+        const float display_height = static_cast<float>(display_mode->h);
+        const float scale_multiplier = display_height / BASE_PIXEL_HEIGHT_FOR_SCALING;
+
+        return static_cast<int>(DEFAULT_INITIAL_WINDOW_SCALE * scale_multiplier + 0.5f);
+    }
+    return DEFAULT_INITIAL_WINDOW_SCALE;
+}
+
 void set_emulation_screen_blank(GraphicsController& graphics_controller)
 {
     for (int i = 0; i < DISPLAY_WIDTH_PIXELS * DISPLAY_HEIGHT_PIXELS; i++)
@@ -113,6 +127,18 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
 
 void render_frame(RenderContext& context, bool should_skip_frame_data_update)
 {
+    if (context.is_currently_rendering)
+    {
+        return;
+    }
+
+    int window_width, window_height;
+    SDL_GetWindowSize(context.sdl_window, &window_width, &window_height);
+    if (window_width <= 0 || window_height <= 0)
+    {
+        return;
+    }
+    context.is_currently_rendering = true;
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
 
     if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index &&
@@ -170,6 +196,7 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
             *context.menu_and_cursor_display_status,
             *context.graphics_controller,
             *context.menu_properties,
+            *context.key_bindings,
             context.sdl_window,
             *context.should_stop_emulation,
             *context.error_message);
@@ -185,6 +212,10 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
         *context.menu_properties,
         *context.graphics_controller);
 
+    render_keybinds_editor(
+        *context.menu_properties,
+        *context.key_bindings);
+
     render_error_message_popup(
         *context.file_loading_status,
         context.emulation_controller->is_emulation_paused_atomic,
@@ -195,6 +226,7 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
     sdl_logical_presentation_imgui_workaround_post_frame(context.sdl_renderer, logical_values);
 
     SDL_RenderPresent(context.sdl_renderer);
+    context.is_currently_rendering = false;
 }
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339

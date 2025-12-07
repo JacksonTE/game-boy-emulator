@@ -36,6 +36,7 @@ void render_main_menu_bar(
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
+    KeyBindings& key_bindings,
     SDL_Window* sdl_window,
     bool& should_stop_emulation,
     std::string& error_message);
@@ -46,10 +47,16 @@ void render_custom_colour_palette_editor(
     MenuProperties& menu_properties,
     GraphicsController& graphics_controller);
 
+void render_keybinds_editor(
+    MenuProperties& menu_properties,
+    KeyBindings& key_bindings);
+
 void render_error_message_popup(
     FileLoadingStatus& file_loading_status,
     std::atomic<bool>& is_emulation_paused_atomic,
     std::string& error_message);
+
+std::string get_keybind_label(SDL_Keycode key);
 
 ImVec4 get_imvec4_from_abgr(uint32_t abgr);
 
