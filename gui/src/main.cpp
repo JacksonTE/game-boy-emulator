@@ -16,6 +16,7 @@
 #include "input_events.h"
 #include "raii_wrappers.h"
 #include "gui_state_types.h"
+#include "persistent_settings.h"
 
 static void run_emulator_core(
     std::stop_token stop_token,
@@ -164,6 +165,48 @@ int main()
         std::string error_message = "";
         bool should_stop_emulation = false;
 
+        std::string loaded_game_rom_path{};
+        std::string loaded_boot_rom_path{};
+
+        PersistentSettings loaded_settings{};
+        if (load_settings_from_file(loaded_settings))
+        {
+            apply_loaded_settings(
+                loaded_settings,
+                key_bindings,
+                menu_properties,
+                graphics_controller,
+                emulation_controller);
+
+            if (!loaded_settings.loaded_boot_rom_path.empty() &&
+                std::filesystem::exists(loaded_settings.loaded_boot_rom_path))
+            {
+                if (game_boy_emulator.try_to_load_file_to_memory(
+                        loaded_settings.loaded_boot_rom_path.c_str(),
+                        GameBoyEmulator::FileType::BootROM,
+                        error_message))
+                {
+                    loaded_boot_rom_path = loaded_settings.loaded_boot_rom_path;
+                }
+            }
+
+            if (!loaded_settings.loaded_game_rom_path.empty() &&
+                std::filesystem::exists(loaded_settings.loaded_game_rom_path))
+            {
+                if (game_boy_emulator.try_to_load_file_to_memory(
+                        loaded_settings.loaded_game_rom_path.c_str(),
+                        GameBoyEmulator::FileType::GameROM,
+                        error_message))
+                {
+                    loaded_game_rom_path = loaded_settings.loaded_game_rom_path;
+                    game_boy_emulator.reset_state();
+                    SDL_SetWindowTitle(
+                        sdl_window.get(),
+                        std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
+                }
+            }
+        }
+
         RenderContext render_context
         {
             &game_boy_emulator,
@@ -177,6 +220,9 @@ int main()
             sdl_texture.get(),
             sdl_window.get(),
             &previously_published_frame_buffer_index,
+            &loaded_game_rom_path,
+            &loaded_boot_rom_path,
+            false,
             &should_stop_emulation,
             &error_message
         };
@@ -202,12 +248,23 @@ int main()
                 key_bindings,
                 menu_properties,
                 sdl_window.get(),
+                &loaded_game_rom_path,
+                &loaded_boot_rom_path,
                 should_stop_emulation,
                 error_message);
 
             constexpr bool should_skip_frame_data_update = false;
             render_frame(render_context, should_skip_frame_data_update);
         }
+
+        const PersistentSettings settings_to_save =
+            gather_current_settings(
+                key_bindings,
+                menu_properties,
+                graphics_controller,
+                loaded_game_rom_path,
+                loaded_boot_rom_path);
+        save_settings_to_file(settings_to_save);
         return 0;
     }
     catch (const std::exception& exception)

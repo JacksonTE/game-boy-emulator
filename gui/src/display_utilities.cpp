@@ -50,18 +50,26 @@ void update_colour_palette(
             DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
     }
     else
+    {
         set_emulation_screen_blank(graphics_controller);
+    }
 }
 
 bool should_main_menu_bar_and_cursor_be_visible(
     GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
+    bool is_custom_palette_editor_open,
+    bool is_keybinds_editor_open,
     SDL_Window* sdl_window)
 {
     if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
-        emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
+        emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire) ||
+        is_keybinds_editor_open ||
+        is_custom_palette_editor_open)
     {
+        menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden
+            = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
         return true;
     }
 
@@ -125,7 +133,9 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     }
 }
 
-void render_frame(RenderContext& context, bool should_skip_frame_data_update)
+void render_frame(
+    RenderContext& context,
+    bool should_skip_frame_data_update)
 {
     if (context.is_currently_rendering)
     {
@@ -179,10 +189,12 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
     ImGui::NewFrame();
 
     if (should_main_menu_bar_and_cursor_be_visible(
-        *context.game_boy_emulator,
-        *context.emulation_controller,
-        *context.menu_and_cursor_display_status,
-        context.sdl_window))
+            *context.game_boy_emulator,
+            *context.emulation_controller,
+            *context.menu_and_cursor_display_status,
+            context.menu_properties->is_custom_palette_editor_open,
+            context.menu_properties->keybinds_editor_state.is_open,
+            context.sdl_window))
     {
         if (!SDL_CursorVisible())
         {
@@ -198,6 +210,8 @@ void render_frame(RenderContext& context, bool should_skip_frame_data_update)
             *context.menu_properties,
             *context.key_bindings,
             context.sdl_window,
+            context.loaded_game_rom_path,
+            context.loaded_boot_rom_path,
             *context.should_stop_emulation,
             *context.error_message);
     }

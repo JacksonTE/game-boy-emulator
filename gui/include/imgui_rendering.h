@@ -38,6 +38,8 @@ void render_main_menu_bar(
     MenuProperties& menu_properties,
     KeyBindings& key_bindings,
     SDL_Window* sdl_window,
+    std::string* loaded_game_rom_path,
+    std::string* loaded_boot_rom_path,
     bool& should_stop_emulation,
     std::string& error_message);
 

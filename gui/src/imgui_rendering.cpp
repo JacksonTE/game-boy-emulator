@@ -12,6 +12,8 @@ void render_main_menu_bar(
     MenuProperties& menu_properties,
     KeyBindings& key_bindings,
     SDL_Window* sdl_window,
+    std::string* loaded_game_rom_path,
+    std::string* loaded_boot_rom_path,
     bool& should_stop_emulation,
     std::string& error_message)
 {
@@ -26,7 +28,7 @@ void render_main_menu_bar(
             ImGui::Spacing();
             if (ImGui::MenuItem(
                     "Load Game ROM",
-                    get_keybind_label(key_bindings.load_rom).c_str()))
+                    get_keybind_label(key_bindings.load_game_rom).c_str()))
             {
                 try_load_file_to_memory_with_dialog(
                     GameBoyEmulator::FileType::GameROM,
@@ -35,6 +37,7 @@ void render_main_menu_bar(
                     file_loading_status,
                     menu_and_cursor_display_status,
                     sdl_window,
+                    loaded_game_rom_path,
                     error_message);
             }
             ImGui::Spacing();
@@ -47,6 +50,7 @@ void render_main_menu_bar(
                     file_loading_status,
                     menu_and_cursor_display_status,
                     sdl_window,
+                    loaded_boot_rom_path,
                     error_message);
             }
             imgui_spaced_separator();
@@ -59,6 +63,7 @@ void render_main_menu_bar(
                 set_emulation_screen_blank(graphics_controller);
                 SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
                 game_boy_emulator.unload_game_rom_from_memory_thread_safe();
+                *loaded_game_rom_path = "";
                 game_boy_emulator.reset_state();
                 emulation_controller.is_fast_forward_enabled_atomic.store(false, std::memory_order_release);
                 emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
@@ -72,6 +77,7 @@ void render_main_menu_bar(
             {
                 emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
                 game_boy_emulator.unload_boot_rom_from_memory_thread_safe();
+                *loaded_boot_rom_path = "";
 
                 if (game_boy_emulator.is_boot_rom_mapped_in_memory() &&
                     game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
@@ -322,7 +328,7 @@ void render_keybinds_editor(
                 &key_bindings.button_select
             };
             const float gameboy_label_width = 57.5f * font_scale;
-            const float emulator_label_width = 105.0f * font_scale;
+            const float emulator_label_width = 130.0f * font_scale;
 
             ImVec2 original_frame_padding = ImGui::GetStyle().FramePadding;
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(original_frame_padding.x, original_frame_padding.y * 0.5f));
@@ -356,14 +362,14 @@ void render_keybinds_editor(
 
             const char* emulator_labels[] = 
             {
-                "Load ROM",
+                "Load Game ROM",
                 "Fast-Forward",
                 "Pause", "Reset",
                 "Fullscreen"
             };
             SDL_Keycode* emulator_keys[] =
             {
-                &key_bindings.load_rom,
+                &key_bindings.load_game_rom,
                 &key_bindings.fast_forward,
                 &key_bindings.pause,
                 &key_bindings.reset,

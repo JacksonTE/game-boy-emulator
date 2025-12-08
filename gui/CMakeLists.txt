@@ -7,7 +7,8 @@ add_executable(emulator-gui
     "src/display_utilities.cpp"
     "src/imgui_rendering.cpp"
     "src/input_events.cpp"
-    "src/main.cpp")
+    "src/main.cpp"
+    "src/persistent_settings.cpp")
 
 target_include_directories(emulator-gui PRIVATE
     "include"
