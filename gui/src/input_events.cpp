@@ -9,6 +9,7 @@ bool try_load_file_to_memory_with_dialog(
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window,
+    std::string* loaded_rom_path,
     std::string& error_message)
 {
     file_loading_status.is_emulation_paused_before_rom_loading = emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire);
@@ -38,6 +39,7 @@ bool try_load_file_to_memory_with_dialog(
             }
             is_operation_successful = true;
         }
+        *loaded_rom_path = rom_path;
         NFD_FreePathU8(rom_path);
     }
     else if (result == NFD_ERROR)
@@ -108,13 +110,21 @@ void clear_duplicate_keybind(
     SDL_Keycode new_key,
     SDL_Keycode* current_binding)
 {
-    SDL_Keycode* all_keybinds[] = {
-        &key_bindings.button_up, &key_bindings.button_down,
-        &key_bindings.button_left, &key_bindings.button_right,
-        &key_bindings.button_a, &key_bindings.button_b,
-        &key_bindings.button_start, &key_bindings.button_select,
-        &key_bindings.load_rom, &key_bindings.fast_forward,
-        &key_bindings.pause, &key_bindings.reset, &key_bindings.fullscreen
+    SDL_Keycode* all_keybinds[] =
+    {
+        &key_bindings.button_up,
+        &key_bindings.button_down,
+        &key_bindings.button_left,
+        &key_bindings.button_right,
+        &key_bindings.button_a,
+        &key_bindings.button_b,
+        &key_bindings.button_start,
+        &key_bindings.button_select,
+        &key_bindings.load_game_rom,
+        &key_bindings.fast_forward,
+        &key_bindings.pause,
+        &key_bindings.reset,
+        &key_bindings.fullscreen
     };
 
     for (SDL_Keycode* keybind : all_keybinds)
@@ -140,6 +150,8 @@ void handle_sdl_events(
     KeyBindings& key_bindings,
     MenuProperties& menu_properties,
     SDL_Window* sdl_window,
+    std::string* loaded_game_rom_path,
+    std::string* loaded_boot_rom_path,
     bool& should_stop_emulation,
     std::string& error_message)
 {
@@ -183,7 +195,7 @@ void handle_sdl_events(
                     };
                     SDL_Keycode* emulator_keys[] =
                     {
-                        &key_bindings.load_rom,
+                        &key_bindings.load_game_rom,
                         &key_bindings.fast_forward,
                         &key_bindings.pause,
                         &key_bindings.reset,
@@ -210,7 +222,7 @@ void handle_sdl_events(
                     }
                     key_pressed_states.was_fullscreen_key_previously_pressed = is_key_pressed;
                 }
-                else if (key == key_bindings.load_rom && is_key_pressed)
+                else if (key == key_bindings.load_game_rom && is_key_pressed)
                 {
                     try_load_file_to_memory_with_dialog(
                         GameBoyEmulator::FileType::GameROM,
@@ -219,6 +231,7 @@ void handle_sdl_events(
                         file_loading_status,
                         menu_and_cursor_display_status,
                         sdl_window,
+                        loaded_game_rom_path,
                         error_message);
                 }
 

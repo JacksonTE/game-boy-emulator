@@ -13,6 +13,7 @@ bool try_load_file_to_memory_with_dialog(
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window,
+    std::string* loaded_rom_path,
     std::string& error_message);
 
 void toggle_emulation_paused_state(
@@ -41,5 +42,7 @@ void handle_sdl_events(
     KeyBindings& key_bindings,
     MenuProperties& menu_properties,
     SDL_Window* sdl_window,
+    std::string* loaded_game_rom_path,
+    std::string* loaded_boot_rom_path,
     bool& should_stop_emulation,
     std::string& error_message);

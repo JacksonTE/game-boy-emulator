@@ -74,7 +74,7 @@ struct KeyBindings
     SDL_Keycode button_start = SDLK_RETURN;
     SDL_Keycode button_select = SDLK_BACKSPACE;
 
-    SDL_Keycode load_rom = SDLK_O;
+    SDL_Keycode load_game_rom = SDLK_O;
     SDL_Keycode fast_forward = SDLK_SPACE;
     SDL_Keycode pause = SDLK_ESCAPE;
     SDL_Keycode reset = SDLK_R;
@@ -91,7 +91,7 @@ struct KeyBindings
         button_start = SDLK_RETURN;
         button_select = SDLK_BACKSPACE;
 
-        load_rom = SDLK_O;
+        load_game_rom = SDLK_O;
         fast_forward = SDLK_SPACE;
         pause = SDLK_ESCAPE;
         reset = SDLK_R;
@@ -135,7 +135,9 @@ struct RenderContext
     SDL_Texture* sdl_texture{};
     SDL_Window* sdl_window{};
     uint8_t* previously_published_frame_buffer_index{};
+    std::string* loaded_game_rom_path{};
+    std::string* loaded_boot_rom_path{};
+    bool is_currently_rendering{};
     bool* should_stop_emulation{};
     std::string* error_message{};
-    bool is_currently_rendering = false;
 };

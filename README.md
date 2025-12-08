@@ -21,14 +21,14 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 
 | Game Boy | Key                    |
 | -------- | ---------------------- |
-| A        | <kbd>X          </kbd> |
-| B        | <kbd>Z          </kbd> |
 | Up       | <kbd>Up Arrow   </kbd> |
 | Down     | <kbd>Down Arrow </kbd> |
 | Left     | <kbd>Left Arrow </kbd> |
 | Right    | <kbd>Right Arrow</kbd> |
+| A        | <kbd>X          </kbd> |
+| B        | <kbd>Z          </kbd> |
 | Start    | <kbd>Enter      </kbd> |
-| Select   | <kbd>Shift      </kbd> |
+| Select   | <kbd>Backspace  </kbd> |
 
 </td>
 <td valign="top">
@@ -36,10 +36,10 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 | Emulator      | Key               |
 | ------------- | ----------------- |
 | Load Game ROM | <kbd>O     </kbd> |
-| Quit          | <kbd>Alt+F4</kbd> |
 | Fast-Forward  | <kbd>Space </kbd> |
 | Pause         | <kbd>Escape</kbd> |
 | Reset         | <kbd>R     </kbd> |
+| Fullscreen    | <kbd>F11   </kbd> |
 
 </td>
 </tr>
