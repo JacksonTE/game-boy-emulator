@@ -64,7 +64,9 @@ static void run_emulator_core(
                     SDL_DelayPrecise(delay_in_nanoseconds);
                 }
                 else
+                {
                     next_frame_counter_tick = current_counter_tick;
+                }
             }
         }
     }
@@ -165,40 +167,34 @@ int main()
         std::string error_message = "";
         bool should_stop_emulation = false;
 
-        std::string loaded_game_rom_path{};
-        std::string loaded_boot_rom_path{};
-
-        PersistentSettings loaded_settings{};
-        if (load_settings_from_file(loaded_settings))
+        PersistentSettings persistent_settings{};
+        if (load_settings_from_file(persistent_settings))
         {
             apply_loaded_settings(
-                loaded_settings,
+                persistent_settings,
                 key_bindings,
                 menu_properties,
                 graphics_controller,
                 emulation_controller);
 
-            if (!loaded_settings.loaded_boot_rom_path.empty() &&
-                std::filesystem::exists(loaded_settings.loaded_boot_rom_path))
+            if (!persistent_settings.loaded_boot_rom_path.empty() &&
+                std::filesystem::exists(persistent_settings.loaded_boot_rom_path))
             {
-                if (game_boy_emulator.try_to_load_file_to_memory(
-                        loaded_settings.loaded_boot_rom_path.c_str(),
-                        GameBoyEmulator::FileType::BootROM,
-                        error_message))
-                {
-                    loaded_boot_rom_path = loaded_settings.loaded_boot_rom_path;
-                }
+                game_boy_emulator.try_to_load_file_to_memory(
+                    persistent_settings.loaded_boot_rom_path.c_str(),
+                    GameBoyEmulator::FileType::BootROM,
+                    error_message);
             }
 
-            if (!loaded_settings.loaded_game_rom_path.empty() &&
-                std::filesystem::exists(loaded_settings.loaded_game_rom_path))
+            if (!persistent_settings.loaded_game_rom_path.empty() &&
+                std::filesystem::exists(persistent_settings.loaded_game_rom_path))
             {
                 if (game_boy_emulator.try_to_load_file_to_memory(
-                        loaded_settings.loaded_game_rom_path.c_str(),
+                        persistent_settings.loaded_game_rom_path.c_str(),
                         GameBoyEmulator::FileType::GameROM,
                         error_message))
                 {
-                    loaded_game_rom_path = loaded_settings.loaded_game_rom_path;
+                    game_boy_emulator.try_load_save_file(std::filesystem::path(SDL_GetBasePath()));
                     game_boy_emulator.reset_state();
                     SDL_SetWindowTitle(
                         sdl_window.get(),
@@ -220,8 +216,8 @@ int main()
             sdl_texture.get(),
             sdl_window.get(),
             &previously_published_frame_buffer_index,
-            &loaded_game_rom_path,
-            &loaded_boot_rom_path,
+            &persistent_settings.loaded_game_rom_path,
+            &persistent_settings.loaded_boot_rom_path,
             false,
             &should_stop_emulation,
             &error_message
@@ -248,8 +244,8 @@ int main()
                 key_bindings,
                 menu_properties,
                 sdl_window.get(),
-                &loaded_game_rom_path,
-                &loaded_boot_rom_path,
+                &persistent_settings.loaded_game_rom_path,
+                &persistent_settings.loaded_boot_rom_path,
                 should_stop_emulation,
                 error_message);
 
@@ -257,13 +253,15 @@ int main()
             render_frame(render_context, should_skip_frame_data_update);
         }
 
+        game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
+
         const PersistentSettings settings_to_save =
             gather_current_settings(
                 key_bindings,
                 menu_properties,
                 graphics_controller,
-                loaded_game_rom_path,
-                loaded_boot_rom_path);
+                persistent_settings.loaded_game_rom_path,
+                persistent_settings.loaded_boot_rom_path);
         save_settings_to_file(settings_to_save);
         return 0;
     }

@@ -28,6 +28,9 @@ public:
     RegisterFile<std::endian::native> get_register_file() const;
     void print_register_file_state() const;
 
+    bool try_load_save_file(const std::filesystem::path& save_directory);
+    bool try_save_save_file(const std::filesystem::path& save_directory) const;
+
     bool try_to_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message);
     void unload_boot_rom_from_memory_thread_safe();
     void unload_game_rom_from_memory_thread_safe();

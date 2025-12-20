@@ -60,6 +60,7 @@ void render_main_menu_bar(
                     false,
                     game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
+                game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
                 set_emulation_screen_blank(graphics_controller);
                 SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
                 game_boy_emulator.unload_game_rom_from_memory_thread_safe();

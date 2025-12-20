@@ -31,11 +31,17 @@ bool try_load_file_to_memory_with_dialog(
 
     if (result == NFD_OKAY)
     {
+        if (file_type == GameBoyEmulator::FileType::GameROM)
+        {
+            game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
+        }
+
         if (game_boy_emulator.try_to_load_file_to_memory(rom_path, file_type, error_message))
         {
             if (file_type == GameBoyEmulator::FileType::GameROM)
             {
                 game_boy_emulator.reset_state();
+                game_boy_emulator.try_load_save_file(std::filesystem::path(SDL_GetBasePath()));
             }
             is_operation_successful = true;
         }
