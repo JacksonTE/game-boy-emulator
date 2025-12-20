@@ -267,7 +267,9 @@ void handle_sdl_events(
                     {
                         if (is_key_pressed && !key_pressed_states.was_reset_key_previously_pressed)
                         {
+                            emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
                             game_boy_emulator.reset_state();
+                            emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
                         }
                         key_pressed_states.was_reset_key_previously_pressed = is_key_pressed;
                     }
