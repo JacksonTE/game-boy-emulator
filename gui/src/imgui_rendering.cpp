@@ -189,6 +189,7 @@ void render_main_menu_bar(
                     false,
                     game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()))
             {
+                emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
                 game_boy_emulator.reset_state();
                 emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
             }
