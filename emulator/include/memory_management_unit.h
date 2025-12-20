@@ -70,6 +70,8 @@ public:
 
     virtual void reset_state();
     void set_post_boot_state();
+    bool try_load_cartridge_ram_from_save_file(const std::filesystem::path& save_directory);
+    bool try_save_cartridge_ram_to_save_file(const std::filesystem::path& save_directory) const;
     bool try_to_load_file_to_read_only_memory(const std::filesystem::path& file_path, FileType file_type, std::string& error_message);
     void unload_boot_rom_thread_safe();
     void unload_game_rom_thread_safe();

@@ -82,6 +82,16 @@ void MemoryManagementUnit::set_post_boot_state()
     oam_dma_machine_cycles_elapsed = 0;
 }
 
+bool MemoryManagementUnit::try_load_cartridge_ram_from_save_file(const std::filesystem::path& save_directory)
+{
+    return game_cartridge_slot.try_load_ram_from_save_file(save_directory);
+}
+
+bool MemoryManagementUnit::try_save_cartridge_ram_to_save_file(const std::filesystem::path& save_directory) const
+{
+    return game_cartridge_slot.try_save_ram_to_save_file(save_directory);
+}
+
 bool MemoryManagementUnit::try_to_load_file_to_read_only_memory(
     const std::filesystem::path& file_path,
     FileType file_type,

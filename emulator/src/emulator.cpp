@@ -63,6 +63,16 @@ void Emulator::print_register_file_state() const
     GameBoyEmulator::print_register_file_state(central_processing_unit.get_register_file());
 }
 
+bool Emulator::try_load_save_file(const std::filesystem::path& save_directory)
+{
+    return memory_management_unit->try_load_cartridge_ram_from_save_file(save_directory);
+}
+
+bool Emulator::try_save_save_file(const std::filesystem::path& save_directory) const
+{
+    return memory_management_unit->try_save_cartridge_ram_to_save_file(save_directory);
+}
+
 bool Emulator::try_to_load_file_to_memory(std::filesystem::path file_path, FileType file_type, std::string& error_message)
 {
     return memory_management_unit->try_to_load_file_to_read_only_memory(file_path, file_type, error_message);

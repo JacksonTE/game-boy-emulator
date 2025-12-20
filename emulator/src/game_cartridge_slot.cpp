@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cctype>
 #include <format>
 
 #include "console_output_utilities.h"
@@ -19,6 +20,8 @@ void GameCartridgeSlot::reset_state()
     rom.resize(MemoryBankControllerBase::ROM_ONLY_WITH_NO_MBC_FILE_SIZE, 0);
     ram.resize(0);
     memory_bank_controller = std::make_unique<MemoryBankControllerBase>(rom, ram);
+    game_rom_title.clear();
+    has_battery = false;
 }
 
 bool GameCartridgeSlot::try_load_file(
@@ -292,6 +295,26 @@ bool GameCartridgeSlot::try_load_file(
             std::string("Could not read game rom file ") + file_path.string(),
             error_message);
     }
+    has_battery = (cartridge_type == MBC1_WITH_RAM_AND_BATTERY_BYTE ||
+                   cartridge_type == MBC2_WITH_BATTERY_BYTE ||
+                   cartridge_type == MBC3_WITH_TIMER_AND_BATTERY_BYTE ||
+                   cartridge_type == MBC3_WITH_TIMER_AND_RAM_AND_BATTERY_BYTE ||
+                   cartridge_type == MBC3_WITH_RAM_AND_BATTERY_BYTE ||
+                   cartridge_type == MBC5_WITH_RAM_AND_BATTERY_BYTE ||
+                   cartridge_type == MBC5_WITH_RUMBLE_AND_RAM_AND_BATTERY);
+
+    game_rom_title.clear();
+    game_rom_title.reserve(GAME_ROM_TITLE_MAX_LENGTH);
+
+    for (uint16_t address = GAME_ROM_TITLE_START; address <= GAME_ROM_TITLE_START + GAME_ROM_TITLE_MAX_LENGTH; address++)
+    {
+        const uint8_t title_byte = rom.at(address);
+        if (title_byte == GAME_ROM_TITLE_FINISHED_BYTE)
+        {
+            break;
+        }
+        game_rom_title.push_back(static_cast<char>(title_byte));
+    }
     return true;
 }
 
@@ -303,6 +326,81 @@ uint8_t GameCartridgeSlot::read_byte(uint16_t address) const
 void GameCartridgeSlot::write_byte(uint16_t address, uint8_t value)
 {
     memory_bank_controller->write_byte(address, value);
+}
+
+bool GameCartridgeSlot::has_battery_backed_ram() const
+{
+    return has_battery && !ram.empty();
+}
+
+const std::string& GameCartridgeSlot::get_game_title() const
+{
+    return game_rom_title;
+}
+
+std::string GameCartridgeSlot::get_sanitized_save_filename() const
+{
+    std::string filename;
+    for (char c : game_rom_title)
+    {
+        filename += std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_'
+            ? c
+            : '_';
+    }
+
+    if (filename.empty())
+    {
+        filename = "unknown_game";
+    }
+    return filename + ".sav";
+}
+
+bool GameCartridgeSlot::try_load_ram_from_save_file(const std::filesystem::path& save_directory)
+{
+    if (!has_battery_backed_ram())
+    {
+        return false;
+    }
+
+    const std::filesystem::path save_path = save_directory / get_sanitized_save_filename();
+
+    if (!std::filesystem::exists(save_path))
+    {
+        return false;
+    }
+
+    std::ifstream save_file(save_path, std::ios::binary);
+    if (!save_file.is_open())
+    {
+        return false;
+    }
+
+    save_file.seekg(0, std::ios::end);
+    const std::streamsize file_size = save_file.tellg();
+    save_file.seekg(0, std::ios::beg);
+
+    if (static_cast<size_t>(file_size) != ram.size())
+    {
+        return false;
+    }
+    return static_cast<bool>(save_file.read(reinterpret_cast<char*>(ram.data()), ram.size()));
+}
+
+bool GameCartridgeSlot::try_save_ram_to_save_file(const std::filesystem::path& save_directory) const
+{
+    if (!has_battery_backed_ram())
+    {
+        return false;
+    }
+
+    const std::filesystem::path save_path = save_directory / get_sanitized_save_filename();
+
+    std::ofstream save_file(save_path, std::ios::binary | std::ios::trunc);
+    if (!save_file.is_open())
+    {
+        return false;
+    }
+    return static_cast<bool>(save_file.write(reinterpret_cast<const char*>(ram.data()), ram.size()));
 }
 
 } // namespace GameBoyEmulator
