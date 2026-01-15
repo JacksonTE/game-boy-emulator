@@ -1,0 +1,33 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "win-x64-relwithdebinfo",
+      "displayName": "Windows x64 RelWithDebInfo",
+      "description": "Windows Release build with debug info using Ninja generator",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_STANDARD": "20"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "relwithdebinfo-build",
+      "displayName": "Windows x64 RelWithDebInfo",
+      "configurePreset": "win-x64-relwithdebinfo"
+    }
+  ]
+}

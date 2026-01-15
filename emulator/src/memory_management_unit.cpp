@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
+#include <string>
 
 #include "bitwise_utilities.h"
 #include "console_output_utilities.h"
@@ -279,8 +279,7 @@ uint8_t MemoryManagementUnit::read_byte(uint16_t address, bool is_access_unrestr
         const uint16_t local_address = address - HIGH_RAM_START;
         return high_ram[local_address];
     }
-    else
-        return interrupt_enable_ie;
+    return interrupt_enable_ie;
 }
 
 void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted)
@@ -391,7 +390,9 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
         high_ram[local_address] = value;
     }
     else
+    {
         interrupt_enable_ie = value;
+    }
 }
 
 void MemoryManagementUnit::step_forward_one_machine_cycle()
