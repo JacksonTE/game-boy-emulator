@@ -162,7 +162,9 @@ void PixelProcessingUnit::write_stat_lcd_status(uint8_t value)
         stat_lcd_status = 0xFF; // TODO eventually confirm spurious interrupt timing with Ocean’s Road Rash and Vic Tokai’s Xerd no Densetsu
     }
     else
+    {
         stat_lcd_status = new_stat_value;
+    }
 }
 
 uint8_t PixelProcessingUnit::read_ly_lcd_y_coordinate() const
@@ -532,7 +534,9 @@ void PixelProcessingUnit::trigger_stat_interrupts()
         }
     }
     else
+    {
         are_stat_interrupts_blocked = false;
+    }
 }
 
 void PixelProcessingUnit::switch_to_mode(PixelProcessingUnitMode new_mode)
@@ -581,7 +585,9 @@ void PixelProcessingUnit::step_fetchers_forward_one_dot()
         step_background_fetcher_forward_one_dot();
     }
     else
+    {
         step_object_fetcher_forward_one_dot();
+    }
 
     if (is_object_display_enabled())
     {
@@ -598,7 +604,9 @@ void PixelProcessingUnit::step_fetchers_forward_one_dot()
         }
     }
     else
+    {
         object_fetcher.is_enabled = false;
+    }
 }
 
 void PixelProcessingUnit::step_background_fetcher_forward_one_dot()

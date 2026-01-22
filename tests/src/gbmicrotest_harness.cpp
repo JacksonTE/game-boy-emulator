@@ -13,8 +13,9 @@ static std::filesystem::path get_test_directory_path()
 static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const std::filesystem::path& directory)
 {
     if (!std::filesystem::exists(directory))
+    {
         return { directory };
-
+    }
     std::vector<std::filesystem::path> test_rom_paths;
 
     for (const auto& entry : std::filesystem::directory_iterator(directory))

@@ -173,7 +173,9 @@ void MBC2::write_byte(uint16_t address, uint8_t value)
         cartridge_ram[address_to_write] = value_with_undefined_upper_nibble;
     }
     else
+    {
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
+    }
 }
 
 MBC3::MBC3(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
@@ -294,7 +296,9 @@ void MBC3::write_byte(uint16_t address, uint8_t value)
         }
     }
     else
+    {
         throw std::runtime_error("Attemped to write to an out of bounds address in the cartridge's ROM or RAM. Exiting.");
+    }
 }
 
 MBC5::MBC5(std::vector<uint8_t>& rom, std::vector<uint8_t>& ram)
@@ -367,7 +371,9 @@ void MBC5::write_byte(uint16_t address, uint8_t value)
         cartridge_ram[address_to_write] = value;
     }
     else
+    {
         throw std::runtime_error("Attemped to write to out of bounds address " + std::to_string(address) + " in the cartridge's ROM or RAM. Exiting.");
+    }
 }
 
 } // namespace GameBoyEmulator

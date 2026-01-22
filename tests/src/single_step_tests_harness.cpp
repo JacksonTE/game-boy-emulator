@@ -47,7 +47,9 @@ struct MachineCycleOperation
     bool operator==(const MachineCycleOperation& other) const
     {
         if (memory_interaction != other.memory_interaction)
+        {
             return false;
+        }
 
         switch (memory_interaction)
         {
@@ -138,8 +140,9 @@ static std::vector<SingleStepTestCase> load_test_cases_from_json_file(const std:
 {
     std::ifstream file(json_test_file_path);
     if (!file)
+    {
         throw std::runtime_error("Error: could not open JSON file " + json_test_file_path.string());
-
+    }
     nlohmann::json json_test_file_object;
     file >> json_test_file_object;
     std::vector<SingleStepTestCase> json_test_cases;

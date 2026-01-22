@@ -135,7 +135,9 @@ public:
                 std::cout << "Warning: attempted to shift out of an empty PISO shift register while tracking its size.\n";
             }
             else
+            {
                 current_size--;
+            }
         }
 
         T head = entries[0];

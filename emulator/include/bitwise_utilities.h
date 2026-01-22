@@ -16,9 +16,13 @@ template<typename T>
 inline void set_bit(T& variable, uint8_t bit_position, bool new_bit_state)
 {
     if (new_bit_state)
+    {
         variable |= (static_cast<T>(1) << bit_position);
+    }
     else
+    {
         variable &= ~(static_cast<T>(1) << bit_position);
+    }
 }
 
 template<typename T>
