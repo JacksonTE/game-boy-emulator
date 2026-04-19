@@ -1,5 +1,10 @@
 name: Run Tests
-run-name: "Run Tests: ${{ github.event_name == 'pull_request' && github.event.pull_request.title || github.event.head_commit.message }}"
+run-name: >-
+  Run Tests: ${{
+    github.event_name == 'pull_request' && github.event.pull_request.title ||
+    github.event.head_commit.message ||
+    format('Triggered by {0}', github.actor)
+  }}
 
 on:
   push:
@@ -14,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Dependencies
         run: |

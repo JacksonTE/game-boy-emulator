@@ -366,8 +366,7 @@ TEST_P(SingleStepTest, JsonTestCasesFile)
     }
 }
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     SingleStepTestSuite,
     SingleStepTest,
     testing::ValuesIn(get_ordered_json_test_file_paths()),
@@ -376,5 +375,4 @@ INSTANTIATE_TEST_SUITE_P
         std::string test_rom_file_name = info.param.stem().string();
         std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), ' ', '_');
         return "opcode_" + test_rom_file_name;
-    }
-);
+    });

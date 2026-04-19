@@ -224,8 +224,7 @@ TEST_P(GbmicroTest, TestRom)
     ASSERT_TRUE(did_test_succeed) << "Test didn't reach a finished state within " << MAX_INSTRUCTIONS_BEFORE_TIMEOUT << " instructions";
 }
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     GbmicroTests,
     GbmicroTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path())),
@@ -234,5 +233,4 @@ INSTANTIATE_TEST_SUITE_P
         std::string test_rom_file_name = info.param.stem().string();
         std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), '-', '_');
         return test_rom_file_name;
-    }
-);
+    });

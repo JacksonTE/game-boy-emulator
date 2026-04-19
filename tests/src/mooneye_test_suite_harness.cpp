@@ -81,32 +81,25 @@ TEST_P(MooneyeTest, TestRom)
     ASSERT_TRUE(did_test_succeed) << "Test didn't reach a finished state within " << MAX_INSTRUCTIONS_BEFORE_TIMEOUT << " instructions";
 }
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsBits,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "bits")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsInstructions,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "instr")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsInterrupts,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "interrupts")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsObjectAttributeMemoryDirectMemoryAccess,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "oam_dma")),
@@ -115,11 +108,9 @@ INSTANTIATE_TEST_SUITE_P
         std::string test_rom_file_name = info.param.stem().string();
         std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), '-', '_');
         return test_rom_file_name;
-    }
-);
+    });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsPixelProcessingUnit,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "ppu")),
@@ -128,19 +119,15 @@ INSTANTIATE_TEST_SUITE_P
         std::string test_rom_file_name = info.param.stem().string();
         std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), '-', '_');
         return test_rom_file_name;
-    }
-);
+    });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsTimer,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance" / "timer")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeAcceptanceTestsMiscellaneous,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "acceptance")),
@@ -149,29 +136,22 @@ INSTANTIATE_TEST_SUITE_P
         std::string test_rom_file_name = info.param.stem().string();
         std::replace(test_rom_file_name.begin(), test_rom_file_name.end(), '-', '_');
         return test_rom_file_name;
-    }
-);
+    });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeEmulatorOnlyTestsMBC1,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc1")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeEmulatorOnlyTestsMBC2,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc2")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
 
-INSTANTIATE_TEST_SUITE_P
-(
+INSTANTIATE_TEST_SUITE_P(
     MooneyeEmulatorOnlyTestsMBC5,
     MooneyeTest,
     testing::ValuesIn(get_test_rom_paths_in_directory(get_test_directory_path() / "emulator-only" / "mbc5")),
-    [](auto info) { return info.param.stem().string(); }
-);
+    [](auto info) { return info.param.stem().string(); });
