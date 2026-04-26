@@ -84,13 +84,11 @@ static void run_emulator_core(
 // Allows menu bar and the rendering rectangle to resize responsively while window size is being changed
 static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sdl_event)
 {
-    if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED ||
-        sdl_event->type == SDL_EVENT_WINDOW_MOVED)
+    if (sdl_event->type == SDL_EVENT_WINDOW_EXPOSED)
     {
         RenderContext* render_context = static_cast<RenderContext*>(render_context_data);
         update_imgui_scale_by_resolution(render_context->sdl_window);
-        constexpr bool should_skip_frame_data_update = false;
-        render_frame(*render_context, should_skip_frame_data_update);
+        render_frame(*render_context);
     }
     return true;
 }
@@ -145,9 +143,7 @@ static void emscripten_main_loop_iteration(void* arg)
         emscripten_cancel_main_loop();
         return;
     }
-
-    constexpr bool should_skip_frame_data_update = false;
-    render_frame(*state->render_context, should_skip_frame_data_update);
+    render_frame(*state->render_context);
 }
 
 #endif
@@ -337,8 +333,7 @@ int main()
                 should_stop_emulation,
                 error_message);
 
-            constexpr bool should_skip_frame_data_update = false;
-            render_frame(render_context, should_skip_frame_data_update);
+            render_frame(render_context);
         }
 
         game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
