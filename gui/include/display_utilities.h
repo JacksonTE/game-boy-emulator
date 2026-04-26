@@ -76,7 +76,7 @@ bool should_main_menu_bar_and_cursor_be_visible(
 
 void update_imgui_scale_by_resolution(SDL_Window* sdl_window);
 
-void render_frame(RenderContext& context, bool should_skip_frame_data_update);
+void render_frame(RenderContext& context);
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339
 struct sdl_logical_presentation_imgui_workaround_t

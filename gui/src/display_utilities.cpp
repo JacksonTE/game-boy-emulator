@@ -133,9 +133,7 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     }
 }
 
-void render_frame(
-    RenderContext& context,
-    bool should_skip_frame_data_update)
+void render_frame(RenderContext& context)
 {
     if (context.is_currently_rendering)
     {
@@ -151,8 +149,7 @@ void render_frame(
     context.is_currently_rendering = true;
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
 
-    if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index &&
-        !should_skip_frame_data_update)
+    if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index)
     {
         auto const& pixel_frame_buffer = context.game_boy_emulator->get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
