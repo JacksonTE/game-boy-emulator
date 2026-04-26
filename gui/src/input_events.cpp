@@ -1,6 +1,8 @@
 #include "display_utilities.h"
 #include "input_events.h"
+#ifndef __EMSCRIPTEN__
 #include "nfd_sdl3.h"
+#endif
 
 bool try_load_file_to_memory_with_dialog(
     GameBoyEmulator::FileType file_type,
@@ -12,6 +14,10 @@ bool try_load_file_to_memory_with_dialog(
     std::string* loaded_rom_path,
     std::string& error_message)
 {
+#ifdef __EMSCRIPTEN__
+    // File loading on web is handled via the HTML file input element in shell.html
+    return false;
+#else
     file_loading_status.is_emulation_paused_before_rom_loading = emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire);
     emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
 
@@ -75,6 +81,7 @@ bool try_load_file_to_memory_with_dialog(
             std::memory_order_release);
     }
     return is_operation_successful;
+#endif
 }
 
 void toggle_emulation_paused_state(

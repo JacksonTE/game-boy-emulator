@@ -1,13 +1,17 @@
 #include <atomic>
 #include <exception>
 #include <iostream>
-#include <nfd.h>
 #include <SDL3/SDL.h>
 #include <stop_token>
 #include <string>
 #include <thread>
 
-#ifdef __linux__
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
 #include <gtk/gtk.h>
 #endif
 
@@ -85,11 +89,68 @@ static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sd
     {
         RenderContext* render_context = static_cast<RenderContext*>(render_context_data);
         update_imgui_scale_by_resolution(render_context->sdl_window);
-        constexpr bool should_skip_frame_data_update = true;
+        constexpr bool should_skip_frame_data_update = false;
         render_frame(*render_context, should_skip_frame_data_update);
     }
     return true;
 }
+
+#ifdef __EMSCRIPTEN__
+
+// Holds all state that the emscripten main loop callback needs
+struct EmscriptenLoopState
+{
+    GameBoyEmulator::Emulator* game_boy_emulator;
+    EmulationController* emulation_controller;
+    FileLoadingStatus* file_loading_status;
+    MenuAndCursorDisplayStatus* menu_and_cursor_display_status;
+    KeyPressedStates* key_pressed_states;
+    KeyBindings* key_bindings;
+    MenuProperties* menu_properties;
+    RenderContext* render_context;
+    std::atomic<bool>* did_emulator_core_exception_occur_atomic;
+    std::exception_ptr* emulator_core_exception_pointer;
+    PersistentSettings* persistent_settings;
+    bool* should_stop_emulation;
+    std::string* error_message;
+    SDL_Window* sdl_window;
+};
+
+static void emscripten_main_loop_iteration(void* arg)
+{
+    EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(arg);
+
+    if (state->did_emulator_core_exception_occur_atomic->load(std::memory_order_acquire))
+    {
+        emscripten_cancel_main_loop();
+        std::rethrow_exception(*state->emulator_core_exception_pointer);
+    }
+
+    handle_sdl_events(
+        *state->game_boy_emulator,
+        *state->emulation_controller,
+        *state->file_loading_status,
+        *state->menu_and_cursor_display_status,
+        *state->key_pressed_states,
+        *state->key_bindings,
+        *state->menu_properties,
+        state->sdl_window,
+        &state->persistent_settings->loaded_game_rom_path,
+        &state->persistent_settings->loaded_boot_rom_path,
+        *state->should_stop_emulation,
+        *state->error_message);
+
+    if (*state->should_stop_emulation)
+    {
+        emscripten_cancel_main_loop();
+        return;
+    }
+
+    constexpr bool should_skip_frame_data_update = false;
+    render_frame(*state->render_context, should_skip_frame_data_update);
+}
+
+#endif
 
 int main()
 {
@@ -123,10 +184,12 @@ int main()
 
         update_imgui_scale_by_resolution(sdl_window.get());
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
         gtk_init(NULL, NULL);
 #endif
+#ifndef __EMSCRIPTEN__
         ResourceAcquisitionIsInitialization::NfdInitializerRaii nfd_initializer{};
+#endif
 
         GameBoyEmulator::Emulator game_boy_emulator{};
         EmulationController emulation_controller{};
@@ -228,6 +291,31 @@ int main()
             &render_context
         };
 
+#ifdef __EMSCRIPTEN__
+        EmscriptenLoopState loop_state
+        {
+            &game_boy_emulator,
+            &emulation_controller,
+            &file_loading_status,
+            &menu_and_cursor_display_status,
+            &key_pressed_states,
+            &key_bindings,
+            &menu_properties,
+            &render_context,
+            &did_emulator_core_exception_occur_atomic,
+            &emulator_core_exception_pointer,
+            &persistent_settings,
+            &should_stop_emulation,
+            &error_message,
+            sdl_window.get()
+        };
+        // 0 = use requestAnimationFrame (browser controls frame rate)
+        // false = don't block (return control to browser immediately)
+        emscripten_set_main_loop_arg(emscripten_main_loop_iteration, &loop_state, 0, false);
+        // main() returns here but the loop continues via the browser event loop
+        // The RAII destructors must NOT run yet — Emscripten handles cleanup
+        emscripten_exit_with_live_runtime();
+#else
         while (!should_stop_emulation)
         {
             if (did_emulator_core_exception_occur_atomic.load(std::memory_order_acquire))
@@ -264,10 +352,11 @@ int main()
                 persistent_settings.loaded_boot_rom_path);
         save_settings_to_file(settings_to_save);
         return 0;
+#endif
     }
     catch (const std::exception& exception)
     {
         std::cerr << "Error: " << exception.what() << ", exiting.\n";
         return 1;
-    }   
+    }
 }

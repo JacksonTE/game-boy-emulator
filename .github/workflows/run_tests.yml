@@ -8,9 +8,9 @@ run-name: >-
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
   workflow_call:
 
@@ -32,13 +32,23 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -S . -B build \
+          cmake \
+            -S . \
+            -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DSDL_UNIX_CONSOLE_BUILD=ON \
             -DCMAKE_CXX_FLAGS="-Wno-stringop-overflow"
 
       - name: Build Test Harnesses and Emulator
-        run: cmake --build build --parallel --target game-boy-tests
+        run: |
+          cmake \
+            --build build \
+            --parallel \
+            --target game-boy-tests
 
       - name: Run Tests
-        run: ctest --test-dir build --parallel $(nproc) --output-on-failure
+        run: |
+          ctest \
+            --test-dir build \
+            --parallel $(nproc) \
+            --output-on-failure

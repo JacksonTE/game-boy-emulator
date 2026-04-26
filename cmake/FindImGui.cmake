@@ -24,6 +24,6 @@ target_link_libraries(ImGui PUBLIC
     SDL3::SDL3)
 
 install(FILES "${imgui_SOURCE_DIR}/LICENSE.txt"
-        DESTINATION third-party-licenses
-        RENAME imgui_license.txt
-        COMPONENT documentation)
+    DESTINATION third-party-licenses
+    RENAME imgui_license.txt
+    COMPONENT documentation)

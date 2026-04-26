@@ -3,8 +3,19 @@
 #include "display_utilities.h"
 #include "imgui_rendering.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 int get_initial_window_scale_for_display()
 {
+#ifdef __EMSCRIPTEN__
+    const int viewport_width = EM_ASM_INT({ return window.innerWidth; });
+    const int viewport_height = EM_ASM_INT({ return window.innerHeight; });
+    return std::max(1, std::min(
+        viewport_width / DISPLAY_WIDTH_PIXELS,
+        viewport_height / DISPLAY_HEIGHT_PIXELS));
+#else
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
     if (display_mode != nullptr)
     {
@@ -15,6 +26,7 @@ int get_initial_window_scale_for_display()
         return static_cast<int>(DEFAULT_INITIAL_WINDOW_SCALE * scale_multiplier + 0.5f);
     }
     return DEFAULT_INITIAL_WINDOW_SCALE;
+#endif
 }
 
 void set_emulation_screen_blank(GraphicsController& graphics_controller)
