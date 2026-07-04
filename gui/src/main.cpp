@@ -96,6 +96,56 @@ static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sd
 
 #ifdef __EMSCRIPTEN__
 
+static int get_web_window_scale_for_viewport()
+{
+    const int viewport_width = EM_ASM_INT({ return window.innerWidth; });
+    const int viewport_height = EM_ASM_INT({ return window.innerHeight; });
+
+    return std::max(
+        1,
+        std::min(
+            viewport_width / DISPLAY_WIDTH_PIXELS,
+            viewport_height / DISPLAY_HEIGHT_PIXELS));
+}
+
+static void log_web_resize_diagnostics_if_changed(SDL_Window* sdl_window)
+{
+    const int viewport_width = EM_ASM_INT({ return window.innerWidth; });
+    const int viewport_height = EM_ASM_INT({ return window.innerHeight; });
+    const double device_pixel_ratio = EM_ASM_DOUBLE({ return window.devicePixelRatio; });
+    const int window_scale = get_web_window_scale_for_viewport();
+
+    int sdl_window_width, sdl_window_height;
+    SDL_GetWindowSize(sdl_window, &sdl_window_width, &sdl_window_height);
+
+    static int previous_viewport_width = -1;
+    static int previous_viewport_height = -1;
+    static int previous_sdl_window_width = -1;
+    static int previous_sdl_window_height = -1;
+    static int previous_window_scale = -1;
+
+    if (viewport_width != previous_viewport_width ||
+        viewport_height != previous_viewport_height ||
+        sdl_window_width != previous_sdl_window_width ||
+        sdl_window_height != previous_sdl_window_height ||
+        window_scale != previous_window_scale)
+    {
+        std::cout
+            << "[web-resize] viewport=" << viewport_width << "x" << viewport_height
+            << " dpr=" << device_pixel_ratio
+            << " scale=" << window_scale
+            << " target=" << (DISPLAY_WIDTH_PIXELS * window_scale) << "x" << (DISPLAY_HEIGHT_PIXELS * window_scale)
+            << " sdl=" << sdl_window_width << "x" << sdl_window_height
+            << "\n";
+
+        previous_viewport_width = viewport_width;
+        previous_viewport_height = viewport_height;
+        previous_sdl_window_width = sdl_window_width;
+        previous_sdl_window_height = sdl_window_height;
+        previous_window_scale = window_scale;
+    }
+}
+
 // Holds all state that the emscripten main loop callback needs
 struct EmscriptenLoopState
 {
@@ -115,9 +165,34 @@ struct EmscriptenLoopState
     SDL_Window* sdl_window;
 };
 
+static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event, void* user_data)
+{
+    EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
+
+    const int viewport_w = (ui_event != nullptr)
+        ? ui_event->windowInnerWidth
+        : EM_ASM_INT({ return window.innerWidth; });
+    const int viewport_h = (ui_event != nullptr)
+        ? ui_event->windowInnerHeight
+        : EM_ASM_INT({ return window.innerHeight; });
+
+    int sdl_w, sdl_h;
+    SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
+    if (viewport_w != sdl_w || viewport_h != sdl_h)
+    {
+        SDL_SetWindowSize(state->sdl_window, viewport_w, viewport_h);
+        update_imgui_scale_by_resolution(state->sdl_window);
+        render_frame(*state->render_context);
+    }
+
+    return EM_FALSE;
+}
+
 static void emscripten_main_loop_iteration(void* arg)
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(arg);
+
+    log_web_resize_diagnostics_if_changed(state->sdl_window);
 
     if (state->did_emulator_core_exception_occur_atomic->load(std::memory_order_acquire))
     {
@@ -155,12 +230,19 @@ int main()
     {
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
 
+#ifdef __EMSCRIPTEN__
+        const int initial_window_w = EM_ASM_INT({ return window.innerWidth; });
+        const int initial_window_h = EM_ASM_INT({ return window.innerHeight; });
+#else
         const int adaptive_window_scale = get_initial_window_scale_for_display();
+        const int initial_window_w = DISPLAY_WIDTH_PIXELS * adaptive_window_scale;
+        const int initial_window_h = DISPLAY_HEIGHT_PIXELS * adaptive_window_scale;
+#endif
         ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window
         {
             "Emulate Game Boy",
-            DISPLAY_WIDTH_PIXELS * adaptive_window_scale,
-            DISPLAY_HEIGHT_PIXELS * adaptive_window_scale,
+            initial_window_w,
+            initial_window_h,
             SDL_WINDOW_RESIZABLE
         };
         ResourceAcquisitionIsInitialization::SdlRendererRaii sdl_renderer
@@ -308,6 +390,7 @@ int main()
         };
         // 0 = use requestAnimationFrame (browser controls frame rate)
         // false = don't block (return control to browser immediately)
+        emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &loop_state, false, emscripten_resize_callback);
         emscripten_set_main_loop_arg(emscripten_main_loop_iteration, &loop_state, 0, false);
         // main() returns here but the loop continues via the browser event loop
         // The RAII destructors must NOT run yet — Emscripten handles cleanup

@@ -86,11 +86,19 @@ public:
             throw std::runtime_error(std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
         }
 
+#ifdef __EMSCRIPTEN__
+        SDL_SetRenderLogicalPresentation(
+            renderer,
+            display_width_pixels,
+            display_height_pixels,
+            SDL_LOGICAL_PRESENTATION_DISABLED);
+#else
         SDL_SetRenderLogicalPresentation(
             renderer,
             display_width_pixels,
             display_height_pixels,
             SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+#endif
 
         if (!SDL_SetRenderVSync(renderer, 1))
         {

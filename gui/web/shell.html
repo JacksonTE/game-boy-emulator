@@ -11,18 +11,24 @@
             box-sizing: border-box;
         }
 
+        html {
+            width: 100%;
+            height: 100%;
+        }
+
         body {
             background-color: #000;
             overflow: hidden;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 100%;
+            height: 100%;
         }
 
         canvas {
+            position: fixed;
+            inset: 0;
             display: block;
+            width: 100vw;
+            height: 100vh;
             image-rendering: pixelated;
             outline: none;
         }
@@ -40,19 +46,6 @@
 
         window.addEventListener('load', function() {
             const canvas = document.getElementById('canvas');
-
-            function pinCanvasCssSize() {
-                // Always express the canvas in CSS pixels (buffer px / DPR).
-                // Never clear the CSS size — doing so lets the browser
-                // upscale the buffer and cause blur in fullscreen.
-                canvas.style.width  = Math.round(canvas.width  / window.devicePixelRatio) + 'px';
-                canvas.style.height = Math.round(canvas.height / window.devicePixelRatio) + 'px';
-            }
-
-            const observer = new MutationObserver(pinCanvasCssSize);
-            observer.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
-
-            document.addEventListener('fullscreenchange', pinCanvasCssSize);
         });
     </script>
     {{{ SCRIPT }}}
