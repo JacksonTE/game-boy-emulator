@@ -96,56 +96,6 @@ static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sd
 
 #ifdef __EMSCRIPTEN__
 
-static int get_web_window_scale_for_viewport()
-{
-    const int viewport_width = EM_ASM_INT({ return window.innerWidth; });
-    const int viewport_height = EM_ASM_INT({ return window.innerHeight; });
-
-    return std::max(
-        1,
-        std::min(
-            viewport_width / DISPLAY_WIDTH_PIXELS,
-            viewport_height / DISPLAY_HEIGHT_PIXELS));
-}
-
-static void log_web_resize_diagnostics_if_changed(SDL_Window* sdl_window)
-{
-    const int viewport_width = EM_ASM_INT({ return window.innerWidth; });
-    const int viewport_height = EM_ASM_INT({ return window.innerHeight; });
-    const double device_pixel_ratio = EM_ASM_DOUBLE({ return window.devicePixelRatio; });
-    const int window_scale = get_web_window_scale_for_viewport();
-
-    int sdl_window_width, sdl_window_height;
-    SDL_GetWindowSize(sdl_window, &sdl_window_width, &sdl_window_height);
-
-    static int previous_viewport_width = -1;
-    static int previous_viewport_height = -1;
-    static int previous_sdl_window_width = -1;
-    static int previous_sdl_window_height = -1;
-    static int previous_window_scale = -1;
-
-    if (viewport_width != previous_viewport_width ||
-        viewport_height != previous_viewport_height ||
-        sdl_window_width != previous_sdl_window_width ||
-        sdl_window_height != previous_sdl_window_height ||
-        window_scale != previous_window_scale)
-    {
-        std::cout
-            << "[web-resize] viewport=" << viewport_width << "x" << viewport_height
-            << " dpr=" << device_pixel_ratio
-            << " scale=" << window_scale
-            << " target=" << (DISPLAY_WIDTH_PIXELS * window_scale) << "x" << (DISPLAY_HEIGHT_PIXELS * window_scale)
-            << " sdl=" << sdl_window_width << "x" << sdl_window_height
-            << "\n";
-
-        previous_viewport_width = viewport_width;
-        previous_viewport_height = viewport_height;
-        previous_sdl_window_width = sdl_window_width;
-        previous_sdl_window_height = sdl_window_height;
-        previous_window_scale = window_scale;
-    }
-}
-
 // Holds all state that the emscripten main loop callback needs
 struct EmscriptenLoopState
 {
@@ -191,8 +141,6 @@ static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event
 static void emscripten_main_loop_iteration(void* arg)
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(arg);
-
-    log_web_resize_diagnostics_if_changed(state->sdl_window);
 
     if (state->did_emulator_core_exception_occur_atomic->load(std::memory_order_acquire))
     {

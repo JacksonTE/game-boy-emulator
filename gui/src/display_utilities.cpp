@@ -165,58 +165,6 @@ void render_frame(RenderContext& context)
         return;
     }
 
-#ifdef __EMSCRIPTEN__
-    {
-        ImGuiIO& io = ImGui::GetIO();
-        const double device_pixel_ratio = EM_ASM_DOUBLE({ return window.devicePixelRatio; });
-        const int canvas_width = EM_ASM_INT({ return document.getElementById('canvas').width; });
-        const int canvas_height = EM_ASM_INT({ return document.getElementById('canvas').height; });
-        const int canvas_css_width = EM_ASM_INT({ return Math.round(document.getElementById('canvas').getBoundingClientRect().width); });
-        const int canvas_css_height = EM_ASM_INT({ return Math.round(document.getElementById('canvas').getBoundingClientRect().height); });
-
-        static int previous_window_width = -1;
-        static int previous_window_height = -1;
-        static int previous_canvas_width = -1;
-        static int previous_canvas_height = -1;
-        static int previous_canvas_css_width = -1;
-        static int previous_canvas_css_height = -1;
-        static float previous_imgui_display_width = -1.0f;
-        static float previous_imgui_display_height = -1.0f;
-        static float previous_font_scale = -1.0f;
-
-        if (window_width != previous_window_width ||
-            window_height != previous_window_height ||
-            canvas_width != previous_canvas_width ||
-            canvas_height != previous_canvas_height ||
-            canvas_css_width != previous_canvas_css_width ||
-            canvas_css_height != previous_canvas_css_height ||
-            io.DisplaySize.x != previous_imgui_display_width ||
-            io.DisplaySize.y != previous_imgui_display_height ||
-            ImGui::GetStyle().FontScaleMain != previous_font_scale)
-        {
-            std::cout
-                << "[web-render] sdl=" << window_width << "x" << window_height
-                << " canvas=" << canvas_width << "x" << canvas_height
-                << " css=" << canvas_css_width << "x" << canvas_css_height
-                << " dpr=" << device_pixel_ratio
-                << " imgui_display=" << io.DisplaySize.x << "x" << io.DisplaySize.y
-                << " framebuffer_scale=" << io.DisplayFramebufferScale.x << "x" << io.DisplayFramebufferScale.y
-                << " font_scale=" << ImGui::GetStyle().FontScaleMain
-                << "\n";
-
-            previous_window_width = window_width;
-            previous_window_height = window_height;
-            previous_canvas_width = canvas_width;
-            previous_canvas_height = canvas_height;
-            previous_canvas_css_width = canvas_css_width;
-            previous_canvas_css_height = canvas_css_height;
-            previous_imgui_display_width = io.DisplaySize.x;
-            previous_imgui_display_height = io.DisplaySize.y;
-            previous_font_scale = ImGui::GetStyle().FontScaleMain;
-        }
-    }
-#endif
-
     context.is_currently_rendering = true;
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
 
@@ -237,25 +185,6 @@ void render_frame(RenderContext& context)
     }
 
     SDL_RenderClear(context.sdl_renderer);
-#ifdef __EMSCRIPTEN__
-    const float main_menu_bar_height_pixels = ImGui::GetFrameHeight();
-    const float available_height = std::max(0.0f, static_cast<float>(window_height) - main_menu_bar_height_pixels);
-    const int emulation_scale = std::max(
-        1,
-        std::min(
-            window_width / static_cast<int>(DISPLAY_WIDTH_PIXELS),
-            static_cast<int>(available_height) / static_cast<int>(DISPLAY_HEIGHT_PIXELS)));
-    const float emulation_width = static_cast<float>(DISPLAY_WIDTH_PIXELS * emulation_scale);
-    const float emulation_height = static_cast<float>(DISPLAY_HEIGHT_PIXELS * emulation_scale);
-    SDL_FRect emulation_screen_rectangle =
-        SDL_FRect
-        {
-            (static_cast<float>(window_width) - emulation_width) * 0.5f,
-            main_menu_bar_height_pixels + (available_height - emulation_height) * 0.5f,
-            emulation_width,
-            emulation_height
-        };
-#else
     SDL_FRect emulation_screen_rectangle =
         SDL_FRect
         {
@@ -264,7 +193,6 @@ void render_frame(RenderContext& context)
             static_cast<float>(DISPLAY_WIDTH_PIXELS),
             static_cast<float>(DISPLAY_HEIGHT_PIXELS)
         };
-#endif
     SDL_RenderTexture(context.sdl_renderer, context.sdl_texture, nullptr, &emulation_screen_rectangle);
 
     sdl_logical_presentation_imgui_workaround_t logical_values
