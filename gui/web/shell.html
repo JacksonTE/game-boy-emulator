@@ -35,8 +35,24 @@
         document.addEventListener('DOMContentLoaded', function() {
             const canvas = document.getElementById('canvas');
             canvas.focus();
-            // Re-focus if user clicks anywhere on the page
             document.addEventListener('click', function() { canvas.focus(); });
+        });
+
+        window.addEventListener('load', function() {
+            const canvas = document.getElementById('canvas');
+
+            function pinCanvasCssSize() {
+                // Always express the canvas in CSS pixels (buffer px / DPR).
+                // Never clear the CSS size — doing so lets the browser
+                // upscale the buffer and cause blur in fullscreen.
+                canvas.style.width  = Math.round(canvas.width  / window.devicePixelRatio) + 'px';
+                canvas.style.height = Math.round(canvas.height / window.devicePixelRatio) + 'px';
+            }
+
+            const observer = new MutationObserver(pinCanvasCssSize);
+            observer.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
+
+            document.addEventListener('fullscreenchange', pinCanvasCssSize);
         });
     </script>
     {{{ SCRIPT }}}

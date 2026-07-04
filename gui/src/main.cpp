@@ -84,7 +84,8 @@ static void run_emulator_core(
 // Allows menu bar and the rendering rectangle to resize responsively while window size is being changed
 static bool resize_event_watch_callback(void* render_context_data, SDL_Event* sdl_event)
 {
-    if (sdl_event->type == SDL_EVENT_WINDOW_EXPOSED)
+    if (sdl_event->type == SDL_EVENT_WINDOW_EXPOSED ||
+        sdl_event->type == SDL_EVENT_WINDOW_RESIZED)
     {
         RenderContext* render_context = static_cast<RenderContext*>(render_context_data);
         update_imgui_scale_by_resolution(render_context->sdl_window);

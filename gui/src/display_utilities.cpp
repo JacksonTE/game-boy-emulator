@@ -10,11 +10,13 @@
 int get_initial_window_scale_for_display()
 {
 #ifdef __EMSCRIPTEN__
-    const int viewport_width = EM_ASM_INT({ return window.innerWidth; });
-    const int viewport_height = EM_ASM_INT({ return window.innerHeight; });
+    double dpr = emscripten_get_device_pixel_ratio();
+    int viewport_width = EM_ASM_INT({ return window.innerWidth; });
+    int viewport_height = EM_ASM_INT({ return window.innerHeight; });
+    // Scale to physical pixels so canvas buffer matches display resolution
     return std::max(1, std::min(
-        viewport_width / DISPLAY_WIDTH_PIXELS,
-        viewport_height / DISPLAY_HEIGHT_PIXELS));
+        static_cast<int>(viewport_width * dpr) / DISPLAY_WIDTH_PIXELS,
+        static_cast<int>(viewport_height * dpr) / DISPLAY_HEIGHT_PIXELS));
 #else
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
     if (display_mode != nullptr)
@@ -119,30 +121,36 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     SDL_DisplayID display_id = SDL_GetDisplayForWindow(sdl_window);
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(display_id);
 
-    if (display_mode != nullptr)
+    if (display_mode == nullptr)
     {
-        constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
-
-        const float display_height = static_cast<float>(display_mode->h);
-        float font_scale = (display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING);
-
-        ImGuiStyle& style = ImGui::GetStyle();
-
-        constexpr float BASE_FRAME_PADDING_X = 6.0f;
-        constexpr float BASE_FRAME_PADDING_Y = 6.0f;
-        constexpr float BASE_ITEM_SPACING_X = 8.0f;
-        constexpr float BASE_ITEM_SPACING_Y = 4.0f;
-        constexpr float BASE_ITEM_INNER_SPACING_X = 4.0f;
-        constexpr float BASE_ITEM_INNER_SPACING_Y = 6.0f;
-        constexpr float BASE_WINDOW_PADDING_X = 8.0f;
-        constexpr float BASE_WINDOW_PADDING_Y = 10.0f;
-
-        style.FramePadding = ImVec2(BASE_FRAME_PADDING_X * font_scale, BASE_FRAME_PADDING_Y * font_scale);
-        style.ItemSpacing = ImVec2(BASE_ITEM_SPACING_X * font_scale, BASE_ITEM_SPACING_Y * font_scale);
-        style.ItemInnerSpacing = ImVec2(BASE_ITEM_INNER_SPACING_X * font_scale, BASE_ITEM_INNER_SPACING_Y * font_scale);
-        style.WindowPadding = ImVec2(BASE_WINDOW_PADDING_X * font_scale, BASE_WINDOW_PADDING_Y * font_scale);
-        style.FontScaleMain = font_scale;
+        return;
     }
+
+#ifdef __EMSCRIPTEN__
+    float display_height = static_cast<float>(EM_ASM_INT({ return screen.height * window.devicePixelRatio; }));
+#else
+    float display_height = static_cast<float>(display_mode->h);
+#endif
+
+    constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
+    float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
+
+    ImGuiStyle& style = ImGui::GetStyle();
+
+    constexpr float BASE_FRAME_PADDING_X = 6.0f;
+    constexpr float BASE_FRAME_PADDING_Y = 6.0f;
+    constexpr float BASE_ITEM_SPACING_X = 8.0f;
+    constexpr float BASE_ITEM_SPACING_Y = 4.0f;
+    constexpr float BASE_ITEM_INNER_SPACING_X = 4.0f;
+    constexpr float BASE_ITEM_INNER_SPACING_Y = 6.0f;
+    constexpr float BASE_WINDOW_PADDING_X = 8.0f;
+    constexpr float BASE_WINDOW_PADDING_Y = 10.0f;
+
+    style.FramePadding = ImVec2(BASE_FRAME_PADDING_X * font_scale, BASE_FRAME_PADDING_Y * font_scale);
+    style.ItemSpacing = ImVec2(BASE_ITEM_SPACING_X * font_scale, BASE_ITEM_SPACING_Y * font_scale);
+    style.ItemInnerSpacing = ImVec2(BASE_ITEM_INNER_SPACING_X * font_scale, BASE_ITEM_INNER_SPACING_Y * font_scale);
+    style.WindowPadding = ImVec2(BASE_WINDOW_PADDING_X * font_scale, BASE_WINDOW_PADDING_Y * font_scale);
+    style.FontScaleMain = font_scale;
 }
 
 void render_frame(RenderContext& context)
