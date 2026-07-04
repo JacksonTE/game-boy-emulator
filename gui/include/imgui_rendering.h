@@ -36,7 +36,7 @@ void render_main_menu_bar(
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
-    KeyBindings& key_bindings,
+    const KeyBindings& key_bindings,
     SDL_Window* sdl_window,
     std::string* loaded_game_rom_path,
     std::string* loaded_boot_rom_path,
@@ -58,8 +58,8 @@ void render_error_message_popup(
     std::atomic<bool>& is_emulation_paused_atomic,
     std::string& error_message);
 
-std::string get_keybind_label(SDL_Keycode key);
+std::string get_keybind_label(const SDL_Keycode key);
 
-ImVec4 get_imvec4_from_abgr(uint32_t abgr);
+ImVec4 get_imvec4_from_abgr(const uint32_t abgr);
 
 void imgui_spaced_separator();

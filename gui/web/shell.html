@@ -40,8 +40,20 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const canvas = document.getElementById('canvas');
-            canvas.focus();
-            document.addEventListener('click', function() { canvas.focus(); });
+
+            function focusCanvas() {
+                canvas.focus({ preventScroll: true });
+            }
+
+            focusCanvas();
+
+            document.addEventListener('click', function() {
+                focusCanvas();
+            });
+
+            document.addEventListener('fullscreenchange', function() {
+                focusCanvas();
+            });
         });
     </script>
     {{{ SCRIPT }}}

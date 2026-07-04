@@ -115,25 +115,43 @@ struct EmscriptenLoopState
     SDL_Window* sdl_window;
 };
 
+static void sync_emscripten_window_to_viewport(
+    EmscriptenLoopState* state,
+    int viewport_w,
+    int viewport_h)
+{
+    int sdl_w, sdl_h;
+    SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
+
+    if (viewport_w != sdl_w || viewport_h != sdl_h)
+    {
+        SDL_SetWindowSize(state->sdl_window, viewport_w, viewport_h);
+    }
+
+    update_imgui_scale_by_resolution(state->sdl_window);
+    render_frame(*state->render_context);
+}
+
 static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event, void* user_data)
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
 
-    const int viewport_w = (ui_event != nullptr)
-        ? ui_event->windowInnerWidth
-        : EM_ASM_INT({ return window.innerWidth; });
-    const int viewport_h = (ui_event != nullptr)
-        ? ui_event->windowInnerHeight
-        : EM_ASM_INT({ return window.innerHeight; });
+    const int viewport_w = ui_event->windowInnerWidth;
+    const int viewport_h = ui_event->windowInnerHeight;
 
-    int sdl_w, sdl_h;
-    SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
-    if (viewport_w != sdl_w || viewport_h != sdl_h)
-    {
-        SDL_SetWindowSize(state->sdl_window, viewport_w, viewport_h);
-        update_imgui_scale_by_resolution(state->sdl_window);
-        render_frame(*state->render_context);
-    }
+    sync_emscripten_window_to_viewport(state, viewport_w, viewport_h);
+
+    return EM_FALSE;
+}
+
+static EM_BOOL emscripten_fullscreen_change_callback(int, const EmscriptenFullscreenChangeEvent*, void* user_data)
+{
+    EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
+
+    const int viewport_w = EM_ASM_INT({ return window.innerWidth; });
+    const int viewport_h = EM_ASM_INT({ return window.innerHeight; });
+
+    sync_emscripten_window_to_viewport(state, viewport_w, viewport_h);
 
     return EM_FALSE;
 }
@@ -339,6 +357,7 @@ int main()
         // 0 = use requestAnimationFrame (browser controls frame rate)
         // false = don't block (return control to browser immediately)
         emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &loop_state, false, emscripten_resize_callback);
+        emscripten_set_fullscreenchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, &loop_state, false, emscripten_fullscreen_change_callback);
         emscripten_set_main_loop_arg(emscripten_main_loop_iteration, &loop_state, 0, false);
         // main() returns here but the loop continues via the browser event loop
         // The RAII destructors must NOT run yet — Emscripten handles cleanup

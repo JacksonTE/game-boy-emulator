@@ -1,5 +1,8 @@
 #include "display_utilities.h"
 #include "input_events.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #ifndef __EMSCRIPTEN__
 #include "nfd_sdl3.h"
 #endif
@@ -106,13 +109,17 @@ void toggle_fullscreen_enabled_state(
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     SDL_Window* sdl_window)
 {
+#ifndef __EMSCRIPTEN__
     float mouse_x_monitor_coordinate, mouse_y_monitor_coordinate;
     SDL_GetGlobalMouseState(&mouse_x_monitor_coordinate, &mouse_y_monitor_coordinate);
+#endif
 
     const bool was_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN) != 0;
     SDL_SetWindowFullscreen(sdl_window, !was_fullscreen_enabled);
 
+#ifndef __EMSCRIPTEN__
     SDL_WarpMouseGlobal(mouse_x_monitor_coordinate, mouse_y_monitor_coordinate);
+#endif
 
     menu_and_cursor_display_status.cursor_changes_to_ignore_count =
         menu_and_cursor_display_status.MAX_CURSOR_CHANGES_TO_IGNORE;
@@ -229,11 +236,13 @@ void handle_sdl_events(
 
                 if (key == key_bindings.fullscreen)
                 {
+#ifndef __EMSCRIPTEN__
                     if (is_key_pressed && !key_pressed_states.was_fullscreen_key_previously_pressed)
                     {
                         toggle_fullscreen_enabled_state(menu_and_cursor_display_status, sdl_window);
                     }
                     key_pressed_states.was_fullscreen_key_previously_pressed = is_key_pressed;
+#endif
                 }
                 else if (key == key_bindings.load_game_rom && is_key_pressed)
                 {

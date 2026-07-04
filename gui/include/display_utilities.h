@@ -67,7 +67,7 @@ void update_colour_palette(
     const uint8_t currently_published_frame_buffer_index);
 
 bool should_main_menu_bar_and_cursor_be_visible(
-    GameBoyEmulator::Emulator& game_boy_emulator,
+    const GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     bool is_custom_palette_editor_open,

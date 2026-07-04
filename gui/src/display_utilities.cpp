@@ -60,7 +60,7 @@ void update_colour_palette(
 }
 
 bool should_main_menu_bar_and_cursor_be_visible(
-    GameBoyEmulator::Emulator& game_boy_emulator,
+    const GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     bool is_custom_palette_editor_open,
@@ -122,16 +122,14 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     {
         return;
     }
-
     constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
 
 #ifdef __EMSCRIPTEN__
     const float display_height = static_cast<float>(EM_ASM_DOUBLE({ return screen.height; }));
-    float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 #else
-    float display_height = static_cast<float>(display_mode->h);
-    float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
+    const float display_height = static_cast<float>(display_mode->h);
 #endif
+    const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 
     ImGuiStyle& style = ImGui::GetStyle();
 

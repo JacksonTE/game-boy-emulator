@@ -10,7 +10,7 @@ void render_main_menu_bar(
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
-    KeyBindings& key_bindings,
+    const KeyBindings& key_bindings,
     SDL_Window* sdl_window,
     std::string* loaded_game_rom_path,
     std::string* loaded_boot_rom_path,
@@ -87,11 +87,13 @@ void render_main_menu_bar(
                 }
                 emulation_controller.is_emulation_paused_atomic.store(is_emulation_paused);
             }
+#ifndef __EMSCRIPTEN__
             imgui_spaced_separator();
             if (ImGui::MenuItem("Quit", "[Alt+F4]"))
             {
                 should_stop_emulation = true;
             }
+#endif
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Video"))
@@ -129,9 +131,14 @@ void render_main_menu_bar(
                 menu_properties.is_custom_palette_editor_open = true;
             }
             imgui_spaced_separator();
+            const std::string fullscreen_shortcut_label = get_keybind_label(key_bindings.fullscreen);
+            const char* fullscreen_shortcut = fullscreen_shortcut_label.c_str();
+#ifdef __EMSCRIPTEN__
+            fullscreen_shortcut = nullptr;
+#endif
             if (ImGui::MenuItem(
                     is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen",
-                    get_keybind_label(key_bindings.fullscreen).c_str()))
+                    fullscreen_shortcut))
             {
                 toggle_fullscreen_enabled_state(
                     menu_and_cursor_display_status,
@@ -378,7 +385,12 @@ void render_keybinds_editor(
                 &key_bindings.fullscreen
             };
 
-            for (int i = 0; i < 5; i++)
+            int emulator_key_count = static_cast<int>(std::size(emulator_labels));
+#ifdef __EMSCRIPTEN__
+            emulator_key_count--;
+#endif
+
+            for (int i = 0; i < emulator_key_count; i++)
             {
                 ImGui::Text("%s:", emulator_labels[i]);
                 ImGui::SameLine(emulator_label_width);
@@ -463,7 +475,7 @@ void render_error_message_popup(
     }
 }
 
-std::string get_keybind_label(SDL_Keycode key)
+std::string get_keybind_label(const SDL_Keycode key)
 {
     if (key == SDLK_UNKNOWN)
     {
@@ -472,7 +484,7 @@ std::string get_keybind_label(SDL_Keycode key)
     return std::string("[") + SDL_GetKeyName(key) + "]";
 }
 
-ImVec4 get_imvec4_from_abgr(uint32_t abgr)
+ImVec4 get_imvec4_from_abgr(const uint32_t abgr)
 {
     const uint8_t alpha = (abgr >> 24) & 0xFF;
     const uint8_t blue = (abgr >> 16) & 0xFF;
