@@ -43,39 +43,24 @@ static void run_emulator_core(
 
         while (!stop_token.stop_requested())
         {
-            if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
-                emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
-            {
-                SDL_Delay(0);
+            if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe()
+                || emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire)
 #ifdef __EMSCRIPTEN__
-                web_thread_pacing_state->target_published_frame_sequence_number_atomic.store(
-                    game_boy_emulator.get_published_frame_sequence_number_thread_safe(),
-                    std::memory_order_release);
-#else
+                || game_boy_emulator.get_published_frame_sequence_number_thread_safe() >=
+                   web_thread_pacing_state->target_published_frame_sequence_number_atomic.load(std::memory_order_acquire)
+#endif
+            )
+            {
+#ifndef __EMSCRIPTEN__
                 next_frame_counter_tick = SDL_GetPerformanceCounter();
                 previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 #endif
-                continue;
-            }
-
-#ifdef __EMSCRIPTEN__
-            const uint64_t target_published_frame_sequence_number =
-                web_thread_pacing_state->target_published_frame_sequence_number_atomic.load(std::memory_order_acquire);
-
-            if (game_boy_emulator.get_published_frame_sequence_number_thread_safe() >= target_published_frame_sequence_number)
-            {
                 SDL_Delay(0);
                 continue;
             }
-
-            while (!stop_token.stop_requested() &&
-                   game_boy_emulator.get_published_frame_sequence_number_thread_safe() < target_published_frame_sequence_number)
-            {
-                game_boy_emulator.execute_next_instruction();
-            }
-#else
             game_boy_emulator.execute_next_instruction();
 
+#ifndef __EMSCRIPTEN__
             const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
 
             if (currently_published_frame_buffer_index != previously_published_frame_buffer_index)
