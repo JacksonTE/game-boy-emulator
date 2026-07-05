@@ -61,6 +61,20 @@ void render_error_message_popup(
     std::atomic<bool>& is_emulation_paused_atomic,
     std::string& error_message);
 
+void render_auxiliary_windows(
+    const uint8_t currently_published_frame_buffer_index,
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    FileLoadingStatus& file_loading_status,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    GraphicsController& graphics_controller,
+    MenuProperties& menu_properties,
+    KeyBindings& key_bindings,
+    std::string& error_message
+#ifndef __EMSCRIPTEN__
+    , FrameDiagnosticsState& frame_diagnostics_state
+#endif
+);
+
 std::string get_keybind_label(const SDL_Keycode key);
 
 ImVec4 get_imvec4_from_abgr(const uint32_t abgr);
