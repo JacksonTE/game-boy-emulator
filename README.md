@@ -37,9 +37,9 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 | ------------- | ----------------- |
 | Load Game ROM | <kbd>O     </kbd> |
 | Fast-Forward  | <kbd>Space </kbd> |
-| Pause         | <kbd>Escape</kbd> |
+| Pause         | <kbd>P     </kbd> |
 | Reset         | <kbd>R     </kbd> |
-| Fullscreen    | <kbd>F11   </kbd> |
+| Fullscreen    | <kbd>F     </kbd> |
 
 </td>
 </tr>

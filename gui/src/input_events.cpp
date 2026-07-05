@@ -363,6 +363,12 @@ void handle_sdl_events(
 
                 if (menu_properties.keybinds_editor_state.is_waiting_for_key && is_key_pressed)
                 {
+#ifdef __EMSCRIPTEN__
+                    if (key == SDLK_ESCAPE || key == SDLK_F11)
+                    {
+                        break;
+                    }
+#endif
                     SDL_Keycode* gameboy_keys[] =
                     {
                         &key_bindings.button_up,
@@ -397,13 +403,11 @@ void handle_sdl_events(
 
                 if (key == key_bindings.fullscreen)
                 {
-#ifndef __EMSCRIPTEN__
                     if (is_key_pressed && !key_pressed_states.was_fullscreen_key_previously_pressed)
                     {
                         toggle_fullscreen_enabled_state(menu_and_cursor_display_status, sdl_window);
                     }
                     key_pressed_states.was_fullscreen_key_previously_pressed = is_key_pressed;
-#endif
                 }
                 else if (key == key_bindings.load_game_rom && is_key_pressed)
                 {

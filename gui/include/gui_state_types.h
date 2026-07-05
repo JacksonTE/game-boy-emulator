@@ -76,9 +76,9 @@ struct KeyBindings
 
     SDL_Keycode load_game_rom = SDLK_O;
     SDL_Keycode fast_forward = SDLK_SPACE;
-    SDL_Keycode pause = SDLK_ESCAPE;
+    SDL_Keycode pause = SDLK_P;
     SDL_Keycode reset = SDLK_R;
-    SDL_Keycode fullscreen = SDLK_F11;
+    SDL_Keycode fullscreen = SDLK_F;
 
     void reset_to_defaults()
     {
@@ -93,9 +93,9 @@ struct KeyBindings
 
         load_game_rom = SDLK_O;
         fast_forward = SDLK_SPACE;
-        pause = SDLK_ESCAPE;
+        pause = SDLK_P;
         reset = SDLK_R;
-        fullscreen = SDLK_F11;
+        fullscreen = SDLK_F;
     }
 };
 

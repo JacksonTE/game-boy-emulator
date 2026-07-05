@@ -135,13 +135,9 @@ void render_main_menu_bar(
             }
             imgui_spaced_separator();
             const std::string fullscreen_shortcut_label = get_keybind_label(key_bindings.fullscreen);
-            const char* fullscreen_shortcut = fullscreen_shortcut_label.c_str();
-#ifdef __EMSCRIPTEN__
-            fullscreen_shortcut = nullptr;
-#endif
             if (ImGui::MenuItem(
                     is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen",
-                    fullscreen_shortcut))
+                    fullscreen_shortcut_label.c_str()))
             {
                 toggle_fullscreen_enabled_state(
                     menu_and_cursor_display_status,
@@ -397,9 +393,6 @@ void render_keybinds_editor(
             };
 
             int emulator_key_count = static_cast<int>(std::size(emulator_labels));
-#ifdef __EMSCRIPTEN__
-            emulator_key_count--;
-#endif
 
             for (int i = 0; i < emulator_key_count; i++)
             {
