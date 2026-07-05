@@ -40,6 +40,10 @@
     <input id="rom-file-input" type="file" accept=".gb,.gbc,.bin,.rom" style="display: none;">
     <script>
         window.Module = window.Module || {};
+        window.Module.isWebCursorVisible = true;
+        window.Module.setWebCursorVisible = window.Module.setWebCursorVisible || function(isVisible) {
+            window.Module.isWebCursorVisible = isVisible;
+        };
 
         document.addEventListener('DOMContentLoaded', function() {
             const module = window.Module;
@@ -57,6 +61,13 @@
                 canvas.focus({ preventScroll: true });
             }
 
+            function applyWebCursorVisibility() {
+                const cursorStyle = module.isWebCursorVisible ? 'default' : 'none';
+                canvas.style.cursor = cursorStyle;
+                document.body.style.cursor = cursorStyle;
+                document.documentElement.style.cursor = cursorStyle;
+            }
+
             function reportWebFileSelectionResult(fileType, result) {
                 const callback = module._set_pending_web_file_selection_result;
                 if (typeof callback === 'function') {
@@ -69,6 +80,11 @@
                     FS.mkdir('/tmp');
                 }
             }
+
+            module.setWebCursorVisible = function(isVisible) {
+                module.isWebCursorVisible = isVisible;
+                applyWebCursorVisibility();
+            };
 
             function handleFilePickerCancelled() {
                 window.setTimeout(function() {
@@ -133,6 +149,7 @@
             });
 
             focusCanvas();
+            applyWebCursorVisibility();
 
             document.addEventListener('click', function() {
                 focusCanvas();

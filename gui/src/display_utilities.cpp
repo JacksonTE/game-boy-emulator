@@ -7,6 +7,38 @@
 #include <emscripten.h>
 #endif
 
+static bool is_cursor_currently_visible()
+{
+#ifdef __EMSCRIPTEN__
+    return EM_ASM_INT(
+    {
+        return Module.isWebCursorVisible ? 1 : 0;
+    }) != 0;
+#else
+    return SDL_CursorVisible();
+#endif
+}
+
+static void set_cursor_visible(const bool is_visible)
+{
+#ifdef __EMSCRIPTEN__
+    EM_ASM(
+    {
+        Module.setWebCursorVisible(!!$0);
+    },
+    is_visible ? 1 : 0);
+#else
+    if (is_visible)
+    {
+        SDL_ShowCursor();
+    }
+    else
+    {
+        SDL_HideCursor();
+    }
+#endif
+}
+
 int get_initial_window_scale_for_display()
 {
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
@@ -67,13 +99,7 @@ bool should_main_menu_bar_and_cursor_be_visible(
     bool is_keybinds_editor_open,
     SDL_Window* sdl_window)
 {
-#ifdef __EMSCRIPTEN__
     (void)sdl_window;
-    menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden
-        = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
-    return true;
-#endif
-
     if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
         emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire) ||
         is_keybinds_editor_open ||
@@ -84,11 +110,17 @@ bool should_main_menu_bar_and_cursor_be_visible(
         return true;
     }
 
-    float mouse_y_position_in_window;
-    SDL_GetGlobalMouseState(nullptr, &mouse_y_position_in_window);
-    const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * ImGui::GetIO().DisplayFramebufferScale.y;
     ImGuiIO& io = ImGui::GetIO();
-    if (SDL_GetMouseFocus() == sdl_window)
+    const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * io.DisplayFramebufferScale.y;
+    const bool is_mouse_position_valid = ImGui::IsMousePosValid(&io.MousePos);
+    const bool is_mouse_in_window =
+        is_mouse_position_valid &&
+        io.MousePos.x >= 0.0f &&
+        io.MousePos.y >= 0.0f &&
+        io.MousePos.x < io.DisplaySize.x &&
+        io.MousePos.y < io.DisplaySize.y;
+
+    if (is_mouse_in_window)
     {
         if (menu_and_cursor_display_status.cursor_changes_to_ignore_count != 0)
         {
@@ -96,13 +128,13 @@ bool should_main_menu_bar_and_cursor_be_visible(
             return false;
         }
         else if (menu_and_cursor_display_status.is_main_menu_bar_hovered ||
-                mouse_y_position_in_window <= main_menu_bar_height_pixels ||
+                io.MousePos.y <= main_menu_bar_height_pixels ||
                 io.MouseDelta.x != 0.0f ||
                 io.MouseDelta.y != 0.0f)
         {
-                menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden
-                    = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
-                return true;
+            menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden
+                = MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS;
+            return true;
         }
     }
 
@@ -208,9 +240,9 @@ void render_frame(RenderContext& context)
             context.menu_properties->keybinds_editor_state.is_open,
             context.sdl_window))
     {
-        if (!SDL_CursorVisible())
+        if (!is_cursor_currently_visible())
         {
-            SDL_ShowCursor();
+            set_cursor_visible(true);
         }
         render_main_menu_bar(
             currently_published_frame_buffer_index,
@@ -227,9 +259,9 @@ void render_frame(RenderContext& context)
             *context.should_stop_emulation,
             *context.error_message);
     }
-    else if (SDL_CursorVisible())
+    else if (is_cursor_currently_visible())
     {
-        SDL_HideCursor();
+        set_cursor_visible(false);
     }
 
     render_custom_colour_palette_editor(
