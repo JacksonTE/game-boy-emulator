@@ -69,7 +69,7 @@ static bool is_cursor_currently_visible()
 #ifdef __EMSCRIPTEN__
     return EM_ASM_INT(
     {
-        return Module.isWebCursorVisible ? 1 : 0;
+        return Module.is_web_cursor_visible ? 1 : 0;
     }) != 0;
 #else
     return SDL_CursorVisible();
