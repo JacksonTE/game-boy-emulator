@@ -241,9 +241,8 @@ bool should_main_menu_bar_and_cursor_be_visible(
 
     ImGuiIO& io = ImGui::GetIO();
     const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * io.DisplayFramebufferScale.y;
-    const bool is_mouse_position_valid = ImGui::IsMousePosValid(&io.MousePos);
     const bool is_mouse_in_window =
-        is_mouse_position_valid &&
+        ImGui::IsMousePosValid(&io.MousePos) &&
         io.MousePos.x >= 0.0f &&
         io.MousePos.y >= 0.0f &&
         io.MousePos.x < io.DisplaySize.x &&
@@ -285,10 +284,11 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     }
     constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
 
+    const float display_height = 
 #ifdef __EMSCRIPTEN__
-    const float display_height = static_cast<float>(EM_ASM_DOUBLE({ return screen.height; }));
+        static_cast<float>(EM_ASM_DOUBLE({ return screen.height; }));
 #else
-    const float display_height = static_cast<float>(display_mode->h);
+        static_cast<float>(display_mode->h);
 #endif
     const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 

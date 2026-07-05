@@ -11,5 +11,6 @@ target_include_directories(game-boy-emulator PUBLIC
     "include")
 
 if(EMSCRIPTEN)
-    target_compile_options(game-boy-emulator PRIVATE -pthread)
+    target_compile_options(game-boy-emulator PRIVATE
+        -pthread)
 endif()

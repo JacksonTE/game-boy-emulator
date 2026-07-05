@@ -11,7 +11,8 @@ if(EMSCRIPTEN)
         "src/imgui_rendering.cpp"
         "src/input_events.cpp"
         "src/main.cpp"
-        "src/persistent_settings.cpp")
+        "src/persistent_settings.cpp"
+        "src/web_main_loop.cpp")
 
     target_include_directories(emulator-web PRIVATE
         "include"
@@ -57,7 +58,8 @@ else()
         "src/imgui_rendering.cpp"
         "src/input_events.cpp"
         "src/main.cpp"
-        "src/persistent_settings.cpp")
+        "src/persistent_settings.cpp"
+        "src/web_main_loop.cpp")
 
     target_include_directories(emulator-gui PRIVATE
         "include"
