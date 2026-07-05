@@ -326,13 +326,13 @@ void render_frame(RenderContext& context)
 
     context.is_currently_rendering = true;
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
+    const uint64_t current_published_frame_sequence_number = context.game_boy_emulator->get_published_frame_sequence_number_thread_safe();
 
 #ifndef __EMSCRIPTEN__
-    const uint64_t current_published_frame_sequence_number = context.game_boy_emulator->get_published_frame_sequence_number_thread_safe();
     update_frame_diagnostics(*context.frame_diagnostics_state, current_published_frame_sequence_number);
 #endif
 
-    if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index)
+    if (current_published_frame_sequence_number != *context.previously_published_frame_sequence_number)
     {
         auto const& pixel_frame_buffer = context.game_boy_emulator->get_pixel_frame_buffer(currently_published_frame_buffer_index);
 
@@ -346,6 +346,7 @@ void render_frame(RenderContext& context)
             context.graphics_controller->abgr_pixel_buffer.get(),
             DISPLAY_WIDTH_PIXELS * sizeof(uint32_t));
         *context.previously_published_frame_buffer_index = currently_published_frame_buffer_index;
+        *context.previously_published_frame_sequence_number = current_published_frame_sequence_number;
     }
 
     SDL_RenderClear(context.sdl_renderer);

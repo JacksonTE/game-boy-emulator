@@ -155,6 +155,7 @@ struct RenderContext
     SDL_Texture* sdl_texture{};
     SDL_Window* sdl_window{};
     uint8_t* previously_published_frame_buffer_index{};
+    uint64_t* previously_published_frame_sequence_number{};
     std::string* loaded_game_rom_path{};
     std::string* loaded_boot_rom_path{};
     bool is_currently_rendering{};

@@ -353,6 +353,7 @@ int main()
         set_emulation_screen_blank(graphics_controller);
 
         uint8_t previously_published_frame_buffer_index = 0;
+        uint64_t previously_published_frame_sequence_number = 0;
         std::string error_message = "";
         bool should_stop_emulation = false;
 
@@ -406,6 +407,7 @@ int main()
             sdl_texture.get(),
             sdl_window.get(),
             &previously_published_frame_buffer_index,
+            &previously_published_frame_sequence_number,
             &persistent_settings.loaded_game_rom_path,
             &persistent_settings.loaded_boot_rom_path,
             false,
