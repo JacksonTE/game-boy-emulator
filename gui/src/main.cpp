@@ -180,6 +180,16 @@ static void emscripten_main_loop_iteration(void* arg)
         *state->should_stop_emulation,
         *state->error_message);
 
+    consume_pending_web_file_selection(
+        *state->game_boy_emulator,
+        *state->emulation_controller,
+        *state->file_loading_status,
+        *state->menu_and_cursor_display_status,
+        state->sdl_window,
+        &state->persistent_settings->loaded_game_rom_path,
+        &state->persistent_settings->loaded_boot_rom_path,
+        *state->error_message);
+
     if (*state->should_stop_emulation)
     {
         emscripten_cancel_main_loop();

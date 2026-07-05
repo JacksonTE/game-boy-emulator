@@ -37,13 +37,100 @@
 </head>
 <body>
     <canvas id="canvas" width="160" height="144" tabindex="0"></canvas>
+    <input id="rom-file-input" type="file" accept=".gb,.gbc,.bin,.rom" style="display: none;">
     <script>
+        window.Module = window.Module || {};
+
         document.addEventListener('DOMContentLoaded', function() {
+            const module = window.Module;
             const canvas = document.getElementById('canvas');
+            const romFileInput = document.getElementById('rom-file-input');
+            const webSelectedPaths = {
+                0: '/tmp/web-selected-game-rom.gb',
+                1: '/tmp/web-selected-boot-rom.bin'
+            };
+            let pendingFileType = 0;
+            let isFilePickerOpen = false;
+            let isFileSelectionHandled = false;
 
             function focusCanvas() {
                 canvas.focus({ preventScroll: true });
             }
+
+            function reportWebFileSelectionResult(fileType, result) {
+                const callback = module._set_pending_web_file_selection_result;
+                if (typeof callback === 'function') {
+                    callback(fileType, result);
+                }
+            }
+
+            function ensureWebRomDirectory() {
+                if (!FS.analyzePath('/tmp').exists) {
+                    FS.mkdir('/tmp');
+                }
+            }
+
+            function handleFilePickerCancelled() {
+                window.setTimeout(function() {
+                    if (isFilePickerOpen && !isFileSelectionHandled && romFileInput.files.length === 0) {
+                        isFilePickerOpen = false;
+                        reportWebFileSelectionResult(pendingFileType, 3);
+                        focusCanvas();
+                    }
+                }, 0);
+            }
+
+            module.openRomFilePicker = function(fileType) {
+                pendingFileType = fileType;
+                isFilePickerOpen = true;
+                isFileSelectionHandled = false;
+                romFileInput.value = '';
+                romFileInput.click();
+            };
+
+            romFileInput.addEventListener('change', function(event) {
+                const [selectedFile] = event.target.files;
+
+                if (!selectedFile) {
+                    isFilePickerOpen = false;
+                    isFileSelectionHandled = true;
+                    reportWebFileSelectionResult(pendingFileType, 3);
+                    focusCanvas();
+                    return;
+                }
+
+                isFilePickerOpen = false;
+                isFileSelectionHandled = true;
+
+                const reader = new FileReader();
+
+                reader.addEventListener('load', function(loadEvent) {
+                    try {
+                        ensureWebRomDirectory();
+
+                        const romPath = webSelectedPaths[pendingFileType] ?? webSelectedPaths[0];
+                        const romBytes = new Uint8Array(loadEvent.target.result);
+
+                        if (FS.analyzePath(romPath).exists) {
+                            FS.unlink(romPath);
+                        }
+
+                        FS.writeFile(romPath, romBytes);
+                        reportWebFileSelectionResult(pendingFileType, 2);
+                    } catch {
+                        reportWebFileSelectionResult(pendingFileType, 4);
+                    }
+
+                    focusCanvas();
+                });
+
+                reader.addEventListener('error', function() {
+                    reportWebFileSelectionResult(pendingFileType, 4);
+                    focusCanvas();
+                });
+
+                reader.readAsArrayBuffer(selectedFile);
+            });
 
             focusCanvas();
 
@@ -54,6 +141,8 @@
             document.addEventListener('fullscreenchange', function() {
                 focusCanvas();
             });
+
+            window.addEventListener('focus', handleFilePickerCancelled);
         });
     </script>
     {{{ SCRIPT }}}

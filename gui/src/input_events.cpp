@@ -2,10 +2,117 @@
 #include "input_events.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-#endif
-#ifndef __EMSCRIPTEN__
+#else
 #include "nfd_sdl3.h"
 #endif
+
+#ifdef __EMSCRIPTEN__
+namespace
+{
+
+enum class WebFileSelectionResult
+{
+    None,
+    Waiting,
+    Ready,
+    Cancelled,
+    Error
+};
+
+struct WebPendingFileSelection
+{
+    std::atomic<WebFileSelectionResult> result{WebFileSelectionResult::None};
+    std::atomic<GameBoyEmulator::FileType> file_type{GameBoyEmulator::FileType::GameROM};
+};
+
+WebPendingFileSelection web_pending_file_selection{};
+
+constexpr const char* WEB_SELECTED_GAME_ROM_PATH = "/tmp/web-selected-game-rom.gb";
+constexpr const char* WEB_SELECTED_BOOT_ROM_PATH = "/tmp/web-selected-boot-rom.bin";
+
+const char* get_web_selected_rom_path(const GameBoyEmulator::FileType file_type)
+{
+    return file_type == GameBoyEmulator::FileType::BootROM
+        ? WEB_SELECTED_BOOT_ROM_PATH
+        : WEB_SELECTED_GAME_ROM_PATH;
+}
+
+} // namespace
+
+extern "C"
+{
+
+EMSCRIPTEN_KEEPALIVE void set_pending_web_file_selection_result(const int file_type, const int result)
+{
+    web_pending_file_selection.file_type.store(static_cast<GameBoyEmulator::FileType>(file_type), std::memory_order_release);
+    web_pending_file_selection.result.store(static_cast<WebFileSelectionResult>(result), std::memory_order_release);
+}
+
+}
+
+#endif
+
+static void finish_failed_rom_loading_operation(
+    EmulationController& emulation_controller,
+    FileLoadingStatus& file_loading_status,
+    const std::string& error_message)
+{
+    file_loading_status.did_rom_loading_error_occur = !error_message.empty();
+    emulation_controller.is_emulation_paused_atomic.store(
+        file_loading_status.is_emulation_paused_before_rom_loading,
+        std::memory_order_release);
+}
+
+static bool try_load_file_to_memory_from_path(
+    const std::filesystem::path& file_path,
+    GameBoyEmulator::FileType file_type,
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    EmulationController& emulation_controller,
+    FileLoadingStatus& file_loading_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
+    SDL_Window* sdl_window,
+    std::string* loaded_rom_path,
+    std::string& error_message)
+{
+    bool is_operation_successful = false;
+
+    if (file_type == GameBoyEmulator::FileType::GameROM)
+    {
+        game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
+    }
+
+    if (game_boy_emulator.try_to_load_file_to_memory(file_path, file_type, error_message))
+    {
+        if (file_type == GameBoyEmulator::FileType::GameROM)
+        {
+            game_boy_emulator.reset_state();
+            game_boy_emulator.try_load_save_file(std::filesystem::path(SDL_GetBasePath()));
+        }
+        *loaded_rom_path = file_path.string();
+        is_operation_successful = true;
+    }
+
+    if (is_operation_successful)
+    {
+        file_loading_status.did_rom_loading_error_occur = false;
+        if (file_type == GameBoyEmulator::FileType::GameROM)
+        {
+            SDL_SetWindowTitle(
+                sdl_window,
+                std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
+        }
+        emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
+        menu_and_cursor_display_status.cursor_changes_to_ignore_count =
+            menu_and_cursor_display_status.MAX_CURSOR_CHANGES_TO_IGNORE;
+        menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden = 0.0f;
+    }
+    else
+    {
+        finish_failed_rom_loading_operation(emulation_controller, file_loading_status, error_message);
+    }
+
+    return is_operation_successful;
+}
 
 bool try_load_file_to_memory_with_dialog(
     GameBoyEmulator::FileType file_type,
@@ -17,13 +124,35 @@ bool try_load_file_to_memory_with_dialog(
     std::string* loaded_rom_path,
     std::string& error_message)
 {
+    error_message.clear();
+    file_loading_status.did_rom_loading_error_occur = false;
+    file_loading_status.is_emulation_paused_before_rom_loading =
+        emulation_controller.is_emulation_paused_atomic.exchange(true, std::memory_order_acq_rel);
+
 #ifdef __EMSCRIPTEN__
-    // File loading on web is handled via the HTML file input element in shell.html
+    web_pending_file_selection.file_type.store(file_type, std::memory_order_release);
+    web_pending_file_selection.result.store(WebFileSelectionResult::Waiting, std::memory_order_release);
+
+    const int did_open_picker = EM_ASM_INT(
+        {
+            if (Module.openRomFilePicker)
+            {
+                Module.openRomFilePicker($0);
+                return 1;
+            }
+            return 0;
+        },
+        static_cast<int>(file_type));
+
+    if (!did_open_picker)
+    {
+        web_pending_file_selection.result.store(WebFileSelectionResult::None, std::memory_order_release);
+        error_message = "Web file picker is unavailable.";
+        finish_failed_rom_loading_operation(emulation_controller, file_loading_status, error_message);
+    }
+
     return false;
 #else
-    file_loading_status.is_emulation_paused_before_rom_loading = emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire);
-    emulation_controller.is_emulation_paused_atomic.store(true, std::memory_order_release);
-
     nfdopendialogu8args_t open_dialog_arguments{};
     nfdu8filteritem_t filters[] =
     {
@@ -40,21 +169,16 @@ bool try_load_file_to_memory_with_dialog(
 
     if (result == NFD_OKAY)
     {
-        if (file_type == GameBoyEmulator::FileType::GameROM)
-        {
-            game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
-        }
-
-        if (game_boy_emulator.try_to_load_file_to_memory(rom_path, file_type, error_message))
-        {
-            if (file_type == GameBoyEmulator::FileType::GameROM)
-            {
-                game_boy_emulator.reset_state();
-                game_boy_emulator.try_load_save_file(std::filesystem::path(SDL_GetBasePath()));
-            }
-            is_operation_successful = true;
-        }
-        *loaded_rom_path = rom_path;
+        is_operation_successful = try_load_file_to_memory_from_path(
+            rom_path,
+            file_type,
+            game_boy_emulator,
+            emulation_controller,
+            file_loading_status,
+            menu_and_cursor_display_status,
+            sdl_window,
+            loaded_rom_path,
+            error_message);
         NFD_FreePathU8(rom_path);
     }
     else if (result == NFD_ERROR)
@@ -63,29 +187,66 @@ bool try_load_file_to_memory_with_dialog(
         error_message = NFD_GetError();
     }
 
-    if (is_operation_successful)
+    if (result != NFD_OKAY)
     {
-        if (file_type == GameBoyEmulator::FileType::GameROM)
-        {
-            SDL_SetWindowTitle(
-                sdl_window,
-                std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
-        }
-        emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
-        menu_and_cursor_display_status.cursor_changes_to_ignore_count =
-            menu_and_cursor_display_status.MAX_CURSOR_CHANGES_TO_IGNORE;
-        menu_and_cursor_display_status.seconds_until_main_menu_bar_and_cursor_hidden = 0.0f;
-    }
-    else
-    {
-        file_loading_status.did_rom_loading_error_occur = (error_message != "");
-        emulation_controller.is_emulation_paused_atomic.store(
-            file_loading_status.is_emulation_paused_before_rom_loading,
-            std::memory_order_release);
+        finish_failed_rom_loading_operation(emulation_controller, file_loading_status, error_message);
     }
     return is_operation_successful;
 #endif
 }
+
+#ifdef __EMSCRIPTEN__
+void consume_pending_web_file_selection(
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    EmulationController& emulation_controller,
+    FileLoadingStatus& file_loading_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
+    SDL_Window* sdl_window,
+    std::string* loaded_game_rom_path,
+    std::string* loaded_boot_rom_path,
+    std::string& error_message)
+{
+    const WebFileSelectionResult result =
+        web_pending_file_selection.result.exchange(WebFileSelectionResult::None, std::memory_order_acq_rel);
+
+    if (result == WebFileSelectionResult::None || result == WebFileSelectionResult::Waiting)
+    {
+        if (result == WebFileSelectionResult::Waiting)
+        {
+            web_pending_file_selection.result.store(WebFileSelectionResult::Waiting, std::memory_order_release);
+        }
+        return;
+    }
+
+    const GameBoyEmulator::FileType file_type = web_pending_file_selection.file_type.load(std::memory_order_acquire);
+
+    if (result == WebFileSelectionResult::Cancelled)
+    {
+        emulation_controller.is_emulation_paused_atomic.store(
+            file_loading_status.is_emulation_paused_before_rom_loading,
+            std::memory_order_release);
+        return;
+    }
+
+    if (result == WebFileSelectionResult::Error)
+    {
+        error_message = "Failed to read the selected file in the browser.";
+        finish_failed_rom_loading_operation(emulation_controller, file_loading_status, error_message);
+        return;
+    }
+
+    try_load_file_to_memory_from_path(
+        get_web_selected_rom_path(file_type),
+        file_type,
+        game_boy_emulator,
+        emulation_controller,
+        file_loading_status,
+        menu_and_cursor_display_status,
+        sdl_window,
+        file_type == GameBoyEmulator::FileType::BootROM ? loaded_boot_rom_path : loaded_game_rom_path,
+        error_message);
+}
+#endif
 
 void toggle_emulation_paused_state(
     std::atomic<bool>& is_emulation_paused_atomic,

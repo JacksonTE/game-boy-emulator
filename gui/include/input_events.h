@@ -16,6 +16,18 @@ bool try_load_file_to_memory_with_dialog(
     std::string* loaded_rom_path,
     std::string& error_message);
 
+#ifdef __EMSCRIPTEN__
+void consume_pending_web_file_selection(
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    EmulationController& emulation_controller,
+    FileLoadingStatus& file_loading_status,
+    MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
+    SDL_Window* sdl_window,
+    std::string* loaded_game_rom_path,
+    std::string* loaded_boot_rom_path,
+    std::string& error_message);
+#endif
+
 void toggle_emulation_paused_state(
     std::atomic<bool>& is_emulation_paused_atomic,
     float& seconds_until_main_menu_bar_and_cursor_hidden);
