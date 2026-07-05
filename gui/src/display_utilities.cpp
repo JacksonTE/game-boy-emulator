@@ -209,7 +209,7 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
 #ifdef __EMSCRIPTEN__
     const double browser_window_height = EM_ASM_DOUBLE(
     {
-        return window.outerHeight || window.screen.height;
+        return window.innerHeight * (window.devicePixelRatio || 1);
     });
 
     if (browser_window_height <= 0.0)
@@ -252,7 +252,7 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
         previous_logged_window_width = window_width;
         previous_logged_window_height = window_height;
 
-        std::cout << "[web_scale] outer_height=" << browser_window_height
+        std::cout << "[web_scale] viewport_pixel_height=" << browser_window_height
                   << " inner_height=" << browser_inner_height
                   << " device_pixel_ratio=" << browser_device_pixel_ratio
                   << " sdl_window_width=" << window_width

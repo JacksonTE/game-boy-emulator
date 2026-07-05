@@ -72,6 +72,19 @@
                 document.documentElement.style.cursor = cursor_style;
             }
 
+            function sync_canvas_backing_resolution()
+            {
+                const device_pixel_ratio = window.devicePixelRatio || 1;
+                const backing_width = Math.max(1, Math.round(window.innerWidth * device_pixel_ratio));
+                const backing_height = Math.max(1, Math.round(window.innerHeight * device_pixel_ratio));
+
+                if (canvas.width !== backing_width || canvas.height !== backing_height)
+                {
+                    canvas.width = backing_width;
+                    canvas.height = backing_height;
+                }
+            }
+
             function log_web_metrics(source)
             {
                 console.log('[web_shell]', source,
@@ -181,6 +194,7 @@
             });
 
             focus_canvas();
+            sync_canvas_backing_resolution();
             apply_web_cursor_visibility();
             log_web_metrics('dom_content_loaded');
 
@@ -191,6 +205,7 @@
 
             window.addEventListener('resize', function()
             {
+                sync_canvas_backing_resolution();
                 log_web_metrics('window_resize');
             });
 
