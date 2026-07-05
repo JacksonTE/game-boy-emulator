@@ -203,21 +203,6 @@ bool should_main_menu_bar_and_cursor_be_visible(
 
 void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
 {
-    constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
-
-#ifdef __EMSCRIPTEN__
-    const double browser_window_height = EM_ASM_DOUBLE(
-    {
-        return window.outerHeight || window.screen.height;
-    });
-
-    if (browser_window_height <= 0.0)
-    {
-        return;
-    }
-
-    const float display_height = static_cast<float>(browser_window_height);
-#else
     SDL_DisplayID display_id = SDL_GetDisplayForWindow(sdl_window);
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(display_id);
 
@@ -225,8 +210,13 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     {
         return;
     }
+    constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
 
-    const float display_height = static_cast<float>(display_mode->h);
+    const float display_height = 
+#ifdef __EMSCRIPTEN__
+        static_cast<float>(EM_ASM_DOUBLE({ return screen.height; }));
+#else
+        static_cast<float>(display_mode->h);
 #endif
     const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 
