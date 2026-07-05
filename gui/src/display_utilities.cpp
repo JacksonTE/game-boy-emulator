@@ -20,14 +20,19 @@ static void refresh_web_imgui_font_if_needed(
     const float target_font_size = std::max(
         1.0f,
         std::round(BASE_IMGUI_FONT_SIZE_PIXELS * font_scale * device_pixel_ratio));
+    const float font_size_ratio = BASE_IMGUI_FONT_SIZE_PIXELS * font_scale / target_font_size;
     static float previous_loaded_font_size = 0.0f;
+    static float previous_font_size_ratio = 0.0f;
 
-    if (io.FontDefault != nullptr && previous_loaded_font_size == target_font_size)
+    if (io.FontDefault != nullptr &&
+        previous_loaded_font_size == target_font_size &&
+        previous_font_size_ratio == font_size_ratio)
     {
         return;
     }
 
     previous_loaded_font_size = target_font_size;
+    previous_font_size_ratio = font_size_ratio;
 
     ImFontConfig font_config;
     font_config.FontDataOwnedByAtlas = false;
@@ -45,6 +50,7 @@ static void refresh_web_imgui_font_if_needed(
 
     std::cout << "[web_font] target_font_size=" << target_font_size
               << " font_scale=" << font_scale
+              << " font_size_ratio=" << font_size_ratio
               << " device_pixel_ratio=" << device_pixel_ratio << "\n";
 }
 #endif
@@ -263,7 +269,10 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     const double browser_device_pixel_ratio = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; });
     int window_width = 0;
     int window_height = 0;
+    int window_pixel_width = 0;
+    int window_pixel_height = 0;
     SDL_GetWindowSize(sdl_window, &window_width, &window_height);
+    SDL_GetWindowSizeInPixels(sdl_window, &window_pixel_width, &window_pixel_height);
 #else
     SDL_DisplayID display_id = SDL_GetDisplayForWindow(sdl_window);
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(display_id);
@@ -280,28 +289,43 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
 #ifdef __EMSCRIPTEN__
     refresh_web_imgui_font_if_needed(font_scale, static_cast<float>(browser_device_pixel_ratio));
 
+    const float loaded_font_size = std::max(1.0f, std::round(BASE_IMGUI_FONT_SIZE_PIXELS * font_scale * static_cast<float>(browser_device_pixel_ratio)));
+    const float font_scale_main = (BASE_IMGUI_FONT_SIZE_PIXELS * font_scale) / loaded_font_size;
+
     static float previous_logged_display_height = -1.0f;
     static float previous_logged_font_scale = -1.0f;
     static int previous_logged_window_width = -1;
     static int previous_logged_window_height = -1;
+    static int previous_logged_window_pixel_width = -1;
+    static int previous_logged_window_pixel_height = -1;
+    static float previous_logged_font_scale_main = -1.0f;
 
     if (previous_logged_display_height != display_height ||
         previous_logged_font_scale != font_scale ||
         previous_logged_window_width != window_width ||
-        previous_logged_window_height != window_height)
+        previous_logged_window_height != window_height ||
+        previous_logged_window_pixel_width != window_pixel_width ||
+        previous_logged_window_pixel_height != window_pixel_height ||
+        previous_logged_font_scale_main != font_scale_main)
     {
         previous_logged_display_height = display_height;
         previous_logged_font_scale = font_scale;
         previous_logged_window_width = window_width;
         previous_logged_window_height = window_height;
+        previous_logged_window_pixel_width = window_pixel_width;
+        previous_logged_window_pixel_height = window_pixel_height;
+        previous_logged_font_scale_main = font_scale_main;
 
         std::cout << "[web_scale] viewport_height=" << browser_window_height
                   << " inner_height=" << browser_inner_height
                   << " device_pixel_ratio=" << browser_device_pixel_ratio
                   << " sdl_window_width=" << window_width
                   << " sdl_window_height=" << window_height
+                  << " sdl_window_pixel_width=" << window_pixel_width
+                  << " sdl_window_pixel_height=" << window_pixel_height
                   << " display_height=" << display_height
-                  << " font_scale=" << font_scale << "\n";
+                  << " font_scale=" << font_scale
+                  << " font_scale_main=" << font_scale_main << "\n";
     }
 #endif
 
@@ -321,7 +345,7 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     style.ItemInnerSpacing = ImVec2(BASE_ITEM_INNER_SPACING_X * font_scale, BASE_ITEM_INNER_SPACING_Y * font_scale);
     style.WindowPadding = ImVec2(BASE_WINDOW_PADDING_X * font_scale, BASE_WINDOW_PADDING_Y * font_scale);
 #ifdef __EMSCRIPTEN__
-    style.FontScaleMain = 1.0f / static_cast<float>(browser_device_pixel_ratio);
+    style.FontScaleMain = font_scale_main;
 #else
     style.FontScaleMain = font_scale;
 #endif
