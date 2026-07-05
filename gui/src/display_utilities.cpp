@@ -1,4 +1,5 @@
 #include <backends/imgui_impl_sdlrenderer3.h>
+#include <iostream>
 
 #include "display_utilities.h"
 #include "imgui_rendering.h"
@@ -217,6 +218,11 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     }
 
     const float display_height = static_cast<float>(browser_window_height);
+    const double browser_inner_height = EM_ASM_DOUBLE({ return window.innerHeight || 0; });
+    const double browser_device_pixel_ratio = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; });
+    int window_width = 0;
+    int window_height = 0;
+    SDL_GetWindowSize(sdl_window, &window_width, &window_height);
 #else
     SDL_DisplayID display_id = SDL_GetDisplayForWindow(sdl_window);
     const SDL_DisplayMode* display_mode = SDL_GetCurrentDisplayMode(display_id);
@@ -229,6 +235,32 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     const float display_height = static_cast<float>(display_mode->h);
 #endif
     const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
+
+#ifdef __EMSCRIPTEN__
+    static float previous_logged_display_height = -1.0f;
+    static float previous_logged_font_scale = -1.0f;
+    static int previous_logged_window_width = -1;
+    static int previous_logged_window_height = -1;
+
+    if (previous_logged_display_height != display_height ||
+        previous_logged_font_scale != font_scale ||
+        previous_logged_window_width != window_width ||
+        previous_logged_window_height != window_height)
+    {
+        previous_logged_display_height = display_height;
+        previous_logged_font_scale = font_scale;
+        previous_logged_window_width = window_width;
+        previous_logged_window_height = window_height;
+
+        std::cout << "[web_scale] outer_height=" << browser_window_height
+                  << " inner_height=" << browser_inner_height
+                  << " device_pixel_ratio=" << browser_device_pixel_ratio
+                  << " sdl_window_width=" << window_width
+                  << " sdl_window_height=" << window_height
+                  << " display_height=" << display_height
+                  << " font_scale=" << font_scale << "\n";
+    }
+#endif
 
     ImGuiStyle& style = ImGui::GetStyle();
 
