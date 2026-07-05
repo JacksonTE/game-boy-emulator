@@ -1,5 +1,7 @@
 #include <backends/imgui_impl_sdlrenderer3.h>
 
+#include <cmath>
+
 #include "display_utilities.h"
 #include "imgui_rendering.h"
 
@@ -214,7 +216,7 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
 
     const float display_height = 
 #ifdef __EMSCRIPTEN__
-        static_cast<float>(EM_ASM_DOUBLE({ return screen.height; }));
+        static_cast<float>(std::max(1, get_web_viewport_metrics().pixel_viewport_height));
 #else
         static_cast<float>(display_mode->h);
 #endif
@@ -237,6 +239,72 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     style.WindowPadding = ImVec2(BASE_WINDOW_PADDING_X * font_scale, BASE_WINDOW_PADDING_Y * font_scale);
     style.FontScaleMain = font_scale;
 }
+
+#ifdef __EMSCRIPTEN__
+double get_web_device_pixel_ratio()
+{
+    const double device_pixel_ratio = EM_ASM_DOUBLE(
+    {
+        return window.devicePixelRatio || 1.0;
+    });
+
+    if (device_pixel_ratio > 0.0)
+    {
+        return device_pixel_ratio;
+    }
+
+    return 1.0;
+}
+
+web_viewport_metrics_t get_web_viewport_metrics()
+{
+    web_viewport_metrics_t metrics{};
+    metrics.css_viewport_width = EM_ASM_INT({ return window.innerWidth || 0; });
+    metrics.css_viewport_height = EM_ASM_INT({ return window.innerHeight || 0; });
+    metrics.device_pixel_ratio = get_web_device_pixel_ratio();
+    metrics.pixel_viewport_width = static_cast<int>(std::lround(static_cast<double>(metrics.css_viewport_width) * metrics.device_pixel_ratio));
+    metrics.pixel_viewport_height = static_cast<int>(std::lround(static_cast<double>(metrics.css_viewport_height) * metrics.device_pixel_ratio));
+
+    return metrics;
+}
+
+void log_web_display_metrics(SDL_Window* sdl_window, const char* reason)
+{
+    const web_viewport_metrics_t metrics = get_web_viewport_metrics();
+
+    int sdl_window_width = 0;
+    int sdl_window_height = 0;
+    SDL_GetWindowSize(sdl_window, &sdl_window_width, &sdl_window_height);
+
+    EM_ASM(
+    {
+        console.info(
+            "[web-display]",
+            UTF8ToString($0),
+            {
+                css_viewport_width: $1,
+                css_viewport_height: $2,
+                pixel_viewport_width: $3,
+                pixel_viewport_height: $4,
+                device_pixel_ratio: $5,
+                sdl_window_width: $6,
+                sdl_window_height: $7,
+                canvas_client_width: Module.canvas ? Module.canvas.clientWidth : 0,
+                canvas_client_height: Module.canvas ? Module.canvas.clientHeight : 0,
+                canvas_width: Module.canvas ? Module.canvas.width : 0,
+                canvas_height: Module.canvas ? Module.canvas.height : 0
+            });
+    },
+    reason,
+    metrics.css_viewport_width,
+    metrics.css_viewport_height,
+    metrics.pixel_viewport_width,
+    metrics.pixel_viewport_height,
+    metrics.device_pixel_ratio,
+    sdl_window_width,
+    sdl_window_height);
+}
+#endif
 
 void render_frame(RenderContext& context)
 {

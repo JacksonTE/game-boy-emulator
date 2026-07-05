@@ -113,8 +113,9 @@ int main()
         ResourceAcquisitionIsInitialization::SdlInitializerRaii sdl_initializer{SDL_INIT_VIDEO};
 
 #ifdef __EMSCRIPTEN__
-        const int initial_window_w = EM_ASM_INT({ return window.innerWidth; });
-        const int initial_window_h = EM_ASM_INT({ return window.innerHeight; });
+        const web_viewport_metrics_t initial_web_viewport_metrics = get_web_viewport_metrics();
+        const int initial_window_w = initial_web_viewport_metrics.pixel_viewport_width;
+        const int initial_window_h = initial_web_viewport_metrics.pixel_viewport_height;
 #else
         const int adaptive_window_scale = get_initial_window_scale_for_display();
         const int initial_window_w = DISPLAY_WIDTH_PIXELS * adaptive_window_scale;
@@ -144,6 +145,10 @@ int main()
         ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
 
         update_imgui_scale_by_resolution(sdl_window.get());
+
+#ifdef __EMSCRIPTEN__
+        log_web_display_metrics(sdl_window.get(), "startup");
+#endif
 
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
         gtk_init(NULL, NULL);

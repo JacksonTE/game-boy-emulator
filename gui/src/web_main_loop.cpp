@@ -10,29 +10,41 @@
 
 static void sync_emscripten_window_to_viewport(
     EmscriptenLoopState* state,
-    int viewport_w,
-    int viewport_h)
+    const char* reason)
 {
+    const web_viewport_metrics_t viewport_metrics = get_web_viewport_metrics();
+
+    emscripten_set_element_css_size(
+        "#canvas",
+        static_cast<double>(viewport_metrics.css_viewport_width),
+        static_cast<double>(viewport_metrics.css_viewport_height));
+    emscripten_set_canvas_element_size(
+        "#canvas",
+        viewport_metrics.pixel_viewport_width,
+        viewport_metrics.pixel_viewport_height);
+
     int sdl_w, sdl_h;
     SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
 
-    if (viewport_w != sdl_w || viewport_h != sdl_h)
+    if (viewport_metrics.pixel_viewport_width != sdl_w || viewport_metrics.pixel_viewport_height != sdl_h)
     {
-        SDL_SetWindowSize(state->sdl_window, viewport_w, viewport_h);
+        SDL_SetWindowSize(
+            state->sdl_window,
+            viewport_metrics.pixel_viewport_width,
+            viewport_metrics.pixel_viewport_height);
     }
 
     update_imgui_scale_by_resolution(state->sdl_window);
+    log_web_display_metrics(state->sdl_window, reason);
     render_frame(*state->render_context);
 }
 
 static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event, void* user_data)
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
+    (void)ui_event;
 
-    const int viewport_w = ui_event->windowInnerWidth;
-    const int viewport_h = ui_event->windowInnerHeight;
-
-    sync_emscripten_window_to_viewport(state, viewport_w, viewport_h);
+    sync_emscripten_window_to_viewport(state, "resize");
 
     return EM_FALSE;
 }
@@ -41,10 +53,7 @@ static EM_BOOL emscripten_fullscreen_change_callback(int, const EmscriptenFullsc
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
 
-    const int viewport_w = EM_ASM_INT({ return window.innerWidth; });
-    const int viewport_h = EM_ASM_INT({ return window.innerHeight; });
-
-    sync_emscripten_window_to_viewport(state, viewport_w, viewport_h);
+    sync_emscripten_window_to_viewport(state, "fullscreenchange");
 
     return EM_FALSE;
 }
@@ -117,6 +126,7 @@ void start_emscripten_main_loop(EmscriptenLoopState& loop_state)
 {
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &loop_state, false, emscripten_resize_callback);
     emscripten_set_fullscreenchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, &loop_state, false, emscripten_fullscreen_change_callback);
+    sync_emscripten_window_to_viewport(&loop_state, "main-loop-start");
     emscripten_set_main_loop_arg(emscripten_main_loop_iteration, &loop_state, 0, false);
 }
 

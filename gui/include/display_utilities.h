@@ -76,6 +76,23 @@ bool should_main_menu_bar_and_cursor_be_visible(
 
 void update_imgui_scale_by_resolution(SDL_Window* sdl_window);
 
+#ifdef __EMSCRIPTEN__
+struct web_viewport_metrics_t
+{
+    int css_viewport_width{};
+    int css_viewport_height{};
+    int pixel_viewport_width{};
+    int pixel_viewport_height{};
+    double device_pixel_ratio{1.0};
+};
+
+double get_web_device_pixel_ratio();
+
+web_viewport_metrics_t get_web_viewport_metrics();
+
+void log_web_display_metrics(SDL_Window* sdl_window, const char* reason);
+#endif
+
 void render_frame(RenderContext& context);
 
 // Used in workaround for https://github.com/ocornut/imgui/issues/8339
