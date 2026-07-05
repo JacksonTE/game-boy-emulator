@@ -143,6 +143,9 @@ int main()
         };
         ResourceAcquisitionIsInitialization::ImGuiContextRaii imgui_context{sdl_window.get(), sdl_renderer.get()};
 
+#ifdef __EMSCRIPTEN__
+        sync_emscripten_canvas_to_viewport(sdl_window.get(), initial_window_w, initial_window_h);
+#endif
         update_imgui_scale_by_resolution(sdl_window.get());
 
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)

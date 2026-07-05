@@ -36,6 +36,8 @@ struct EmscriptenLoopState
     uint64_t target_published_frame_sequence_number;
 };
 
+void sync_emscripten_canvas_to_viewport(SDL_Window* sdl_window, int viewport_w, int viewport_h);
+
 void start_emscripten_main_loop(EmscriptenLoopState& loop_state);
 
 #endif

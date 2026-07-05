@@ -11,10 +11,7 @@
 #include "display_utilities.h"
 #include "input_events.h"
 
-static void sync_emscripten_window_to_viewport(
-    EmscriptenLoopState* state,
-    int viewport_w,
-    int viewport_h)
+void sync_emscripten_canvas_to_viewport(SDL_Window* sdl_window, int viewport_w, int viewport_h)
 {
     const double device_pixel_ratio = emscripten_get_device_pixel_ratio();
     const int canvas_pixel_w = std::max(1, static_cast<int>(std::round(static_cast<double>(viewport_w) * device_pixel_ratio)));
@@ -24,11 +21,11 @@ static void sync_emscripten_window_to_viewport(
     emscripten_set_element_css_size("#canvas", static_cast<double>(viewport_w), static_cast<double>(viewport_h));
 
     int sdl_w, sdl_h;
-    SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
+    SDL_GetWindowSize(sdl_window, &sdl_w, &sdl_h);
 
     if (viewport_w != sdl_w || viewport_h != sdl_h)
     {
-        SDL_SetWindowSize(state->sdl_window, viewport_w, viewport_h);
+        SDL_SetWindowSize(sdl_window, viewport_w, viewport_h);
     }
 
     std::cout << "[web_viewport] viewport_w=" << viewport_w
@@ -38,6 +35,14 @@ static void sync_emscripten_window_to_viewport(
               << " canvas_pixel_h=" << canvas_pixel_h
               << " previous_sdl_w=" << sdl_w
               << " previous_sdl_h=" << sdl_h << "\n";
+}
+
+static void sync_emscripten_window_to_viewport(
+    EmscriptenLoopState* state,
+    int viewport_w,
+    int viewport_h)
+{
+    sync_emscripten_canvas_to_viewport(state->sdl_window, viewport_w, viewport_h);
 
     update_imgui_scale_by_resolution(state->sdl_window);
     render_frame(*state->render_context);
