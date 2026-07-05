@@ -22,21 +22,36 @@
 #include "gui_state_types.h"
 #include "persistent_settings.h"
 
+struct WebThreadPacingState
+{
+    std::atomic<uint64_t> target_published_frame_sequence_number_atomic{};
+};
+
 static void run_emulator_core(
     std::stop_token stop_token,
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     std::atomic<bool>& did_exception_occur_atomic,
-    std::exception_ptr& exception_pointer)
+    std::exception_ptr& exception_pointer
+#ifdef __EMSCRIPTEN__
+    , WebThreadPacingState* web_thread_pacing_state
+#endif
+)
 {
     try
     {
+#ifdef __EMSCRIPTEN__
+        web_thread_pacing_state->target_published_frame_sequence_number_atomic.store(
+            game_boy_emulator.get_published_frame_sequence_number_thread_safe(),
+            std::memory_order_release);
+#else
         constexpr double FRAME_DURATION_SECONDS = 0.01674;
         const uint64_t counter_ticks_per_second = SDL_GetPerformanceFrequency();
         const uint64_t counter_ticks_per_frame_rounded = static_cast<uint64_t>(FRAME_DURATION_SECONDS * counter_ticks_per_second + 0.5);
 
         uint64_t next_frame_counter_tick = SDL_GetPerformanceCounter();
         uint8_t previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
+#endif
 
         while (!stop_token.stop_requested())
         {
@@ -44,10 +59,33 @@ static void run_emulator_core(
                 emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire))
             {
                 SDL_Delay(0);
+#ifdef __EMSCRIPTEN__
+                web_thread_pacing_state->target_published_frame_sequence_number_atomic.store(
+                    game_boy_emulator.get_published_frame_sequence_number_thread_safe(),
+                    std::memory_order_release);
+#else
                 next_frame_counter_tick = SDL_GetPerformanceCounter();
                 previously_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
+#endif
                 continue;
             }
+
+#ifdef __EMSCRIPTEN__
+            const uint64_t target_published_frame_sequence_number =
+                web_thread_pacing_state->target_published_frame_sequence_number_atomic.load(std::memory_order_acquire);
+
+            if (game_boy_emulator.get_published_frame_sequence_number_thread_safe() >= target_published_frame_sequence_number)
+            {
+                SDL_Delay(0);
+                continue;
+            }
+
+            while (!stop_token.stop_requested() &&
+                   game_boy_emulator.get_published_frame_sequence_number_thread_safe() < target_published_frame_sequence_number)
+            {
+                game_boy_emulator.execute_next_instruction();
+            }
+#else
             game_boy_emulator.execute_next_instruction();
 
             const uint8_t currently_published_frame_buffer_index = game_boy_emulator.get_published_frame_buffer_index_thread_safe();
@@ -72,6 +110,7 @@ static void run_emulator_core(
                     next_frame_counter_tick = current_counter_tick;
                 }
             }
+#endif
         }
     }
     catch (...)
@@ -101,6 +140,7 @@ struct EmscriptenLoopState
 {
     GameBoyEmulator::Emulator* game_boy_emulator;
     EmulationController* emulation_controller;
+    WebThreadPacingState* web_thread_pacing_state;
     FileLoadingStatus* file_loading_status;
     MenuAndCursorDisplayStatus* menu_and_cursor_display_status;
     KeyPressedStates* key_pressed_states;
@@ -113,6 +153,7 @@ struct EmscriptenLoopState
     bool* should_stop_emulation;
     std::string* error_message;
     SDL_Window* sdl_window;
+    uint64_t target_published_frame_sequence_number;
 };
 
 static void sync_emscripten_window_to_viewport(
@@ -195,6 +236,28 @@ static void emscripten_main_loop_iteration(void* arg)
         emscripten_cancel_main_loop();
         return;
     }
+
+    if (!state->game_boy_emulator->is_game_rom_loaded_in_memory_thread_safe() ||
+        state->emulation_controller->is_emulation_paused_atomic.load(std::memory_order_acquire))
+    {
+        state->target_published_frame_sequence_number =
+            state->game_boy_emulator->get_published_frame_sequence_number_thread_safe();
+        state->web_thread_pacing_state->target_published_frame_sequence_number_atomic.store(
+            state->target_published_frame_sequence_number,
+            std::memory_order_release);
+        render_frame(*state->render_context);
+        return;
+    }
+
+    const double target_emulation_speed = state->emulation_controller->is_fast_forward_enabled_atomic.load(std::memory_order_acquire)
+        ? state->emulation_controller->target_fast_forward_multiplier_atomic.load(std::memory_order_acquire)
+        : 1.0;
+    const uint64_t frames_to_advance = std::max<uint64_t>(1, static_cast<uint64_t>(target_emulation_speed));
+    state->target_published_frame_sequence_number += frames_to_advance;
+    state->web_thread_pacing_state->target_published_frame_sequence_number_atomic.store(
+        state->target_published_frame_sequence_number,
+        std::memory_order_release);
+
     render_frame(*state->render_context);
 }
 
@@ -250,17 +313,25 @@ int main()
         EmulationController emulation_controller{};
         std::atomic<bool> did_emulator_core_exception_occur_atomic{};
         std::exception_ptr emulator_core_exception_pointer{};
+        WebThreadPacingState web_thread_pacing_state{};
         std::jthread emulator_thread
         {
             run_emulator_core,
             std::ref(game_boy_emulator),
             std::ref(emulation_controller),
             std::ref(did_emulator_core_exception_occur_atomic),
-            std::ref(emulator_core_exception_pointer),
+            std::ref(emulator_core_exception_pointer)
+#ifdef __EMSCRIPTEN__
+            , &web_thread_pacing_state
+#endif
         };
 
         FileLoadingStatus file_loading_status{};
         MenuAndCursorDisplayStatus menu_and_cursor_display_status{};
+        FrameDiagnosticsState frame_diagnostics_state{};
+#ifndef __EMSCRIPTEN__
+        frame_diagnostics_state.performance_counter_frequency = SDL_GetPerformanceFrequency();
+#endif
         constexpr uint32_t initial_custom_colour_palette[4] =
         {
             get_abgr_value_for_current_endianness(0xFF, 0xEF, 0xE0, 0x90),
@@ -327,6 +398,7 @@ int main()
             &emulation_controller,
             &file_loading_status,
             &menu_and_cursor_display_status,
+            &frame_diagnostics_state,
             &graphics_controller,
             &menu_properties,
             &key_bindings,
@@ -351,6 +423,7 @@ int main()
         {
             &game_boy_emulator,
             &emulation_controller,
+            &web_thread_pacing_state,
             &file_loading_status,
             &menu_and_cursor_display_status,
             &key_pressed_states,
@@ -362,7 +435,8 @@ int main()
             &persistent_settings,
             &should_stop_emulation,
             &error_message,
-            sdl_window.get()
+            sdl_window.get(),
+            game_boy_emulator.get_published_frame_sequence_number_thread_safe()
         };
         // 0 = use requestAnimationFrame (browser controls frame rate)
         // false = don't block (return control to browser immediately)

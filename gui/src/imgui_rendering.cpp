@@ -8,6 +8,9 @@ void render_main_menu_bar(
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
+#ifndef __EMSCRIPTEN__
+    FrameDiagnosticsState& frame_diagnostics_state,
+#endif
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
     const KeyBindings& key_bindings,
@@ -202,6 +205,14 @@ void render_main_menu_bar(
             }
             ImGui::EndMenu();
         }
+#ifndef __EMSCRIPTEN__
+        if (ImGui::BeginMenu("Debug"))
+        {
+            ImGui::Spacing();
+            ImGui::MenuItem("Show Performance Overlay", nullptr, &frame_diagnostics_state.is_overlay_enabled);
+            ImGui::EndMenu();
+        }
+#endif
         if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
         {
             if (is_emulation_paused)

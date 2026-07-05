@@ -7,6 +7,135 @@
 #include <emscripten.h>
 #endif
 
+#ifndef __EMSCRIPTEN__
+static void update_frame_diagnostics(
+    FrameDiagnosticsState& frame_diagnostics_state,
+    uint64_t current_published_frame_sequence_number)
+{
+    if (frame_diagnostics_state.performance_counter_frequency == 0)
+    {
+        return;
+    }
+
+    const uint64_t current_frame_counter = SDL_GetPerformanceCounter();
+    if (frame_diagnostics_state.previous_frame_counter == 0)
+    {
+        frame_diagnostics_state.previous_frame_counter = current_frame_counter;
+        frame_diagnostics_state.previous_published_frame_sequence_number = current_published_frame_sequence_number;
+        return;
+    }
+
+    const double frame_time_seconds = static_cast<double>(current_frame_counter - frame_diagnostics_state.previous_frame_counter)
+        / static_cast<double>(frame_diagnostics_state.performance_counter_frequency);
+    frame_diagnostics_state.previous_frame_counter = current_frame_counter;
+
+    const double frame_time_ms = frame_time_seconds * 1000.0;
+    frame_diagnostics_state.sample_elapsed_seconds += frame_time_seconds;
+    frame_diagnostics_state.sample_worst_frame_time_ms = std::max(frame_diagnostics_state.sample_worst_frame_time_ms, frame_time_ms);
+    frame_diagnostics_state.sample_frame_count++;
+
+    if (current_published_frame_sequence_number > frame_diagnostics_state.previous_published_frame_sequence_number)
+    {
+        const uint64_t published_frame_delta =
+            current_published_frame_sequence_number - frame_diagnostics_state.previous_published_frame_sequence_number;
+        frame_diagnostics_state.sample_emulator_frame_count += static_cast<uint32_t>(published_frame_delta);
+        if (published_frame_delta > 1)
+        {
+            frame_diagnostics_state.sample_skipped_frame_count += static_cast<uint32_t>(published_frame_delta - 1);
+        }
+    }
+
+    frame_diagnostics_state.previous_published_frame_sequence_number = current_published_frame_sequence_number;
+
+    if (frame_diagnostics_state.sample_elapsed_seconds >= FrameDiagnosticsState::SAMPLE_WINDOW_SECONDS)
+    {
+        frame_diagnostics_state.displayed_worst_frame_time_ms = frame_diagnostics_state.sample_worst_frame_time_ms;
+        frame_diagnostics_state.displayed_emulator_frame_rate =
+            static_cast<double>(frame_diagnostics_state.sample_emulator_frame_count) / frame_diagnostics_state.sample_elapsed_seconds;
+        frame_diagnostics_state.displayed_skipped_frame_count = frame_diagnostics_state.sample_skipped_frame_count;
+        frame_diagnostics_state.has_completed_sample = true;
+        frame_diagnostics_state.sample_elapsed_seconds = 0.0;
+        frame_diagnostics_state.sample_worst_frame_time_ms = 0.0;
+        frame_diagnostics_state.sample_frame_count = 0;
+        frame_diagnostics_state.sample_emulator_frame_count = 0;
+        frame_diagnostics_state.sample_skipped_frame_count = 0;
+    }
+}
+
+static void render_frame_diagnostics_overlay(FrameDiagnosticsState& frame_diagnostics_state)
+{
+    if (!frame_diagnostics_state.is_overlay_enabled)
+    {
+        return;
+    }
+
+    ImGui::SetNextWindowBgAlpha(0.75f);
+    ImGui::SetNextWindowPos(ImVec2(12.0f, 36.0f), ImGuiCond_FirstUseEver);
+
+    if (ImGui::Begin(
+            "Recent Performance",
+            &frame_diagnostics_state.is_overlay_enabled,
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing))
+    {
+        constexpr float COLUMN_SPACING_WIDTH = 12.0f;
+        constexpr float VALUE_COLUMN_WIDTH = 160.0f;
+        const double displayed_emulator_frame_rate =
+            !frame_diagnostics_state.has_completed_sample &&
+            frame_diagnostics_state.sample_frame_count > 0 &&
+            frame_diagnostics_state.sample_elapsed_seconds > 0.0
+                ? static_cast<double>(frame_diagnostics_state.sample_emulator_frame_count) / frame_diagnostics_state.sample_elapsed_seconds
+                : frame_diagnostics_state.displayed_emulator_frame_rate;
+        const double displayed_worst_frame_time_ms =
+            !frame_diagnostics_state.has_completed_sample && frame_diagnostics_state.sample_frame_count > 0
+                ? frame_diagnostics_state.sample_worst_frame_time_ms
+                : frame_diagnostics_state.displayed_worst_frame_time_ms;
+        const uint32_t displayed_skipped_frame_count =
+            !frame_diagnostics_state.has_completed_sample && frame_diagnostics_state.sample_frame_count > 0
+                ? frame_diagnostics_state.sample_skipped_frame_count
+                : frame_diagnostics_state.displayed_skipped_frame_count;
+
+        if (ImGui::BeginTable(
+                "performance_overlay_table",
+                3,
+                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
+        {
+            ImGui::TableSetupColumn("Metric");
+            ImGui::TableSetupColumn("Spacing", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize, COLUMN_SPACING_WIDTH);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, VALUE_COLUMN_WIDTH);
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted("Emulation FPS:");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(2);
+            const std::string emulation_fps_text = std::format("{:.2f}", displayed_emulator_frame_rate);
+            ImGui::TextUnformatted(emulation_fps_text.c_str());
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted("Worst Frame Time:");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(2);
+            const std::string worst_frame_time_text = std::format("{:.2f} ms", displayed_worst_frame_time_ms);
+            ImGui::TextUnformatted(worst_frame_time_text.c_str());
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted("Skipped Frames:");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(2);
+            const std::string skipped_frames_text = std::format("{}", displayed_skipped_frame_count);
+            ImGui::TextUnformatted(skipped_frames_text.c_str());
+
+            ImGui::EndTable();
+        }
+    }
+    ImGui::End();
+}
+#endif
+
 static bool is_cursor_currently_visible()
 {
 #ifdef __EMSCRIPTEN__
@@ -198,6 +327,11 @@ void render_frame(RenderContext& context)
     context.is_currently_rendering = true;
     const uint8_t currently_published_frame_buffer_index = context.game_boy_emulator->get_published_frame_buffer_index_thread_safe();
 
+#ifndef __EMSCRIPTEN__
+    const uint64_t current_published_frame_sequence_number = context.game_boy_emulator->get_published_frame_sequence_number_thread_safe();
+    update_frame_diagnostics(*context.frame_diagnostics_state, current_published_frame_sequence_number);
+#endif
+
     if (currently_published_frame_buffer_index != *context.previously_published_frame_buffer_index)
     {
         auto const& pixel_frame_buffer = context.game_boy_emulator->get_pixel_frame_buffer(currently_published_frame_buffer_index);
@@ -250,6 +384,9 @@ void render_frame(RenderContext& context)
             *context.emulation_controller,
             *context.file_loading_status,
             *context.menu_and_cursor_display_status,
+#ifndef __EMSCRIPTEN__
+            *context.frame_diagnostics_state,
+#endif
             *context.graphics_controller,
             *context.menu_properties,
             *context.key_bindings,
@@ -278,6 +415,10 @@ void render_frame(RenderContext& context)
         *context.file_loading_status,
         context.emulation_controller->is_emulation_paused_atomic,
         *context.error_message);
+
+#ifndef __EMSCRIPTEN__
+    render_frame_diagnostics_overlay(*context.frame_diagnostics_state);
+#endif
 
     ImGui::Render();
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), context.sdl_renderer);

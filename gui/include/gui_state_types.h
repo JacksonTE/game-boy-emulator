@@ -122,12 +122,32 @@ struct MenuProperties
     KeybindsEditorState keybinds_editor_state{};
 };
 
+struct FrameDiagnosticsState
+{
+    static constexpr double SAMPLE_WINDOW_SECONDS = 1.0;
+
+    bool is_overlay_enabled = false;
+    bool has_completed_sample = false;
+    uint64_t performance_counter_frequency{};
+    uint64_t previous_frame_counter{};
+    uint64_t previous_published_frame_sequence_number{};
+    double displayed_worst_frame_time_ms{};
+    double displayed_emulator_frame_rate{};
+    uint32_t displayed_skipped_frame_count{};
+    double sample_elapsed_seconds{};
+    double sample_worst_frame_time_ms{};
+    uint32_t sample_frame_count{};
+    uint32_t sample_emulator_frame_count{};
+    uint32_t sample_skipped_frame_count{};
+};
+
 struct RenderContext
 {
     GameBoyEmulator::Emulator* game_boy_emulator{};
     EmulationController* emulation_controller{};
     FileLoadingStatus* file_loading_status{};
     MenuAndCursorDisplayStatus* menu_and_cursor_display_status{};
+    FrameDiagnosticsState* frame_diagnostics_state{};
     GraphicsController* graphics_controller{};
     MenuProperties* menu_properties{};
     KeyBindings* key_bindings{};

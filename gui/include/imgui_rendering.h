@@ -34,6 +34,9 @@ void render_main_menu_bar(
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& fullscreen_display_status,
+#ifndef __EMSCRIPTEN__
+    FrameDiagnosticsState& frame_diagnostics_state,
+#endif
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
     const KeyBindings& key_bindings,
