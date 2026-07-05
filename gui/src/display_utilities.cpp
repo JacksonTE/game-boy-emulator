@@ -1,47 +1,11 @@
-#include <algorithm>
 #include <backends/imgui_impl_sdlrenderer3.h>
-#include <cmath>
 #include <iostream>
 
-#include "carlito_embedded.h"
 #include "display_utilities.h"
 #include "imgui_rendering.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-
-constexpr float BASE_IMGUI_FONT_SIZE_PIXELS = 20.0f;
-
-static void refresh_web_imgui_font_if_needed(const float font_scale)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    const float target_font_size = std::max(1.0f, std::round(BASE_IMGUI_FONT_SIZE_PIXELS * font_scale));
-    static float previous_loaded_font_size = 0.0f;
-
-    if (io.FontDefault != nullptr && previous_loaded_font_size == target_font_size)
-    {
-        return;
-    }
-
-    previous_loaded_font_size = target_font_size;
-
-    ImFontConfig font_config;
-    font_config.FontDataOwnedByAtlas = false;
-
-    io.Fonts->Clear();
-    io.FontDefault = io.Fonts->AddFontFromMemoryTTF(
-        const_cast<unsigned char*>(carlito_ttf),
-        carlito_ttf_len,
-        target_font_size,
-        &font_config);
-    io.Fonts->Build();
-
-    ImGui_ImplSDLRenderer3_DestroyFontsTexture();
-    ImGui_ImplSDLRenderer3_CreateFontsTexture();
-
-    std::cout << "[web_font] target_font_size=" << target_font_size
-              << " font_scale=" << font_scale << "\n";
-}
 #endif
 
 #ifndef __EMSCRIPTEN__
@@ -273,8 +237,6 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 
 #ifdef __EMSCRIPTEN__
-    refresh_web_imgui_font_if_needed(font_scale);
-
     static float previous_logged_display_height = -1.0f;
     static float previous_logged_font_scale = -1.0f;
     static int previous_logged_window_width = -1;
@@ -315,11 +277,7 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     style.ItemSpacing = ImVec2(BASE_ITEM_SPACING_X * font_scale, BASE_ITEM_SPACING_Y * font_scale);
     style.ItemInnerSpacing = ImVec2(BASE_ITEM_INNER_SPACING_X * font_scale, BASE_ITEM_INNER_SPACING_Y * font_scale);
     style.WindowPadding = ImVec2(BASE_WINDOW_PADDING_X * font_scale, BASE_WINDOW_PADDING_Y * font_scale);
-#ifdef __EMSCRIPTEN__
-    style.FontScaleMain = 1.0f;
-#else
     style.FontScaleMain = font_scale;
-#endif
 }
 
 void render_frame(RenderContext& context)
