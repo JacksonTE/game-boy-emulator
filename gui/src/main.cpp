@@ -320,9 +320,9 @@ int main()
             std::ref(game_boy_emulator),
             std::ref(emulation_controller),
             std::ref(did_emulator_core_exception_occur_atomic),
-            std::ref(emulator_core_exception_pointer)
+            std::ref(emulator_core_exception_pointer),
 #ifdef __EMSCRIPTEN__
-            , &web_thread_pacing_state
+            &web_thread_pacing_state
 #endif
         };
 
