@@ -5,25 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Boy Emulator</title>
     <style>
-        * {
+        *
+        {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        html {
+        html
+        {
             width: 100%;
             height: 100%;
         }
 
-        body {
+        body
+        {
             background-color: #000;
             overflow: hidden;
             width: 100%;
             height: 100%;
         }
 
-        canvas {
+        canvas
+        {
             position: fixed;
             inset: 0;
             display: block;
@@ -33,133 +37,147 @@
             outline: none;
         }
     </style>
-
 </head>
 <body>
     <canvas id="canvas" width="160" height="144" tabindex="0"></canvas>
     <input id="rom-file-input" type="file" accept=".gb,.gbc,.bin,.rom" style="display: none;">
     <script>
         window.Module = window.Module || {};
-        window.Module.isWebCursorVisible = true;
-        window.Module.setWebCursorVisible = window.Module.setWebCursorVisible || function(isVisible) {
-            window.Module.isWebCursorVisible = isVisible;
-        };
+        window.Module.is_web_cursor_visible = true;
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function()
+        {
             const module = window.Module;
             const canvas = document.getElementById('canvas');
-            const romFileInput = document.getElementById('rom-file-input');
-            const webSelectedPaths = {
+            const rom_file_input = document.getElementById('rom-file-input');
+            const web_selected_paths =
+            {
                 0: '/tmp/web-selected-game-rom.gb',
                 1: '/tmp/web-selected-boot-rom.bin'
             };
-            let pendingFileType = 0;
-            let isFilePickerOpen = false;
-            let isFileSelectionHandled = false;
+            let pending_file_type = 0;
+            let is_file_picker_open = false;
+            let is_file_selection_handled = false;
 
-            function focusCanvas() {
+            function focus_canvas()
+            {
                 canvas.focus({ preventScroll: true });
             }
 
-            function applyWebCursorVisibility() {
-                const cursorStyle = module.isWebCursorVisible ? 'default' : 'none';
-                canvas.style.cursor = cursorStyle;
-                document.body.style.cursor = cursorStyle;
-                document.documentElement.style.cursor = cursorStyle;
+            function apply_web_cursor_visibility()
+            {
+                const cursor_style = module.is_web_cursor_visible ? 'default' : 'none';
+                canvas.style.cursor = cursor_style;
+                document.body.style.cursor = cursor_style;
+                document.documentElement.style.cursor = cursor_style;
             }
 
-            function reportWebFileSelectionResult(fileType, result) {
+            function report_web_file_selection_result(file_type, result)
+            {
                 const callback = module._set_pending_web_file_selection_result;
-                if (typeof callback === 'function') {
-                    callback(fileType, result);
+                if (typeof callback === 'function')
+                {
+                    callback(file_type, result);
                 }
             }
 
-            function ensureWebRomDirectory() {
-                if (!FS.analyzePath('/tmp').exists) {
+            function ensure_web_rom_directory()
+            {
+                if (!FS.analyzePath('/tmp').exists)
+                {
                     FS.mkdir('/tmp');
                 }
             }
 
-            module.setWebCursorVisible = function(isVisible) {
-                module.isWebCursorVisible = isVisible;
-                applyWebCursorVisibility();
+            module.setWebCursorVisible = function(is_visible)
+            {
+                module.is_web_cursor_visible = is_visible;
+                apply_web_cursor_visibility();
             };
 
-            function handleFilePickerCancelled() {
-                window.setTimeout(function() {
-                    if (isFilePickerOpen && !isFileSelectionHandled && romFileInput.files.length === 0) {
-                        isFilePickerOpen = false;
-                        reportWebFileSelectionResult(pendingFileType, 3);
-                        focusCanvas();
+            function handle_file_picker_cancelled()
+            {
+                window.setTimeout(function()
+                {
+                    if (is_file_picker_open && !is_file_selection_handled && rom_file_input.files.length === 0)
+                    {
+                        is_file_picker_open = false;
+                        report_web_file_selection_result(pending_file_type, 3);
+                        focus_canvas();
                     }
                 }, 0);
             }
 
-            module.openRomFilePicker = function(fileType) {
-                pendingFileType = fileType;
-                isFilePickerOpen = true;
-                isFileSelectionHandled = false;
-                romFileInput.value = '';
-                romFileInput.click();
+            module.openRomFilePicker = function(file_type)
+            {
+                pending_file_type = file_type;
+                is_file_picker_open = true;
+                is_file_selection_handled = false;
+                rom_file_input.value = '';
+                rom_file_input.click();
             };
 
-            romFileInput.addEventListener('change', function(event) {
-                const [selectedFile] = event.target.files;
+            rom_file_input.addEventListener('change', function(event)
+            {
+                const [selected_file] = event.target.files;
 
-                if (!selectedFile) {
-                    isFilePickerOpen = false;
-                    isFileSelectionHandled = true;
-                    reportWebFileSelectionResult(pendingFileType, 3);
-                    focusCanvas();
+                if (!selected_file)
+                {
+                    is_file_picker_open = false;
+                    is_file_selection_handled = true;
+                    report_web_file_selection_result(pending_file_type, 3);
+                    focus_canvas();
                     return;
                 }
 
-                isFilePickerOpen = false;
-                isFileSelectionHandled = true;
+                is_file_picker_open = false;
+                is_file_selection_handled = true;
 
                 const reader = new FileReader();
 
-                reader.addEventListener('load', function(loadEvent) {
-                    try {
-                        ensureWebRomDirectory();
+                reader.addEventListener('load', function(load_event)
+                {
+                    try
+                    {
+                        ensure_web_rom_directory();
 
-                        const romPath = webSelectedPaths[pendingFileType] ?? webSelectedPaths[0];
-                        const romBytes = new Uint8Array(loadEvent.target.result);
+                        const rom_path = web_selected_paths[pending_file_type] ?? web_selected_paths[0];
+                        const rom_bytes = new Uint8Array(load_event.target.result);
 
-                        if (FS.analyzePath(romPath).exists) {
-                            FS.unlink(romPath);
+                        if (FS.analyzePath(rom_path).exists)
+                        {
+                            FS.unlink(rom_path);
                         }
 
-                        FS.writeFile(romPath, romBytes);
-                        reportWebFileSelectionResult(pendingFileType, 2);
-                    } catch {
-                        reportWebFileSelectionResult(pendingFileType, 4);
+                        FS.writeFile(rom_path, rom_bytes);
+                        report_web_file_selection_result(pending_file_type, 2);
+                    }
+                    catch
+                    {
+                        report_web_file_selection_result(pending_file_type, 4);
                     }
 
-                    focusCanvas();
+                    focus_canvas();
                 });
 
-                reader.addEventListener('error', function() {
-                    reportWebFileSelectionResult(pendingFileType, 4);
-                    focusCanvas();
+                reader.addEventListener('error', function()
+                {
+                    report_web_file_selection_result(pending_file_type, 4);
+                    focus_canvas();
                 });
 
-                reader.readAsArrayBuffer(selectedFile);
+                reader.readAsArrayBuffer(selected_file);
             });
 
-            focusCanvas();
-            applyWebCursorVisibility();
+            focus_canvas();
+            apply_web_cursor_visibility();
 
-            document.addEventListener('click', function() {
-                focusCanvas();
+            document.addEventListener('click', function()
+            {
+                focus_canvas();
             });
 
-            document.addEventListener('fullscreenchange', function() {
-                focusCanvas();
-            });
-
-            window.addEventListener('focus', handleFilePickerCancelled);
+            window.addEventListener('focus', handle_file_picker_cancelled);
         });
     </script>
     {{{ SCRIPT }}}
