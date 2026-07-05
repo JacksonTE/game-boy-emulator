@@ -36,8 +36,8 @@ static void refresh_web_imgui_font_if_needed(const float font_scale)
         &font_config);
     io.Fonts->Build();
 
-    ImGui_ImplSDLRenderer3_DestroyFontsTexture();
-    ImGui_ImplSDLRenderer3_CreateFontsTexture();
+    ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
+    ImGui_ImplSDLRenderer3_CreateDeviceObjects();
 
     std::cout << "[web_font] target_font_size=" << target_font_size
               << " font_scale=" << font_scale << "\n";
