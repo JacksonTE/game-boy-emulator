@@ -27,9 +27,8 @@ if(EMSCRIPTEN)
 
     target_link_options(emulator-web PRIVATE
         -pthread
-        -sPTHREAD_POOL_SIZE=2
-        -sALLOW_MEMORY_GROWTH=1
-        -sMAXIMUM_MEMORY=268435456
+        -sPTHREAD_POOL_SIZE=1
+        -sINITIAL_MEMORY=67108864
         -sFORCE_FILESYSTEM=1
         --shell-file "${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html")
 
