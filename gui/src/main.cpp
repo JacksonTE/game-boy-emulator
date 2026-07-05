@@ -281,11 +281,9 @@ int main()
             sdl_window.get(),
             game_boy_emulator.get_published_frame_sequence_number_thread_safe()
         };
-        // 0 = use requestAnimationFrame (browser controls frame rate)
-        // false = don't block (return control to browser immediately)
         start_emscripten_main_loop(loop_state);
-        // main() returns here but the loop continues via the browser event loop
-        // The RAII destructors must NOT run yet — Emscripten handles cleanup
+        // main() returns here but the loop continues via the browser event loop.
+        // Emscripten handles cleanup instead of the RAII destructors.
         emscripten_exit_with_live_runtime();
 #else
         while (!should_stop_emulation)
