@@ -122,7 +122,7 @@ int main()
 #endif
         ResourceAcquisitionIsInitialization::SdlWindowRaii sdl_window
         {
-            "Emulate Game Boy",
+            "Game Boy Emulator",
             initial_window_w,
             initial_window_h,
             SDL_WINDOW_RESIZABLE
@@ -229,7 +229,7 @@ int main()
                     game_boy_emulator.reset_state();
                     SDL_SetWindowTitle(
                         sdl_window.get(),
-                        std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
+                        std::string("Game Boy Emulator - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
                 }
             }
         }

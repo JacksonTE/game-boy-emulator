@@ -174,7 +174,7 @@ void render_main_menu_bar(
             {
                 game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
                 set_emulation_screen_blank(graphics_controller);
-                SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
+                SDL_SetWindowTitle(sdl_window, std::string("Game Boy Emulator").c_str());
                 game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                 *loaded_game_rom_path = "";
                 game_boy_emulator.reset_state();

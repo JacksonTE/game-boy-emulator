@@ -99,7 +99,7 @@ static bool try_load_file_to_memory_from_path(
         {
             SDL_SetWindowTitle(
                 sdl_window,
-                std::string("Emulate Game Boy - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
+                std::string("Game Boy Emulator - " + game_boy_emulator.get_loaded_game_rom_title_thread_safe()).c_str());
         }
         emulation_controller.is_emulation_paused_atomic.store(false, std::memory_order_release);
         menu_and_cursor_display_status.cursor_changes_to_ignore_count =
