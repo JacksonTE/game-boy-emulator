@@ -2,6 +2,8 @@
 
 #ifdef __EMSCRIPTEN__
 
+#include <algorithm>
+#include <cmath>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <iostream>
@@ -14,6 +16,13 @@ static void sync_emscripten_window_to_viewport(
     int viewport_w,
     int viewport_h)
 {
+    const double device_pixel_ratio = emscripten_get_device_pixel_ratio();
+    const int canvas_pixel_w = std::max(1, static_cast<int>(std::round(static_cast<double>(viewport_w) * device_pixel_ratio)));
+    const int canvas_pixel_h = std::max(1, static_cast<int>(std::round(static_cast<double>(viewport_h) * device_pixel_ratio)));
+
+    emscripten_set_canvas_element_size("#canvas", canvas_pixel_w, canvas_pixel_h);
+    emscripten_set_element_css_size("#canvas", static_cast<double>(viewport_w), static_cast<double>(viewport_h));
+
     int sdl_w, sdl_h;
     SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
 
@@ -24,6 +33,9 @@ static void sync_emscripten_window_to_viewport(
 
     std::cout << "[web_viewport] viewport_w=" << viewport_w
               << " viewport_h=" << viewport_h
+              << " device_pixel_ratio=" << device_pixel_ratio
+              << " canvas_pixel_w=" << canvas_pixel_w
+              << " canvas_pixel_h=" << canvas_pixel_h
               << " previous_sdl_w=" << sdl_w
               << " previous_sdl_h=" << sdl_h << "\n";
 
