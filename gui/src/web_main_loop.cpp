@@ -4,7 +4,6 @@
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
-#include <iostream>
 
 #include "display_utilities.h"
 #include "input_events.h"
@@ -21,11 +20,6 @@ static void sync_emscripten_window_to_viewport(
     {
         SDL_SetWindowSize(state->sdl_window, viewport_w, viewport_h);
     }
-
-    std::cout << "[web_viewport] viewport_w=" << viewport_w
-              << " viewport_h=" << viewport_h
-              << " previous_sdl_w=" << sdl_w
-              << " previous_sdl_h=" << sdl_h << "\n";
 
     update_imgui_scale_by_resolution(state->sdl_window);
     render_frame(*state->render_context);

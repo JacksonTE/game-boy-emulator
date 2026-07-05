@@ -72,17 +72,6 @@
                 document.documentElement.style.cursor = cursor_style;
             }
 
-            function log_web_metrics(source)
-            {
-                console.log('[web_shell]', source,
-                    'inner', window.innerWidth, window.innerHeight,
-                    'outer', window.outerWidth, window.outerHeight,
-                    'screen', window.screen.width, window.screen.height,
-                    'dpr', window.devicePixelRatio || 1,
-                    'canvas_client', canvas.clientWidth, canvas.clientHeight,
-                    'canvas_backing', canvas.width, canvas.height);
-            }
-
             function report_web_file_selection_result(file_type, result)
             {
                 const callback = module._set_pending_web_file_selection_result;
@@ -182,16 +171,10 @@
 
             focus_canvas();
             apply_web_cursor_visibility();
-            log_web_metrics('dom_content_loaded');
 
             document.addEventListener('click', function()
             {
                 focus_canvas();
-            });
-
-            window.addEventListener('resize', function()
-            {
-                log_web_metrics('window_resize');
             });
 
             window.addEventListener('focus', handle_file_picker_cancelled);
