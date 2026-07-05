@@ -267,43 +267,6 @@ web_viewport_metrics_t get_web_viewport_metrics()
 
     return metrics;
 }
-
-void log_web_display_metrics(SDL_Window* sdl_window, const char* reason)
-{
-    const web_viewport_metrics_t metrics = get_web_viewport_metrics();
-
-    int sdl_window_width = 0;
-    int sdl_window_height = 0;
-    SDL_GetWindowSize(sdl_window, &sdl_window_width, &sdl_window_height);
-
-    EM_ASM(
-    {
-        console.info(
-            "[web-display]",
-            UTF8ToString($0),
-            {
-                css_viewport_width: $1,
-                css_viewport_height: $2,
-                pixel_viewport_width: $3,
-                pixel_viewport_height: $4,
-                device_pixel_ratio: $5,
-                sdl_window_width: $6,
-                sdl_window_height: $7,
-                canvas_client_width: Module.canvas ? Module.canvas.clientWidth : 0,
-                canvas_client_height: Module.canvas ? Module.canvas.clientHeight : 0,
-                canvas_width: Module.canvas ? Module.canvas.width : 0,
-                canvas_height: Module.canvas ? Module.canvas.height : 0
-            });
-    },
-    reason,
-    metrics.css_viewport_width,
-    metrics.css_viewport_height,
-    metrics.pixel_viewport_width,
-    metrics.pixel_viewport_height,
-    metrics.device_pixel_ratio,
-    sdl_window_width,
-    sdl_window_height);
-}
 #endif
 
 void render_frame(RenderContext& context)

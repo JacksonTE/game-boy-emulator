@@ -146,10 +146,6 @@ int main()
 
         update_imgui_scale_by_resolution(sdl_window.get());
 
-#ifdef __EMSCRIPTEN__
-        log_web_display_metrics(sdl_window.get(), "startup");
-#endif
-
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
         gtk_init(NULL, NULL);
 #endif

@@ -35,7 +35,6 @@ static void sync_emscripten_window_to_viewport(
     }
 
     update_imgui_scale_by_resolution(state->sdl_window);
-    log_web_display_metrics(state->sdl_window, reason);
     render_frame(*state->render_context);
 }
 
