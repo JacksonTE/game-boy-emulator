@@ -54,8 +54,8 @@ jobs:
             --output-on-failure \
             --output-junit build/ctest-results.xml
 
-      - name: Publish Test Report
-        if: always()
+      - if: always()
+        name: Publish Test Report
         uses: mikepenz/action-junit-report@v6
         with:
           report_paths: build/ctest-results.xml
