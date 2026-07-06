@@ -6,13 +6,19 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 |----------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | ![Pokémon Yellow: Special Pikachu Edition - Gameplay](https://github.com/user-attachments/assets/a6dce68c-cbb2-4688-8d13-b7fac0789bbb) | ![Donkey Kong Land - Gameplay](https://github.com/user-attachments/assets/634cb879-4189-4196-b395-6e6e06999298)   | ![The Legend of Zelda: Link's Awakening - Gameplay](https://github.com/user-attachments/assets/fc67733c-b722-44d2-9a22-70717476da85) |
 
-## Usage Instructions
+## Setup
+### Web
+1. Visit https://game-boy-emulator.pages.dev/ to access the latest emulator version from the `main` branch.
+
+### Desktop
 1. Download the latest available version for your operating system from the `Releases` tab.
 2. Unzip the folder and run `emulator-gui.exe`.
-3. Acquire a Game Boy game ROM file (not provided but found online easily).
-4. In the top menu click `File`->`Load Game ROM`.
-5. Select the ROM file to run from the file selector.
-6. If the game is currently supported, it will now be running and will be interactable via the default key mappings below.
+
+## Usage
+1. Acquire a Game Boy game ROM file (not provided but found online easily).
+2. In the top menu click `File`->`Load Game ROM`.
+3. Select the ROM file to run from the file selector.
+4. If the game is currently supported, it will now be running and will be interactable via the default key mappings below.
 
 ## Default Controls
 <table>
@@ -55,8 +61,7 @@ A cross-platform, cycle-accurate Nintendo Game Boy emulator written in C++. Game
 
 ## Future Additions
 - Implement the Audio Processing Unit to recreate sound from Game Boy ROMs.
-- Implement save state exporting and cartridge ram exporting.
-- Port to browser with Emscripten.
+- Implement save states for storing progress between sessions.
 - Add support for Game Boy Color games. 
 
 ## Compilation
