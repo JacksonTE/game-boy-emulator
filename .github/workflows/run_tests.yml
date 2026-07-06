@@ -52,7 +52,7 @@ jobs:
             --test-dir build \
             --parallel $(nproc) \
             --output-on-failure \
-            --output-junit build/ctest-results.xml
+            --output-junit ctest-results.xml
 
       - if: always()
         name: Debug Test Report Output
