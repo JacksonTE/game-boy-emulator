@@ -60,3 +60,4 @@ jobs:
           job_summary: true
           annotate_only: true
           skip_annotations: true
+          resolve_ignore_classname: true
