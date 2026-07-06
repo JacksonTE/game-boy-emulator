@@ -65,28 +65,16 @@ static void update_frame_diagnostics(
 
 #endif
 
-static bool is_cursor_currently_visible()
-{
-#ifdef __EMSCRIPTEN__
-    return EM_ASM_INT(
-        {
-            return Module.is_web_cursor_visible ? 1 : 0; 
-        }) != 0;
-#else
-    return SDL_CursorVisible();
-#endif
-}
-
-static void set_cursor_visible(const bool is_visible)
+static void set_cursor_visibility(const bool should_cursor_be_visible)
 {
 #ifdef __EMSCRIPTEN__
     EM_ASM(
         {
             Module.setWebCursorVisible(!!$0);
         },
-        is_visible ? 1 : 0);
+        should_cursor_be_visible ? 1 : 0);
 #else
-    if (is_visible)
+    if (should_cursor_be_visible)
     {
         SDL_ShowCursor();
     }
@@ -331,9 +319,11 @@ void render_frame(RenderContext& context)
             context.menu_properties->is_custom_palette_editor_open,
             context.menu_properties->keybinds_editor_state.is_open))
     {
-        if (!is_cursor_currently_visible())
+#ifndef __EMSCRIPTEN__
+        if (!SDL_CursorVisible())
+#endif
         {
-            set_cursor_visible(true);
+            set_cursor_visibility(true);
         }
         render_main_menu_bar(
             currently_published_frame_buffer_index,
@@ -353,9 +343,14 @@ void render_frame(RenderContext& context)
             *context.should_stop_emulation,
             *context.error_message);
     }
-    else if (is_cursor_currently_visible())
+    else
     {
-        set_cursor_visible(false);
+#ifndef __EMSCRIPTEN__
+        if (SDL_CursorVisible())
+#endif
+        {
+            set_cursor_visibility(false);
+        }
     }
 
     render_auxiliary_windows(
