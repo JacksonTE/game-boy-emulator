@@ -136,6 +136,11 @@ uint8_t Emulator::get_published_frame_buffer_index_thread_safe() const
     return pixel_processing_unit.get_published_frame_buffer_index_thread_safe();
 }
 
+uint64_t Emulator::get_published_frame_sequence_number_thread_safe() const
+{
+    return pixel_processing_unit.get_published_frame_sequence_number_thread_safe();
+}
+
 std::unique_ptr<uint8_t[]>& Emulator::get_pixel_frame_buffer(uint8_t index)
 {
     return pixel_processing_unit.get_pixel_frame_buffer(index);

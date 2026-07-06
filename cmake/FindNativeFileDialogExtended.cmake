@@ -3,7 +3,7 @@ include(FetchContent)
 FetchContent_Declare(
     NativeFileDialogExtended
     GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
-    GIT_TAG e092bbb4578583c6fd0edc2cd14fb9c658194a4d
+    GIT_TAG 3cd252a8f7ca32419b1ca235c2990ba6a0ecba7c
     GIT_SHALLOW TRUE)
 
 FetchContent_MakeAvailable(NativeFileDialogExtended)

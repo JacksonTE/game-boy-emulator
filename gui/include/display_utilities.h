@@ -67,14 +67,28 @@ void update_colour_palette(
     const uint8_t currently_published_frame_buffer_index);
 
 bool should_main_menu_bar_and_cursor_be_visible(
-    GameBoyEmulator::Emulator& game_boy_emulator,
+    const GameBoyEmulator::Emulator& game_boy_emulator,
     const EmulationController& emulation_controller,
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     bool is_custom_palette_editor_open,
-    bool is_keybinds_editor_open,
-    SDL_Window* sdl_window);
+    bool is_keybinds_editor_open);
 
 void update_imgui_scale_by_resolution(SDL_Window* sdl_window);
+
+#ifdef __EMSCRIPTEN__
+struct web_viewport_metrics_t
+{
+    int css_viewport_width{};
+    int css_viewport_height{};
+    int pixel_viewport_width{};
+    int pixel_viewport_height{};
+    double device_pixel_ratio{1.0};
+};
+
+double get_web_device_pixel_ratio();
+
+web_viewport_metrics_t get_web_viewport_metrics();
+#endif
 
 void render_frame(RenderContext& context);
 

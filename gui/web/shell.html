@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Boy Emulator</title>
+    <style>
+        *
+        {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html
+        {
+            width: 100%;
+            height: 100%;
+        }
+
+        body
+        {
+            background-color: #000;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas
+        {
+            position: fixed;
+            inset: 0;
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            image-rendering: pixelated;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" tabindex="0"></canvas>
+    <input id="rom-file-input" type="file" accept=".gb,.gbc,.bin,.rom" style="display: none;">
+    <script>
+        window.Module = window.Module || {};
+        window.Module.is_web_cursor_visible = true;
+
+        document.addEventListener('DOMContentLoaded', function()
+        {
+            const module = window.Module;
+            const canvas = document.getElementById('canvas');
+            const rom_file_input = document.getElementById('rom-file-input');
+            const web_selected_paths =
+            {
+                0: '/tmp/web-selected-game-rom.gb',
+                1: '/tmp/web-selected-boot-rom.bin'
+            };
+            let pending_file_type = 0;
+            let is_file_picker_open = false;
+            let is_file_selection_handled = false;
+
+            function focus_canvas()
+            {
+                canvas.focus({ preventScroll: true });
+            }
+
+            function apply_web_cursor_visibility()
+            {
+                const cursor_style = module.is_web_cursor_visible ? 'default' : 'none';
+                canvas.style.cursor = cursor_style;
+                document.body.style.cursor = cursor_style;
+                document.documentElement.style.cursor = cursor_style;
+            }
+
+            function report_web_file_selection_result(file_type, result)
+            {
+                const callback = module._set_pending_web_file_selection_result;
+                if (typeof callback === 'function')
+                {
+                    callback(file_type, result);
+                }
+            }
+
+            function ensure_web_rom_directory()
+            {
+                if (!FS.analyzePath('/tmp').exists)
+                {
+                    FS.mkdir('/tmp');
+                }
+            }
+
+            module.setWebCursorVisible = function(is_visible)
+            {
+                module.is_web_cursor_visible = is_visible;
+                apply_web_cursor_visibility();
+            };
+
+            function handle_file_picker_cancelled()
+            {
+                window.setTimeout(function()
+                {
+                    if (is_file_picker_open && !is_file_selection_handled && rom_file_input.files.length === 0)
+                    {
+                        is_file_picker_open = false;
+                        report_web_file_selection_result(pending_file_type, 3);
+                        focus_canvas();
+                    }
+                }, 0);
+            }
+
+            module.openRomFilePicker = function(file_type)
+            {
+                pending_file_type = file_type;
+                is_file_picker_open = true;
+                is_file_selection_handled = false;
+                rom_file_input.value = '';
+                rom_file_input.click();
+            };
+
+            rom_file_input.addEventListener('change', function(event)
+            {
+                const [selected_file] = event.target.files;
+
+                if (!selected_file)
+                {
+                    is_file_picker_open = false;
+                    is_file_selection_handled = true;
+                    report_web_file_selection_result(pending_file_type, 3);
+                    focus_canvas();
+                    return;
+                }
+
+                is_file_picker_open = false;
+                is_file_selection_handled = true;
+
+                const reader = new FileReader();
+
+                reader.addEventListener('load', function(load_event)
+                {
+                    try
+                    {
+                        ensure_web_rom_directory();
+
+                        const rom_path = web_selected_paths[pending_file_type] ?? web_selected_paths[0];
+                        const rom_bytes = new Uint8Array(load_event.target.result);
+
+                        if (FS.analyzePath(rom_path).exists)
+                        {
+                            FS.unlink(rom_path);
+                        }
+
+                        FS.writeFile(rom_path, rom_bytes);
+                        report_web_file_selection_result(pending_file_type, 2);
+                    }
+                    catch
+                    {
+                        report_web_file_selection_result(pending_file_type, 4);
+                    }
+
+                    focus_canvas();
+                });
+
+                reader.addEventListener('error', function()
+                {
+                    report_web_file_selection_result(pending_file_type, 4);
+                    focus_canvas();
+                });
+
+                reader.readAsArrayBuffer(selected_file);
+            });
+
+            focus_canvas();
+            apply_web_cursor_visibility();
+
+            document.addEventListener('click', function()
+            {
+                focus_canvas();
+            });
+
+            window.addEventListener('focus', handle_file_picker_cancelled);
+        });
+    </script>
+    {{{ SCRIPT }}}
+</body>
+</html>

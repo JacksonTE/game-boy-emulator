@@ -46,6 +46,7 @@ public:
     void update_dpad_direction_pressed_state_thread_safe(uint8_t direction_flag_mask, bool is_direction_pressed);
 
     uint8_t get_published_frame_buffer_index_thread_safe() const;
+    uint64_t get_published_frame_sequence_number_thread_safe() const;
     std::unique_ptr<uint8_t[]>& get_pixel_frame_buffer(uint8_t index);
 
     std::string get_loaded_game_rom_title_thread_safe() const;

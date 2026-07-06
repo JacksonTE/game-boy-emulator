@@ -76,9 +76,9 @@ struct KeyBindings
 
     SDL_Keycode load_game_rom = SDLK_O;
     SDL_Keycode fast_forward = SDLK_SPACE;
-    SDL_Keycode pause = SDLK_ESCAPE;
+    SDL_Keycode pause = SDLK_P;
     SDL_Keycode reset = SDLK_R;
-    SDL_Keycode fullscreen = SDLK_F11;
+    SDL_Keycode fullscreen = SDLK_F;
 
     void reset_to_defaults()
     {
@@ -93,9 +93,9 @@ struct KeyBindings
 
         load_game_rom = SDLK_O;
         fast_forward = SDLK_SPACE;
-        pause = SDLK_ESCAPE;
+        pause = SDLK_P;
         reset = SDLK_R;
-        fullscreen = SDLK_F11;
+        fullscreen = SDLK_F;
     }
 };
 
@@ -122,12 +122,32 @@ struct MenuProperties
     KeybindsEditorState keybinds_editor_state{};
 };
 
+struct FrameDiagnosticsState
+{
+    static constexpr double SAMPLE_WINDOW_SECONDS = 1.0;
+
+    bool is_overlay_enabled = false;
+    bool has_completed_sample = false;
+    uint64_t performance_counter_frequency{};
+    uint64_t previous_frame_counter{};
+    uint64_t previous_published_frame_sequence_number{};
+    double displayed_worst_frame_time_ms{};
+    double displayed_emulator_frame_rate{};
+    uint32_t displayed_skipped_frame_count{};
+    double sample_elapsed_seconds{};
+    double sample_worst_frame_time_ms{};
+    uint32_t sample_frame_count{};
+    uint32_t sample_emulator_frame_count{};
+    uint32_t sample_skipped_frame_count{};
+};
+
 struct RenderContext
 {
     GameBoyEmulator::Emulator* game_boy_emulator{};
     EmulationController* emulation_controller{};
     FileLoadingStatus* file_loading_status{};
     MenuAndCursorDisplayStatus* menu_and_cursor_display_status{};
+    FrameDiagnosticsState* frame_diagnostics_state{};
     GraphicsController* graphics_controller{};
     MenuProperties* menu_properties{};
     KeyBindings* key_bindings{};
@@ -135,6 +155,7 @@ struct RenderContext
     SDL_Texture* sdl_texture{};
     SDL_Window* sdl_window{};
     uint8_t* previously_published_frame_buffer_index{};
+    uint64_t* previously_published_frame_sequence_number{};
     std::string* loaded_game_rom_path{};
     std::string* loaded_boot_rom_path{};
     bool is_currently_rendering{};

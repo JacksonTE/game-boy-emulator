@@ -111,6 +111,11 @@ uint8_t PixelProcessingUnit::get_published_frame_buffer_index_thread_safe() cons
     return published_frame_index_atomic.load(std::memory_order_acquire);
 }
 
+uint64_t PixelProcessingUnit::get_published_frame_sequence_number_thread_safe() const
+{
+    return published_frame_sequence_number_atomic.load(std::memory_order_acquire);
+}
+
 std::unique_ptr<uint8_t[]>& PixelProcessingUnit::get_pixel_frame_buffer(uint8_t index)
 {
     return pixel_frame_buffers[index];
@@ -777,6 +782,7 @@ uint8_t PixelProcessingUnit::get_object_fetcher_tile_row_byte(uint8_t offset)
 void PixelProcessingUnit::publish_new_frame()
 {
     published_frame_index_atomic.store(in_progress_frame_index, std::memory_order_release);
+    published_frame_sequence_number_atomic.fetch_add(1, std::memory_order_release);
     in_progress_frame_index = 1 - in_progress_frame_index;
 }
 

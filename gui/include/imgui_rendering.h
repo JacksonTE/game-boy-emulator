@@ -34,9 +34,12 @@ void render_main_menu_bar(
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& fullscreen_display_status,
+#ifndef __EMSCRIPTEN__
+    FrameDiagnosticsState& frame_diagnostics_state,
+#endif
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
-    KeyBindings& key_bindings,
+    const KeyBindings& key_bindings,
     SDL_Window* sdl_window,
     std::string* loaded_game_rom_path,
     std::string* loaded_boot_rom_path,
@@ -58,8 +61,22 @@ void render_error_message_popup(
     std::atomic<bool>& is_emulation_paused_atomic,
     std::string& error_message);
 
-std::string get_keybind_label(SDL_Keycode key);
+void render_auxiliary_windows(
+    const uint8_t currently_published_frame_buffer_index,
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    FileLoadingStatus& file_loading_status,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    GraphicsController& graphics_controller,
+    MenuProperties& menu_properties,
+    KeyBindings& key_bindings,
+    std::string& error_message
+#ifndef __EMSCRIPTEN__
+    , FrameDiagnosticsState& frame_diagnostics_state
+#endif
+);
 
-ImVec4 get_imvec4_from_abgr(uint32_t abgr);
+std::string get_keybind_label(const SDL_Keycode key);
+
+ImVec4 get_imvec4_from_abgr(const uint32_t abgr);
 
 void imgui_spaced_separator();

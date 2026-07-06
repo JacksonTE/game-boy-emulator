@@ -2,6 +2,9 @@
 
 #include <cstdint>
 #include <imgui_impl_sdlrenderer3.h>
+#ifndef __EMSCRIPTEN__
+#include <nfd.h>
+#endif
 #include <SDL3/SDL.h>
 #include <stdexcept>
 #include <string>
@@ -240,6 +243,7 @@ private:
     void* userdata_;
 };
 
+#ifndef __EMSCRIPTEN__
 class NfdInitializerRaii
 {
 public:
@@ -262,5 +266,6 @@ public:
     NfdInitializerRaii(NfdInitializerRaii&&) = delete;
     NfdInitializerRaii& operator=(NfdInitializerRaii&&) = delete;
 };
+#endif
 
 } // namespace ResourceAcquisitionIsInitialization

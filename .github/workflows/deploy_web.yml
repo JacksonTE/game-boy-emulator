@@ -1,0 +1,53 @@
+name: Deploy Web Build
+run-name: >-
+  Deploy Web: ${{
+    github.event_name == 'push' && github.event.head_commit.message ||
+    format('Triggered by {0}', github.actor)
+  }}
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Configure Emscripten CMake
+        run: |
+          emcmake cmake \
+            -S . \
+            -B build-web \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_PTHREADS=ON
+
+      - name: Build Web Target
+        run: |
+          cmake \
+            --build build-web \
+            --target emulator-web \
+            --parallel
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build-web/bin --project-name=game-boy-emulator

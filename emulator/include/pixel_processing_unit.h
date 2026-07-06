@@ -195,6 +195,7 @@ public:
     void set_post_boot_state();
 
     uint8_t get_published_frame_buffer_index_thread_safe() const;
+    uint64_t get_published_frame_sequence_number_thread_safe() const;
     std::unique_ptr<uint8_t[]>& get_pixel_frame_buffer(uint8_t index);
 
     uint8_t read_lcdc_lcd_control() const;
@@ -217,6 +218,7 @@ private:
     std::function<void(uint8_t)> request_interrupt_callback;
 
     std::atomic<uint8_t> published_frame_index_atomic{};
+    std::atomic<uint64_t> published_frame_sequence_number_atomic{};
     uint8_t in_progress_frame_index{1};
     std::unique_ptr<uint8_t[]> pixel_frame_buffers[2];
 

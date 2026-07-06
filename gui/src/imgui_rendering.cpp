@@ -2,15 +2,127 @@
 #include "imgui_rendering.h"
 #include "input_events.h"
 
+#ifndef __EMSCRIPTEN__
+void render_frame_diagnostics_overlay(FrameDiagnosticsState& frame_diagnostics_state)
+{
+    if (!frame_diagnostics_state.is_overlay_enabled)
+    {
+        return;
+    }
+
+    ImGui::SetNextWindowBgAlpha(0.75f);
+    ImGui::SetNextWindowPos(ImVec2(12.0f, 36.0f), ImGuiCond_FirstUseEver);
+
+    if (ImGui::Begin(
+            "Recent Performance",
+            &frame_diagnostics_state.is_overlay_enabled,
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing))
+    {
+        constexpr float COLUMN_SPACING_WIDTH = 12.0f;
+        constexpr float VALUE_COLUMN_WIDTH = 160.0f;
+        const double displayed_emulator_frame_rate =
+            !frame_diagnostics_state.has_completed_sample &&
+            frame_diagnostics_state.sample_frame_count > 0 &&
+            frame_diagnostics_state.sample_elapsed_seconds > 0.0
+                ? static_cast<double>(frame_diagnostics_state.sample_emulator_frame_count) / frame_diagnostics_state.sample_elapsed_seconds
+                : frame_diagnostics_state.displayed_emulator_frame_rate;
+        const double displayed_worst_frame_time_ms =
+            !frame_diagnostics_state.has_completed_sample && frame_diagnostics_state.sample_frame_count > 0
+                ? frame_diagnostics_state.sample_worst_frame_time_ms
+                : frame_diagnostics_state.displayed_worst_frame_time_ms;
+        const uint32_t displayed_skipped_frame_count =
+            !frame_diagnostics_state.has_completed_sample && frame_diagnostics_state.sample_frame_count > 0
+                ? frame_diagnostics_state.sample_skipped_frame_count
+                : frame_diagnostics_state.displayed_skipped_frame_count;
+
+        if (ImGui::BeginTable(
+                "performance_overlay_table",
+                3,
+                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
+        {
+            ImGui::TableSetupColumn("Metric");
+            ImGui::TableSetupColumn("Spacing", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize, COLUMN_SPACING_WIDTH);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, VALUE_COLUMN_WIDTH);
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted("Emulation FPS:");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(2);
+            const std::string emulation_fps_text = std::format("{:.2f}", displayed_emulator_frame_rate);
+            ImGui::TextUnformatted(emulation_fps_text.c_str());
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted("Worst Frame Time:");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(2);
+            const std::string worst_frame_time_text = std::format("{:.2f} ms", displayed_worst_frame_time_ms);
+            ImGui::TextUnformatted(worst_frame_time_text.c_str());
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted("Skipped Frames:");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(2);
+            const std::string skipped_frames_text = std::format("{}", displayed_skipped_frame_count);
+            ImGui::TextUnformatted(skipped_frames_text.c_str());
+
+            ImGui::EndTable();
+        }
+    }
+    ImGui::End();
+}
+#endif
+
+void render_auxiliary_windows(
+    const uint8_t currently_published_frame_buffer_index,
+    GameBoyEmulator::Emulator& game_boy_emulator,
+    FileLoadingStatus& file_loading_status,
+    std::atomic<bool>& is_emulation_paused_atomic,
+    GraphicsController& graphics_controller,
+    MenuProperties& menu_properties,
+    KeyBindings& key_bindings,
+    std::string& error_message
+#ifndef __EMSCRIPTEN__
+    , FrameDiagnosticsState& frame_diagnostics_state
+#endif
+)
+{
+    render_custom_colour_palette_editor(
+        currently_published_frame_buffer_index,
+        game_boy_emulator,
+        menu_properties,
+        graphics_controller);
+
+    render_keybinds_editor(
+        menu_properties,
+        key_bindings);
+
+    render_error_message_popup(
+        file_loading_status,
+        is_emulation_paused_atomic,
+        error_message);
+
+#ifndef __EMSCRIPTEN__
+    render_frame_diagnostics_overlay(frame_diagnostics_state);
+#endif
+}
+
 void render_main_menu_bar(
     const uint8_t currently_published_frame_buffer_index,
     GameBoyEmulator::Emulator& game_boy_emulator,
     EmulationController& emulation_controller,
     FileLoadingStatus& file_loading_status,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
+#ifndef __EMSCRIPTEN__
+    FrameDiagnosticsState& frame_diagnostics_state,
+#endif
     GraphicsController& graphics_controller,
     MenuProperties& menu_properties,
-    KeyBindings& key_bindings,
+    const KeyBindings& key_bindings,
     SDL_Window* sdl_window,
     std::string* loaded_game_rom_path,
     std::string* loaded_boot_rom_path,
@@ -62,7 +174,7 @@ void render_main_menu_bar(
             {
                 game_boy_emulator.try_save_save_file(std::filesystem::path(SDL_GetBasePath()));
                 set_emulation_screen_blank(graphics_controller);
-                SDL_SetWindowTitle(sdl_window, std::string("Emulate Game Boy").c_str());
+                SDL_SetWindowTitle(sdl_window, std::string("Game Boy Emulator").c_str());
                 game_boy_emulator.unload_game_rom_from_memory_thread_safe();
                 *loaded_game_rom_path = "";
                 game_boy_emulator.reset_state();
@@ -87,11 +199,13 @@ void render_main_menu_bar(
                 }
                 emulation_controller.is_emulation_paused_atomic.store(is_emulation_paused);
             }
+#ifndef __EMSCRIPTEN__
             imgui_spaced_separator();
             if (ImGui::MenuItem("Quit", "[Alt+F4]"))
             {
                 should_stop_emulation = true;
             }
+#endif
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Video"))
@@ -129,9 +243,10 @@ void render_main_menu_bar(
                 menu_properties.is_custom_palette_editor_open = true;
             }
             imgui_spaced_separator();
+            const std::string fullscreen_shortcut_label = get_keybind_label(key_bindings.fullscreen);
             if (ImGui::MenuItem(
                     is_fullscreen_enabled ? "Exit Fullscreen" : "Fullscreen",
-                    get_keybind_label(key_bindings.fullscreen).c_str()))
+                    fullscreen_shortcut_label.c_str()))
             {
                 toggle_fullscreen_enabled_state(
                     menu_and_cursor_display_status,
@@ -195,6 +310,14 @@ void render_main_menu_bar(
             }
             ImGui::EndMenu();
         }
+#ifndef __EMSCRIPTEN__
+        if (ImGui::BeginMenu("Debug"))
+        {
+            ImGui::Spacing();
+            ImGui::MenuItem("Show Performance Overlay", nullptr, &frame_diagnostics_state.is_overlay_enabled);
+            ImGui::EndMenu();
+        }
+#endif
         if (game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe())
         {
             if (is_emulation_paused)
@@ -378,7 +501,9 @@ void render_keybinds_editor(
                 &key_bindings.fullscreen
             };
 
-            for (int i = 0; i < 5; i++)
+            int emulator_key_count = static_cast<int>(std::size(emulator_labels));
+
+            for (int i = 0; i < emulator_key_count; i++)
             {
                 ImGui::Text("%s:", emulator_labels[i]);
                 ImGui::SameLine(emulator_label_width);
@@ -463,7 +588,7 @@ void render_error_message_popup(
     }
 }
 
-std::string get_keybind_label(SDL_Keycode key)
+std::string get_keybind_label(const SDL_Keycode key)
 {
     if (key == SDLK_UNKNOWN)
     {
@@ -472,7 +597,7 @@ std::string get_keybind_label(SDL_Keycode key)
     return std::string("[") + SDL_GetKeyName(key) + "]";
 }
 
-ImVec4 get_imvec4_from_abgr(uint32_t abgr)
+ImVec4 get_imvec4_from_abgr(const uint32_t abgr)
 {
     const uint8_t alpha = (abgr >> 24) & 0xFF;
     const uint8_t blue = (abgr >> 16) & 0xFF;
