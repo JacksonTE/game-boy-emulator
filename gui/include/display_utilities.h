@@ -71,8 +71,7 @@ bool should_main_menu_bar_and_cursor_be_visible(
     const EmulationController& emulation_controller,
     MenuAndCursorDisplayStatus& fullscreen_display_status,
     bool is_custom_palette_editor_open,
-    bool is_keybinds_editor_open,
-    SDL_Window* sdl_window);
+    bool is_keybinds_editor_open);
 
 void update_imgui_scale_by_resolution(SDL_Window* sdl_window);
 

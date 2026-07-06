@@ -70,9 +70,9 @@ static bool is_cursor_currently_visible()
 {
 #ifdef __EMSCRIPTEN__
     return EM_ASM_INT(
-    {
-        return Module.is_web_cursor_visible ? 1 : 0;
-    }) != 0;
+        {
+            return Module.is_web_cursor_visible ? 1 : 0; 
+        }) != 0;
 #else
     return SDL_CursorVisible();
 #endif
@@ -82,10 +82,10 @@ static void set_cursor_visible(const bool is_visible)
 {
 #ifdef __EMSCRIPTEN__
     EM_ASM(
-    {
-        Module.setWebCursorVisible(!!$0);
-    },
-    is_visible ? 1 : 0);
+        {
+            Module.setWebCursorVisible(!!$0);
+        },
+        is_visible ? 1 : 0);
 #else
     if (is_visible)
     {
@@ -155,10 +155,8 @@ bool should_main_menu_bar_and_cursor_be_visible(
     const EmulationController& emulation_controller,
     MenuAndCursorDisplayStatus& menu_and_cursor_display_status,
     bool is_custom_palette_editor_open,
-    bool is_keybinds_editor_open,
-    SDL_Window* sdl_window)
+    bool is_keybinds_editor_open)
 {
-    (void)sdl_window;
     if (!game_boy_emulator.is_game_rom_loaded_in_memory_thread_safe() ||
         emulation_controller.is_emulation_paused_atomic.load(std::memory_order_acquire) ||
         is_keybinds_editor_open ||
@@ -214,11 +212,10 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     }
     constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
 
-    const float display_height = 
 #ifdef __EMSCRIPTEN__
-        static_cast<float>(std::max(1, get_web_viewport_metrics().pixel_viewport_height));
+    const float display_height = static_cast<float>(std::max(1, get_web_viewport_metrics().pixel_viewport_height));
 #else
-        static_cast<float>(display_mode->h);
+    const float display_height = static_cast<float>(display_mode->h);
 #endif
     const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 
@@ -331,8 +328,7 @@ void render_frame(RenderContext& context)
             *context.emulation_controller,
             *context.menu_and_cursor_display_status,
             context.menu_properties->is_custom_palette_editor_open,
-            context.menu_properties->keybinds_editor_state.is_open,
-            context.sdl_window))
+            context.menu_properties->keybinds_editor_state.is_open))
     {
         if (!is_cursor_currently_visible())
         {

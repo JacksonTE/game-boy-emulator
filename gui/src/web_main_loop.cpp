@@ -9,8 +9,7 @@
 #include "input_events.h"
 
 static void sync_emscripten_window_to_viewport(
-    EmscriptenLoopState* state,
-    const char* reason)
+    EmscriptenLoopState* state)
 {
     const web_viewport_metrics_t viewport_metrics = get_web_viewport_metrics();
 
@@ -43,7 +42,7 @@ static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
     (void)ui_event;
 
-    sync_emscripten_window_to_viewport(state, "resize");
+    sync_emscripten_window_to_viewport(state);
 
     return EM_FALSE;
 }
@@ -52,7 +51,7 @@ static EM_BOOL emscripten_fullscreen_change_callback(int, const EmscriptenFullsc
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
 
-    sync_emscripten_window_to_viewport(state, "fullscreenchange");
+    sync_emscripten_window_to_viewport(state);
 
     return EM_FALSE;
 }
@@ -125,7 +124,7 @@ void start_emscripten_main_loop(EmscriptenLoopState& loop_state)
 {
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &loop_state, false, emscripten_resize_callback);
     emscripten_set_fullscreenchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, &loop_state, false, emscripten_fullscreen_change_callback);
-    sync_emscripten_window_to_viewport(&loop_state, "main-loop-start");
+    sync_emscripten_window_to_viewport(&loop_state);
     emscripten_set_main_loop_arg(emscripten_main_loop_iteration, &loop_state, 0, false);
 }
 
