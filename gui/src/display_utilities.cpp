@@ -1,6 +1,5 @@
+#include <cstdint>
 #include <backends/imgui_impl_sdlrenderer3.h>
-
-#include <cmath>
 
 #include "display_utilities.h"
 #include "imgui_rendering.h"
@@ -214,10 +213,12 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
 
 #ifdef __EMSCRIPTEN__
     const float display_height = static_cast<float>(std::max(1, get_web_viewport_metrics().pixel_viewport_height));
+    constexpr float WEB_FONT_SCALE_MULTIPLIER = 1.15f;
+    const float font_scale = (display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING) * WEB_FONT_SCALE_MULTIPLIER;
 #else
     const float display_height = static_cast<float>(display_mode->h);
-#endif
     const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
+#endif
 
     ImGuiStyle& style = ImGui::GetStyle();
 
