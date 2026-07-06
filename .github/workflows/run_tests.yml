@@ -45,8 +45,21 @@ jobs:
             --target game-boy-tests
 
       - name: Run Tests
+        id: run_tests
+        continue-on-error: true
         run: |
           ctest \
             --test-dir build \
             --parallel $(nproc) \
-            --output-on-failure
+            --output-on-failure \
+            --output-junit build/ctest-results.xml
+
+      - name: Publish Test Report
+        if: always()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: build/ctest-results.xml
+          fail_on_failure: true
+          include_passed: true
+          detailed_summary: true
+          job_summary: true
