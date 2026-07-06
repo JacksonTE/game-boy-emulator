@@ -55,6 +55,25 @@ jobs:
             --output-junit build/ctest-results.xml
 
       - if: always()
+        name: Debug Test Report Output
+        run: |
+          echo "Listing build directory contents"
+          ls -la build || true
+          echo "Listing build/Testing directory contents"
+          ls -la build/Testing || true
+          echo "Searching for XML test reports under build"
+          find build -maxdepth 3 -type f \( -name '*.xml' -o -name 'Test.xml' \) -print || true
+          echo "Checking for build/ctest-results.xml"
+          if [ -f build/ctest-results.xml ]; then
+            echo "Found build/ctest-results.xml"
+            wc -c build/ctest-results.xml || true
+            echo "Preview of build/ctest-results.xml"
+            sed -n '1,120p' build/ctest-results.xml || true
+          else
+            echo "build/ctest-results.xml was not generated"
+          fi
+
+      - if: always()
         name: Publish Test Report
         uses: mikepenz/action-junit-report@v6
         with:
@@ -63,3 +82,5 @@ jobs:
           include_passed: true
           detailed_summary: true
           job_summary: true
+          annotate_only: true
+          skip_annotations: true
