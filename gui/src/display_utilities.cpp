@@ -212,13 +212,24 @@ void update_imgui_scale_by_resolution(SDL_Window* sdl_window)
     constexpr float BASE_PIXEL_HEIGHT_FOR_FONT_SCALING = 1440.0f;
 
 #ifdef __EMSCRIPTEN__
-    const float display_height = static_cast<float>(std::max(1, get_web_viewport_metrics().pixel_viewport_height));
-    constexpr float WEB_FONT_SCALE_MULTIPLIER = 1.15f;
-    const float font_scale = (display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING) * WEB_FONT_SCALE_MULTIPLIER;
+    static float display_height = 0.0f;
+    const bool is_web_fullscreen = EM_ASM_INT(
+    {
+        return document.fullscreenElement ? 1 : 0;
+    }) != 0;
+
+    if (display_height == 0.0f || !is_web_fullscreen)
+    {
+        display_height = static_cast<float>(EM_ASM_INT(
+        {
+            const css_display_height = (window.screen && window.screen.height) || window.innerHeight || 0;
+            return Math.max(1, Math.round(css_display_height * (window.devicePixelRatio || 1.0)));
+        }));
+    }
 #else
     const float display_height = static_cast<float>(display_mode->h);
-    const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 #endif
+    const float font_scale = display_height / BASE_PIXEL_HEIGHT_FOR_FONT_SCALING;
 
     ImGuiStyle& style = ImGui::GetStyle();
 
