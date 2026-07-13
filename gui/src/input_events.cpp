@@ -276,6 +276,15 @@ void toggle_fullscreen_enabled_state(
 #endif
 
     const bool was_fullscreen_enabled = (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN) != 0;
+#ifdef __EMSCRIPTEN__
+    menu_and_cursor_display_status.seconds_until_fullscreen_transition_menu_visible =
+        WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS;
+    EM_ASM(
+        {
+            Module.hideCanvasDuringFullscreenTransition($0);
+        },
+        static_cast<int>(WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS * 1000.0f));
+#endif
     SDL_SetWindowFullscreen(sdl_window, !was_fullscreen_enabled);
 
 #ifndef __EMSCRIPTEN__

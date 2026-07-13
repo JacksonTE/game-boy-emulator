@@ -36,6 +36,11 @@
             image-rendering: pixelated;
             outline: none;
         }
+
+        canvas.web-fullscreen-transition-hidden
+        {
+            opacity: 0;
+        }
     </style>
 </head>
 <body>
@@ -61,6 +66,7 @@
             let is_file_selection_handled = false;
             let should_skip_next_firefox_rom_load_cursor_hide = false;
             let is_firefox_rom_load_cursor_hide_skipped = false;
+            let fullscreen_transition_timeout_id = 0;
 
             function focus_canvas()
             {
@@ -74,6 +80,21 @@
                 document.body.style.cursor = cursor_style;
                 document.documentElement.style.cursor = cursor_style;
             }
+
+            module.hideCanvasDuringFullscreenTransition = function(duration_milliseconds)
+            {
+                if (fullscreen_transition_timeout_id !== 0)
+                {
+                    window.clearTimeout(fullscreen_transition_timeout_id);
+                }
+
+                canvas.classList.add('web-fullscreen-transition-hidden');
+                fullscreen_transition_timeout_id = window.setTimeout(function()
+                {
+                    fullscreen_transition_timeout_id = 0;
+                    canvas.classList.remove('web-fullscreen-transition-hidden');
+                }, duration_milliseconds);
+            };
 
             function report_web_file_selection_result(file_type, result)
             {

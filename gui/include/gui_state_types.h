@@ -27,6 +27,7 @@ struct MenuAndCursorDisplayStatus
     bool is_main_menu_bar_hovered{};
     int cursor_changes_to_ignore_count{};
     float seconds_until_main_menu_bar_and_cursor_hidden{};
+    float seconds_until_fullscreen_transition_menu_visible{};
 };
 
 struct GraphicsController

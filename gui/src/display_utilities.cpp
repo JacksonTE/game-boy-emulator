@@ -167,6 +167,13 @@ bool should_main_menu_bar_and_cursor_be_visible(
     }
 
     ImGuiIO& io = ImGui::GetIO();
+#ifdef __EMSCRIPTEN__
+    if (menu_and_cursor_display_status.seconds_until_fullscreen_transition_menu_visible > 0.0f)
+    {
+        menu_and_cursor_display_status.seconds_until_fullscreen_transition_menu_visible -= io.DeltaTime;
+        return false;
+    }
+#endif
     const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * io.DisplayFramebufferScale.y;
     const bool is_mouse_in_window =
         ImGui::IsMousePosValid(&io.MousePos) &&

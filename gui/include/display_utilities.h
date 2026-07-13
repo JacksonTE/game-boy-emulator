@@ -6,6 +6,7 @@
 #include "gui_state_types.h"
 
 constexpr float MAIN_MENU_BAR_AND_CURSOR_HIDE_DELAY_SECONDS = 2.5f;
+constexpr float WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS = 0.2f;
 
 constexpr int DEFAULT_INITIAL_WINDOW_SCALE = 4;
 constexpr uint8_t DISPLAY_WIDTH_PIXELS = 160;
