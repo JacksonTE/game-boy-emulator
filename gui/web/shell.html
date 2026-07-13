@@ -50,6 +50,7 @@
             const module = window.Module;
             const canvas = document.getElementById('canvas');
             const rom_file_input = document.getElementById('rom-file-input');
+            const is_firefox = navigator.userAgent.toLowerCase().includes('firefox');
             const web_selected_paths =
             {
                 0: '/tmp/web-selected-game-rom.gb',
@@ -58,6 +59,8 @@
             let pending_file_type = 0;
             let is_file_picker_open = false;
             let is_file_selection_handled = false;
+            let should_skip_next_firefox_rom_load_cursor_hide = false;
+            let is_firefox_rom_load_cursor_hide_skipped = false;
 
             function focus_canvas()
             {
@@ -66,7 +69,7 @@
 
             function apply_web_cursor_visibility()
             {
-                const cursor_style = module.is_web_cursor_visible ? 'default' : 'none';
+                const cursor_style = module.is_web_cursor_visible || is_firefox_rom_load_cursor_hide_skipped ? 'default' : 'none';
                 canvas.style.cursor = cursor_style;
                 document.body.style.cursor = cursor_style;
                 document.documentElement.style.cursor = cursor_style;
@@ -92,6 +95,20 @@
             module.setWebCursorVisible = function(is_visible)
             {
                 module.is_web_cursor_visible = is_visible;
+                if (is_visible)
+                {
+                    should_skip_next_firefox_rom_load_cursor_hide = false;
+                    is_firefox_rom_load_cursor_hide_skipped = false;
+                }
+                else if (is_firefox && should_skip_next_firefox_rom_load_cursor_hide)
+                {
+                    should_skip_next_firefox_rom_load_cursor_hide = false;
+                    is_firefox_rom_load_cursor_hide_skipped = true;
+                }
+                else
+                {
+                    is_firefox_rom_load_cursor_hide_skipped = false;
+                }
                 apply_web_cursor_visibility();
             };
 
@@ -102,6 +119,7 @@
                     if (is_file_picker_open && !is_file_selection_handled && rom_file_input.files.length === 0)
                     {
                         is_file_picker_open = false;
+                        should_skip_next_firefox_rom_load_cursor_hide = false;
                         report_web_file_selection_result(pending_file_type, 3);
                         focus_canvas();
                     }
@@ -125,6 +143,7 @@
                 {
                     is_file_picker_open = false;
                     is_file_selection_handled = true;
+                    should_skip_next_firefox_rom_load_cursor_hide = false;
                     report_web_file_selection_result(pending_file_type, 3);
                     focus_canvas();
                     return;
@@ -150,10 +169,12 @@
                         }
 
                         FS.writeFile(rom_path, rom_bytes);
+                        should_skip_next_firefox_rom_load_cursor_hide = is_firefox && pending_file_type === 0;
                         report_web_file_selection_result(pending_file_type, 2);
                     }
                     catch
                     {
+                        should_skip_next_firefox_rom_load_cursor_hide = false;
                         report_web_file_selection_result(pending_file_type, 4);
                     }
 
@@ -162,6 +183,7 @@
 
                 reader.addEventListener('error', function()
                 {
+                    should_skip_next_firefox_rom_load_cursor_hide = false;
                     report_web_file_selection_result(pending_file_type, 4);
                     focus_canvas();
                 });
