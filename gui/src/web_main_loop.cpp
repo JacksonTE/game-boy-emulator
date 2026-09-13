@@ -2,30 +2,49 @@
 
 #ifdef __EMSCRIPTEN__
 
+#include <cmath>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
 #include "display_utilities.h"
 #include "input_events.h"
 
-static void sync_emscripten_window_to_viewport(
+static bool sync_emscripten_window_to_viewport(
     EmscriptenLoopState* state)
 {
     const web_viewport_metrics_t viewport_metrics = get_web_viewport_metrics();
+    if (viewport_metrics.pixel_viewport_width <= 0 || viewport_metrics.pixel_viewport_height <= 0)
+    {
+        return false;
+    }
 
-    emscripten_set_element_css_size(
-        "#canvas",
-        static_cast<double>(viewport_metrics.css_viewport_width),
-        static_cast<double>(viewport_metrics.css_viewport_height));
-    emscripten_set_canvas_element_size(
-        "#canvas",
-        viewport_metrics.pixel_viewport_width,
-        viewport_metrics.pixel_viewport_height);
+    int canvas_w, canvas_h;
+    emscripten_get_canvas_element_size("#canvas", &canvas_w, &canvas_h);
+
+    double css_w, css_h;
+    emscripten_get_element_css_size("#canvas", &css_w, &css_h);
 
     int sdl_w, sdl_h;
     SDL_GetWindowSize(state->sdl_window, &sdl_w, &sdl_h);
 
-    if (viewport_metrics.pixel_viewport_width != sdl_w || viewport_metrics.pixel_viewport_height != sdl_h)
+    const bool is_canvas_size_stale =
+        canvas_w != viewport_metrics.pixel_viewport_width ||
+        canvas_h != viewport_metrics.pixel_viewport_height;
+
+    const bool is_css_size_stale =
+        static_cast<int>(std::lround(css_w)) != viewport_metrics.css_viewport_width ||
+        static_cast<int>(std::lround(css_h)) != viewport_metrics.css_viewport_height;
+
+    const bool is_sdl_size_stale =
+        sdl_w != viewport_metrics.pixel_viewport_width ||
+        sdl_h != viewport_metrics.pixel_viewport_height;
+
+    if (!is_canvas_size_stale && !is_css_size_stale && !is_sdl_size_stale)
+    {
+        return false;
+    }
+
+    if (is_sdl_size_stale)
     {
         SDL_SetWindowSize(
             state->sdl_window,
@@ -33,8 +52,30 @@ static void sync_emscripten_window_to_viewport(
             viewport_metrics.pixel_viewport_height);
     }
 
+    emscripten_set_canvas_element_size(
+        "#canvas",
+        viewport_metrics.pixel_viewport_width,
+        viewport_metrics.pixel_viewport_height);
+
+    emscripten_set_element_css_size(
+        "#canvas",
+        static_cast<double>(viewport_metrics.css_viewport_width),
+        static_cast<double>(viewport_metrics.css_viewport_height));
+
     update_imgui_scale_by_resolution(state->sdl_window);
-    render_frame(*state->render_context);
+
+    if (state->menu_and_cursor_display_status->seconds_until_fullscreen_change_event_timeout > 0.0f ||
+        state->menu_and_cursor_display_status->seconds_until_fullscreen_transition_menu_visible > 0.0f)
+    {
+        state->menu_and_cursor_display_status->seconds_until_fullscreen_transition_menu_visible =
+            WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS;
+        EM_ASM(
+            {
+                Module.hideCanvasDuringFullscreenTransition($0);
+            },
+            static_cast<int>(WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS * 1000.0f));
+    }
+    return true;
 }
 
 static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event, void* user_data)
@@ -42,7 +83,10 @@ static EM_BOOL emscripten_resize_callback(int, const EmscriptenUiEvent* ui_event
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
     (void)ui_event;
 
-    sync_emscripten_window_to_viewport(state);
+    if (sync_emscripten_window_to_viewport(state))
+    {
+        render_frame(*state->render_context);
+    }
 
     return EM_FALSE;
 }
@@ -51,7 +95,22 @@ static EM_BOOL emscripten_fullscreen_change_callback(int, const EmscriptenFullsc
 {
     EmscriptenLoopState* state = static_cast<EmscriptenLoopState*>(user_data);
 
-    sync_emscripten_window_to_viewport(state);
+    if (state->menu_and_cursor_display_status->seconds_until_fullscreen_change_event_timeout > 0.0f)
+    {
+        state->menu_and_cursor_display_status->seconds_until_fullscreen_change_event_timeout = 0.0f;
+        state->menu_and_cursor_display_status->seconds_until_fullscreen_transition_menu_visible =
+            WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS;
+        EM_ASM(
+            {
+                Module.hideCanvasDuringFullscreenTransition($0);
+            },
+            static_cast<int>(WEB_FULLSCREEN_TRANSITION_MENU_HIDE_SECONDS * 1000.0f));
+    }
+
+    if (sync_emscripten_window_to_viewport(state))
+    {
+        render_frame(*state->render_context);
+    }
 
     return EM_FALSE;
 }
@@ -65,6 +124,8 @@ static void emscripten_main_loop_iteration(void* arg)
         emscripten_cancel_main_loop();
         std::rethrow_exception(*state->emulator_core_exception_pointer);
     }
+
+    sync_emscripten_window_to_viewport(state);
 
     handle_sdl_events(
         *state->game_boy_emulator,
@@ -124,7 +185,6 @@ void start_emscripten_main_loop(EmscriptenLoopState& loop_state)
 {
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &loop_state, false, emscripten_resize_callback);
     emscripten_set_fullscreenchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, &loop_state, false, emscripten_fullscreen_change_callback);
-    sync_emscripten_window_to_viewport(&loop_state);
     emscripten_set_main_loop_arg(emscripten_main_loop_iteration, &loop_state, 0, false);
 }
 

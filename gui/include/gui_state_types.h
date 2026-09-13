@@ -28,6 +28,7 @@ struct MenuAndCursorDisplayStatus
     int cursor_changes_to_ignore_count{};
     float seconds_until_main_menu_bar_and_cursor_hidden{};
     float seconds_until_fullscreen_transition_menu_visible{};
+    float seconds_until_fullscreen_change_event_timeout{};
 };
 
 struct GraphicsController

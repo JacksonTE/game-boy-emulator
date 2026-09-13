@@ -167,13 +167,6 @@ bool should_main_menu_bar_and_cursor_be_visible(
     }
 
     ImGuiIO& io = ImGui::GetIO();
-#ifdef __EMSCRIPTEN__
-    if (menu_and_cursor_display_status.seconds_until_fullscreen_transition_menu_visible > 0.0f)
-    {
-        menu_and_cursor_display_status.seconds_until_fullscreen_transition_menu_visible -= io.DeltaTime;
-        return false;
-    }
-#endif
     const float main_menu_bar_height_pixels = ImGui::GetFrameHeight() * io.DisplayFramebufferScale.y;
     const bool is_mouse_in_window =
         ImGui::IsMousePosValid(&io.MousePos) &&
@@ -187,7 +180,6 @@ bool should_main_menu_bar_and_cursor_be_visible(
         if (menu_and_cursor_display_status.cursor_changes_to_ignore_count != 0)
         {
             menu_and_cursor_display_status.cursor_changes_to_ignore_count--;
-            return false;
         }
         else if (menu_and_cursor_display_status.is_main_menu_bar_hovered ||
                 io.MousePos.y <= main_menu_bar_height_pixels ||
@@ -342,38 +334,57 @@ void render_frame(RenderContext& context)
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui::NewFrame();
 
-    if (should_main_menu_bar_and_cursor_be_visible(
+    bool is_fullscreen_transition_in_progress = false;
+#ifdef __EMSCRIPTEN__
+    if (context.menu_and_cursor_display_status->seconds_until_fullscreen_change_event_timeout > 0.0f)
+    {
+        context.menu_and_cursor_display_status->seconds_until_fullscreen_change_event_timeout -= ImGui::GetIO().DeltaTime;
+        is_fullscreen_transition_in_progress = true;
+    }
+    else if (context.menu_and_cursor_display_status->seconds_until_fullscreen_transition_menu_visible > 0.0f)
+    {
+        context.menu_and_cursor_display_status->seconds_until_fullscreen_transition_menu_visible -= ImGui::GetIO().DeltaTime;
+        is_fullscreen_transition_in_progress = true;
+    }
+#endif
+
+    if (!is_fullscreen_transition_in_progress)
+    {
+        const bool is_menu_visible = should_main_menu_bar_and_cursor_be_visible(
             *context.game_boy_emulator,
             *context.emulation_controller,
             *context.menu_and_cursor_display_status,
             context.menu_properties->is_custom_palette_editor_open,
-            context.menu_properties->keybinds_editor_state.is_open))
-    {
-        if (!is_cursor_currently_visible())
+            context.menu_properties->keybinds_editor_state.is_open);
+
+        if (is_menu_visible)
         {
-            set_cursor_visible(true);
-        }
-        render_main_menu_bar(
-            currently_published_frame_buffer_index,
-            *context.game_boy_emulator,
-            *context.emulation_controller,
-            *context.file_loading_status,
-            *context.menu_and_cursor_display_status,
+            if (!is_cursor_currently_visible())
+            {
+                set_cursor_visible(true);
+            }
+            render_main_menu_bar(
+                currently_published_frame_buffer_index,
+                *context.game_boy_emulator,
+                *context.emulation_controller,
+                *context.file_loading_status,
+                *context.menu_and_cursor_display_status,
 #ifndef __EMSCRIPTEN__
-            *context.frame_diagnostics_state,
+                *context.frame_diagnostics_state,
 #endif
-            *context.graphics_controller,
-            *context.menu_properties,
-            *context.key_bindings,
-            context.sdl_window,
-            context.loaded_game_rom_path,
-            context.loaded_boot_rom_path,
-            *context.should_stop_emulation,
-            *context.error_message);
-    }
-    else if (is_cursor_currently_visible())
-    {
-        set_cursor_visible(false);
+                *context.graphics_controller,
+                *context.menu_properties,
+                *context.key_bindings,
+                context.sdl_window,
+                context.loaded_game_rom_path,
+                context.loaded_boot_rom_path,
+                *context.should_stop_emulation,
+                *context.error_message);
+        }
+        else if (is_cursor_currently_visible())
+        {
+            set_cursor_visible(false);
+        }
     }
 
     render_auxiliary_windows(
