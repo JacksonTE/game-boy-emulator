@@ -70,6 +70,7 @@ void PixelProcessingUnit::reset_state()
     previous_mode = PixelProcessingUnitMode::HorizontalBlank;
     current_mode = PixelProcessingUnitMode::HorizontalBlank;
     current_scanline_dot_number = 0;
+    is_in_frame_after_lcd_enable = false;
     is_in_first_scanline_after_lcd_enable = false;
     is_in_first_dot_of_current_step = true;
     is_window_enabled_for_scanline = false;
@@ -77,7 +78,13 @@ void PixelProcessingUnit::reset_state()
     stat_value_after_spurious_interrupt = 0;
     did_spurious_stat_interrupt_occur = false;
     are_stat_interrupts_blocked = false;
-    did_scan_line_end_during_this_machine_cycle = false;
+    is_stat_interrupt_pending = false;
+    previous_ly_lcd_y_coordinate = 0;
+    previous_lyc_lcd_y_coordinate_compare = 0;
+    hblank_mode_delay_dots = 0;
+    is_vram_blocked = false;
+    is_oam_blocked = false;
+    was_wy_condition_triggered_this_frame = false;
 
     scanline_selected_objects.clear();
     current_object_index = 0;
@@ -98,7 +105,7 @@ void PixelProcessingUnit::set_post_boot_state()
 
     previous_mode = PixelProcessingUnitMode::VerticalBlank;
     current_mode = PixelProcessingUnitMode::VerticalBlank;
-    current_scanline_dot_number = 0x018C;
+    current_scanline_dot_number = 395;
 
     lcdc_lcd_control = 0x91;
     stat_lcd_status = 0x85;
@@ -137,6 +144,8 @@ void PixelProcessingUnit::write_lcdc_lcd_control(uint8_t value)
         is_in_first_scanline_after_lcd_enable = true;
         is_in_first_dot_of_current_step = true;
         current_scanline_dot_number = 0;
+        previous_lyc_lcd_y_coordinate_compare = lyc_lcd_y_coordinate_compare;
+        set_bit(stat_lcd_status, 2, lyc_lcd_y_coordinate_compare == 0);
     }
     else if (!will_lcd_enable_bit_be_set && was_lcd_enable_bit_previously_set)
     {
@@ -144,8 +153,15 @@ void PixelProcessingUnit::write_lcdc_lcd_control(uint8_t value)
         publish_new_frame();
 
         ly_lcd_y_coordinate = 0;
+        previous_ly_lcd_y_coordinate = 0;
         wlc_internal_window_line_counter = 0;
+        hblank_mode_delay_dots = 0;
+        is_vram_blocked = false;
+        is_oam_blocked = false;
+        scanline_selected_objects.clear();
+        was_wy_condition_triggered_this_frame = false;
         switch_to_mode(PixelProcessingUnitMode::HorizontalBlank);
+        previous_mode = PixelProcessingUnitMode::HorizontalBlank;
     }
     lcdc_lcd_control = value;
 }
@@ -179,14 +195,9 @@ uint8_t PixelProcessingUnit::read_ly_lcd_y_coordinate() const
 
 uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
 {
-    const bool is_lcd_enable_bit_set = is_bit_set(lcdc_lcd_control, 7);
-    if (is_lcd_enable_bit_set)
+    if (is_vram_blocked)
     {
-        if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-            current_mode == PixelProcessingUnitMode::PixelTransfer && !is_in_first_scanline_after_lcd_enable)
-        {
-            return 0xFF;
-        }
+        return 0xFF;
     }
     const uint16_t local_address = memory_address - VIDEO_RAM_START;
     return video_ram[local_address];
@@ -194,13 +205,9 @@ uint8_t PixelProcessingUnit::read_byte_video_ram(uint16_t memory_address) const
 
 void PixelProcessingUnit::write_byte_video_ram(uint16_t memory_address, uint8_t value)
 {
-    const bool is_lcd_enable_bit_set = is_bit_set(lcdc_lcd_control, 7);
-    if (is_lcd_enable_bit_set)
+    if (is_vram_blocked)
     {
-        if (previous_mode == PixelProcessingUnitMode::PixelTransfer)
-        {
-            return;
-        }
+        return;
     }
     const uint16_t local_address = memory_address - VIDEO_RAM_START;
     video_ram[local_address] = value;
@@ -213,15 +220,9 @@ uint8_t PixelProcessingUnit::read_byte_object_attribute_memory(uint16_t memory_a
         return 0xFF;
     }
 
-    const bool is_lcd_enable_bit_set = is_bit_set(lcdc_lcd_control, 7);
-    if (!is_access_unrestricted && is_lcd_enable_bit_set)
+    if (!is_access_unrestricted && is_oam_blocked)
     {
-        if (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
-            previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan ||
-            previous_mode == PixelProcessingUnitMode::PixelTransfer)
-        {
-            return 0xFF;
-        }
+        return 0xFF;
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
     return object_attribute_memory[local_address];
@@ -236,34 +237,27 @@ void PixelProcessingUnit::write_byte_object_attribute_memory(uint16_t memory_add
             return;
         }
 
-        const bool is_lcd_enable_bit_set = is_bit_set(lcdc_lcd_control, 7);
-        if (is_lcd_enable_bit_set)
+        if (is_oam_blocked)
         {
-            if (previous_mode == PixelProcessingUnitMode::PixelTransfer ||
-                current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && previous_mode == current_mode)
-            {
-                return;
-            }
+            return;
         }
     }
     const uint16_t local_address = memory_address - OBJECT_ATTRIBUTE_MEMORY_START;
     object_attribute_memory[local_address] = value;
 }
 
-void PixelProcessingUnit::step_forward_one_machine_cycle()
+void PixelProcessingUnit::step_one_clock_cycle()
 {
-    previous_mode = current_mode;
-
     const bool is_lcd_enable_bit_set = is_bit_set(lcdc_lcd_control, 7);
-    if (!is_lcd_enable_bit_set)
-    {
-        return;
-    }
-    should_previous_mode_update_early_for_stat_reads = false;
-
-    for (uint8_t i = 0; i < DOTS_PER_MACHINE_CYCLE; i++)
+    if (is_lcd_enable_bit_set)
     {
         current_scanline_dot_number++;
+        if (hblank_mode_delay_dots > 0)
+        {
+            hblank_mode_delay_dots--;
+            is_vram_blocked = false;
+            is_oam_blocked = false;
+        }
 
         switch (current_mode)
         {
@@ -272,11 +266,6 @@ void PixelProcessingUnit::step_forward_one_machine_cycle()
                 break;
             case PixelProcessingUnitMode::PixelTransfer:
                 step_pixel_transfer_forward_one_dot();
-
-                if (current_mode == PixelProcessingUnitMode::HorizontalBlank && i < DOTS_PER_MACHINE_CYCLE - 1)
-                {
-                    should_previous_mode_update_early_for_stat_reads = true;
-                }
                 break;
             case PixelProcessingUnitMode::HorizontalBlank:
                 step_horizontal_blank_forward_one_dot();
@@ -285,24 +274,50 @@ void PixelProcessingUnit::step_forward_one_machine_cycle()
                 step_vertical_blank_forward_one_dot();
                 break;
         }
-    }
-    trigger_stat_interrupts();
-
-    if (should_previous_mode_update_early_for_stat_reads)
-    {
-        previous_mode = PixelProcessingUnitMode::HorizontalBlank;
+        update_previous_mode_for_current_dot();
+        trigger_stat_interrupts();
+        // These corrections affect mode visibility after STAT interrupts are checked for this dot.
+        if ((previous_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && is_oam_dma_in_progress) ||
+            (current_mode == PixelProcessingUnitMode::VerticalBlank && ly_lcd_y_coordinate == 0 && current_scanline_dot_number >= 454))
+        {
+            previous_mode = PixelProcessingUnitMode::HorizontalBlank;
+        }
+        previous_ly_lcd_y_coordinate = ly_lcd_y_coordinate;
+        previous_lyc_lcd_y_coordinate_compare = lyc_lcd_y_coordinate_compare;
     }
 
     if (did_spurious_stat_interrupt_occur)
     {
-        stat_lcd_status = stat_value_after_spurious_interrupt;
+        stat_lcd_status = (stat_lcd_status & 0b10000111) | stat_value_after_spurious_interrupt;
         did_spurious_stat_interrupt_occur = false;
         stat_value_after_spurious_interrupt = 0x00;
     }
 }
 
+void PixelProcessingUnit::update_previous_mode_for_current_dot()
+{
+    previous_mode = current_mode;
+    if (current_scanline_dot_number == 79 &&
+        (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan || is_in_first_scanline_after_lcd_enable))
+    {
+        previous_mode = PixelProcessingUnitMode::PixelTransfer;
+    }
+    if (current_mode == PixelProcessingUnitMode::HorizontalBlank && current_scanline_dot_number == 455)
+    {
+        previous_mode = (ly_lcd_y_coordinate == FIRST_SCANLINE_OF_VERTICAL_BLANK)
+            ? PixelProcessingUnitMode::VerticalBlank
+            : PixelProcessingUnitMode::ObjectAttributeMemoryScan;
+    }
+    if (hblank_mode_delay_dots > 0)
+    {
+        previous_mode = PixelProcessingUnitMode::PixelTransfer;
+    }
+}
+
 void PixelProcessingUnit::step_object_attribute_memory_scan_forward_one_dot()
 {
+    is_oam_blocked = current_scanline_dot_number < 76 || current_scanline_dot_number >= 78;
+    is_vram_blocked = current_scanline_dot_number >= 78;
     if (is_in_first_dot_of_current_step)
     {
         is_in_first_dot_of_current_step = false;
@@ -346,9 +361,12 @@ void PixelProcessingUnit::step_object_attribute_memory_scan_forward_one_dot()
 
 void PixelProcessingUnit::step_pixel_transfer_forward_one_dot()
 {
-    const uint8_t dot_number_for_dummy_push = (is_in_first_scanline_after_lcd_enable
-        ? FIRST_HORIZONTAL_BLANK_AFTER_LCD_ENABLE_DURATION_DOTS
-        : OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS) + 5;
+    const uint8_t dot_number_for_dummy_push = OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS + 4;
+
+    if (current_scanline_dot_number == dot_number_for_dummy_push - 1)
+    {
+        scanline_pixels_to_discard_from_scrolling_count = scx_viewport_x_position % 8;
+    }
 
     if (current_scanline_dot_number < dot_number_for_dummy_push)
     {
@@ -432,18 +450,30 @@ void PixelProcessingUnit::step_pixel_transfer_forward_one_dot()
         if (++lx_internal_lcd_x_coordinate_plus_8 == 168)
         {
             switch_to_mode(PixelProcessingUnitMode::HorizontalBlank);
+            if (is_in_first_scanline_after_lcd_enable)
+            {
+                hblank_mode_delay_dots = 2;
+            }
+            else
+            {
+                is_vram_blocked = false;
+                is_oam_blocked = false;
+            }
         }
     }
 }
 
 void PixelProcessingUnit::step_horizontal_blank_forward_one_dot()
 {
-    if (current_scanline_dot_number < SCANLINE_DURATION_DOTS &&
-        !(is_in_first_scanline_after_lcd_enable &&
-          current_scanline_dot_number == FIRST_SCANLINE_AFTER_LCD_ENABLE_DURATION_DOTS))
+    if (current_scanline_dot_number == 454)
+    {
+        ly_lcd_y_coordinate++;
+        is_oam_blocked = ly_lcd_y_coordinate < FIRST_SCANLINE_OF_VERTICAL_BLANK;
+    }
+    if (current_scanline_dot_number < SCANLINE_DURATION_DOTS)
     {
         if (is_in_first_scanline_after_lcd_enable && 
-            current_scanline_dot_number == FIRST_HORIZONTAL_BLANK_AFTER_LCD_ENABLE_DURATION_DOTS)
+            current_scanline_dot_number == OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS)
         {
             switch_to_mode(PixelProcessingUnitMode::PixelTransfer);
         }
@@ -454,9 +484,7 @@ void PixelProcessingUnit::step_horizontal_blank_forward_one_dot()
     {
         wlc_internal_window_line_counter++;
     }
-    ly_lcd_y_coordinate++;
     current_scanline_dot_number = 0;
-    did_scan_line_end_during_this_machine_cycle = true;
 
     if (ly_lcd_y_coordinate == FIRST_SCANLINE_OF_VERTICAL_BLANK)
     {
@@ -475,7 +503,17 @@ void PixelProcessingUnit::step_vertical_blank_forward_one_dot()
     {
         ly_lcd_y_coordinate = 0;
         wlc_internal_window_line_counter = 0;
-        did_scan_line_end_during_this_machine_cycle = true;
+    }
+    if (current_scanline_dot_number == 454)
+    {
+        if (ly_lcd_y_coordinate != 0)
+        {
+            ly_lcd_y_coordinate++;
+        }
+        else
+        {
+            is_oam_blocked = true;
+        }
     }
     if (current_scanline_dot_number < SCANLINE_DURATION_DOTS)
     {
@@ -487,61 +525,66 @@ void PixelProcessingUnit::step_vertical_blank_forward_one_dot()
         was_wy_condition_triggered_this_frame = false;
         switch_to_mode(PixelProcessingUnitMode::ObjectAttributeMemoryScan);
     }
-    else
-    {
-        ly_lcd_y_coordinate++;
-        did_scan_line_end_during_this_machine_cycle = true;
-    }
     current_scanline_dot_number = 0;
 }
 
 void PixelProcessingUnit::trigger_stat_interrupts()
 {
-    bool should_stat_interrupt_trigger = false;
+    const bool is_final_scanline = (current_mode == PixelProcessingUnitMode::VerticalBlank) && (ly_lcd_y_coordinate == 0);
 
-    if (did_scan_line_end_during_this_machine_cycle)
-    {
-        set_bit(stat_lcd_status, 2, false);
-        did_scan_line_end_during_this_machine_cycle = false;
-    }
-    else
-    {
-        const bool is_lyc_interrupt_select_enabled = is_bit_set(stat_lcd_status, 6);
-        const bool is_ly_equal_to_lyc = (ly_lcd_y_coordinate == lyc_lcd_y_coordinate_compare);
-        set_bit(stat_lcd_status, 2, is_ly_equal_to_lyc);
-        should_stat_interrupt_trigger = (is_ly_equal_to_lyc && is_lyc_interrupt_select_enabled);
-    }
-    const bool is_object_attribute_memory_scan_interrupt_select_enabled = is_bit_set(stat_lcd_status, 5);
-    const bool is_vertical_blank_interrupt_select_enabled = is_bit_set(stat_lcd_status, 4);
-    const bool is_horizontal_blank_interrupt_select_enabled = is_bit_set(stat_lcd_status, 3);
+    const bool is_comparison_enabled = (is_final_scanline || current_scanline_dot_number != 454) &&
+        !(is_final_scanline && current_scanline_dot_number >= 3 && current_scanline_dot_number < 7);
 
-    switch (previous_mode)
-    {
-        case PixelProcessingUnitMode::ObjectAttributeMemoryScan:
-            should_stat_interrupt_trigger |= is_object_attribute_memory_scan_interrupt_select_enabled;
-            break;
-        case PixelProcessingUnitMode::HorizontalBlank:
-            should_stat_interrupt_trigger |= is_horizontal_blank_interrupt_select_enabled;
-            break;
-        case PixelProcessingUnitMode::VerticalBlank:
-            should_stat_interrupt_trigger |= is_vertical_blank_interrupt_select_enabled;
-            break;
-    }
-    should_stat_interrupt_trigger |= (is_object_attribute_memory_scan_interrupt_select_enabled &&
-                                      ly_lcd_y_coordinate == FIRST_SCANLINE_OF_VERTICAL_BLANK);
+    const bool is_ly_equal_to_lyc = is_comparison_enabled && (previous_ly_lcd_y_coordinate == previous_lyc_lcd_y_coordinate_compare);
 
-    if (should_stat_interrupt_trigger)
+    const bool is_lyc_interrupt_select_enabled = is_bit_set(stat_lcd_status, 6);
+
+    // Mode 2 is an entry pulse, rather than a level held throughout the OAM scan.
+    const bool is_oam_interrupt_dot =
+        (current_mode == PixelProcessingUnitMode::HorizontalBlank && current_scanline_dot_number == 453) ||
+        (current_mode == PixelProcessingUnitMode::ObjectAttributeMemoryScan && current_scanline_dot_number == 0 && ly_lcd_y_coordinate == 0);
+    if (is_oam_interrupt_dot)
     {
-        if (!are_stat_interrupts_blocked)
+        const bool should_oam_interrupt_trigger = is_bit_set(stat_lcd_status, 5) || (is_lyc_interrupt_select_enabled && is_ly_equal_to_lyc);
+        is_stat_interrupt_pending = should_oam_interrupt_trigger && !are_stat_interrupts_blocked;
+
+        if (ly_lcd_y_coordinate != 143 && is_lyc_interrupt_select_enabled &&
+            previous_lyc_lcd_y_coordinate_compare == ly_lcd_y_coordinate + 1)
         {
-            are_stat_interrupts_blocked = true;
-            request_interrupt_callback(INTERRUPT_FLAG_STAT_MASK);
+            are_stat_interrupts_blocked = should_oam_interrupt_trigger;
         }
     }
+
+    if (is_stat_interrupt_pending)
+    {
+        request_interrupt_callback(INTERRUPT_FLAG_STAT_MASK);
+        is_stat_interrupt_pending = false;
+    }
     else
     {
-        are_stat_interrupts_blocked = false;
+        const bool is_first_oam_scan = is_in_first_scanline_after_lcd_enable &&
+            current_scanline_dot_number < OBJECT_ATTRIBUTE_MEMORY_SCAN_DURATION_DOTS;
+        const bool is_leaving_vertical_blank = is_final_scanline && current_scanline_dot_number >= 454;
+        bool should_stat_interrupt_trigger = false;
+        if (is_lyc_interrupt_select_enabled && is_ly_equal_to_lyc)
+        {
+            should_stat_interrupt_trigger = true;
+        }
+        if (!is_first_oam_scan && !is_leaving_vertical_blank)
+        {
+            if (previous_mode == PixelProcessingUnitMode::HorizontalBlank && is_bit_set(stat_lcd_status, 3))
+            {
+                should_stat_interrupt_trigger = true;
+            }
+            if (previous_mode == PixelProcessingUnitMode::VerticalBlank && (stat_lcd_status & 0b00110000) != 0)
+            {
+                should_stat_interrupt_trigger = true;
+            }
+        }
+        is_stat_interrupt_pending = should_stat_interrupt_trigger && !are_stat_interrupts_blocked;
+        are_stat_interrupts_blocked = should_stat_interrupt_trigger;
     }
+    set_bit(stat_lcd_status, 2, is_ly_equal_to_lyc);
 }
 
 void PixelProcessingUnit::switch_to_mode(PixelProcessingUnitMode new_mode)
@@ -551,8 +594,12 @@ void PixelProcessingUnit::switch_to_mode(PixelProcessingUnitMode new_mode)
         case PixelProcessingUnitMode::ObjectAttributeMemoryScan:
             scanline_selected_objects.clear();
             current_object_index = 0;
+            is_in_first_dot_of_current_step = true;
+            is_oam_blocked = true;
             break;
         case PixelProcessingUnitMode::PixelTransfer:
+            is_vram_blocked = true;
+            is_oam_blocked = true;
             if (!was_wy_condition_triggered_this_frame)
             {
                 was_wy_condition_triggered_this_frame = (wy_window_y_position == ly_lcd_y_coordinate);

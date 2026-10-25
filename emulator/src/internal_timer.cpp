@@ -23,20 +23,24 @@ void InternalTimer::reset_state()
 void InternalTimer::set_post_boot_state()
 {
     reset_state();
-    system_counter = 0xABC8;
+    system_counter = 0xABCC;
 }
 
-void InternalTimer::step_forward_one_machine_cycle()
+void InternalTimer::step_one_clock_cycle(uint8_t clock_index_within_m_cycle)
 {
-    system_counter += 4;
+    system_counter++;
 
-    if (did_tima_overflow_occur)
+    if (clock_index_within_m_cycle == 3)
     {
-        request_interrupt_callback(TIMER_INTERRUPT_FLAG_MASK);
-        tima_timer = tma_timer_modulo;
+        if (did_tima_overflow_occur)
+        {
+            request_interrupt_callback(TIMER_INTERRUPT_FLAG_MASK);
+            tima_timer = tma_timer_modulo;
+        }
+        is_tima_overflow_handled = did_tima_overflow_occur;
+        did_tima_overflow_occur = false;
     }
-    is_tima_overflow_handled = did_tima_overflow_occur;
-    did_tima_overflow_occur = increment_tima_and_does_it_overflow();
+    increment_tima_early();
 }
 
 uint8_t InternalTimer::read_div() const
@@ -61,7 +65,7 @@ uint8_t InternalTimer::read_tac() const
 
 void InternalTimer::write_div(uint8_t value)
 {
-    system_counter = 0x0000;
+    system_counter = 0;
     increment_tima_early();
 }
 
@@ -94,8 +98,7 @@ void InternalTimer::increment_tima_early()
 {
     if (increment_tima_and_does_it_overflow())
     {
-        request_interrupt_callback(TIMER_INTERRUPT_FLAG_MASK);
-        tima_timer = tma_timer_modulo;
+        did_tima_overflow_occur = true;
     }
 }
 

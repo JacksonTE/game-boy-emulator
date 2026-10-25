@@ -9,19 +9,25 @@ namespace GameBoyEmulator
 {
 
 CentralProcessingUnit::CentralProcessingUnit(
-    std::function<void()> emulator_step_single_machine_cycle,
+    std::function<void(uint8_t clock_index_within_m_cycle)> step_all_emulator_components_one_cycle,
     MemoryManagementUnit& memory_management_unit_reference)
-    : emulator_step_single_machine_cycle_callback{emulator_step_single_machine_cycle},
+    : step_all_emulator_components_one_cycle_callback{step_all_emulator_components_one_cycle},
       memory_management_unit{memory_management_unit_reference}
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
 }
 
 void CentralProcessingUnit::reset_state(bool should_add_startup_machine_cycle)
 {
+    current_machine_cycle_clock_index = 0;
+    is_interrupt_pending = false;
+    is_servicing_interrupt = false;
+    remaining_interrupt_service_delay_m_cycles = 0;
+    interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
+    is_halted = false;
     if (should_add_startup_machine_cycle)
     {
-        emulator_step_single_machine_cycle_callback();
+        step_all_emulator_components();
     }
     set_register_file_state(RegisterFile<std::endian::native>{});
     interrupt_master_enable_ime = InterruptMasterEnableState::Disabled;
@@ -73,12 +79,13 @@ void CentralProcessingUnit::execute_next_instruction()
 {
     if (is_halted)
     {
-        emulator_step_single_machine_cycle_callback();
+        step_all_emulator_components();
     }
     else
     {
         if (is_current_instruction_prefixed)
         {
+            instruction_register_ir = fetch_immediate8_and_step_emulator_components();
             decode_current_prefixed_opcode_and_execute();
         }
         else
@@ -111,27 +118,31 @@ void CentralProcessingUnit::fetch_next_instruction()
             is_halted = false;
         }
     }
-    instruction_register_ir = is_current_instruction_prefixed
-        ? fetch_immediate8_and_step_emulator_components()
-        : immediate8;
+    instruction_register_ir = immediate8;
 }
 
 void CentralProcessingUnit::service_interrupt()
 {
-    bool is_interrupt_pending = (memory_management_unit.get_pending_interrupt_mask() != 0);
-    if (is_interrupt_pending && is_halted)
-    {
-        is_halted = false;
-    }
-    if (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled || !is_interrupt_pending)
+    if (!is_interrupt_pending || (remaining_interrupt_service_delay_m_cycles > 0))
     {
         return;
     }
-    emulator_step_single_machine_cycle_callback();
-    register_file.program_counter -= is_current_instruction_prefixed ? 2 : 1;
+    is_interrupt_pending = false;
+    is_halted = false;
+    if ((interrupt_master_enable_ime != InterruptMasterEnableState::Enabled) || (memory_management_unit.get_pending_interrupt_mask() == 0))
+    {
+        return;
+    }
+    is_servicing_interrupt = true;
+    decrement_and_step_emulator_components(register_file.program_counter);
     decrement_and_step_emulator_components(register_file.stack_pointer);
     write_byte_and_step_emulator_components(register_file.stack_pointer--, register_file.program_counter >> 8);
     uint8_t interrupt_flag_mask = memory_management_unit.get_pending_interrupt_mask();
+    if (interrupt_flag_mask != 0)
+    {
+        const uint8_t interrupt_index = static_cast<uint8_t>(std::countr_zero(interrupt_flag_mask));
+        interrupt_flag_mask = static_cast<uint8_t>(1U << interrupt_index);
+    }
     write_byte_and_step_emulator_components(register_file.stack_pointer, register_file.program_counter & 0xFF);
 
     memory_management_unit.clear_interrupt_flag_bit(interrupt_flag_mask);
@@ -141,18 +152,63 @@ void CentralProcessingUnit::service_interrupt()
         : 0x0040 + 8 * static_cast<uint8_t>(std::countr_zero(interrupt_flag_mask));
 
     fetch_next_instruction();
+    is_servicing_interrupt = false;
 }
 
 uint8_t CentralProcessingUnit::read_byte_and_step_emulator_components(uint16_t address)
 {
-    emulator_step_single_machine_cycle_callback();
-    return memory_management_unit.read_byte(address, false);
+    step_all_emulator_components(3);
+    const uint8_t value = memory_management_unit.read_byte(address, false);
+    step_all_emulator_components(1);
+    return value;
 }
 
 void CentralProcessingUnit::write_byte_and_step_emulator_components(uint16_t address, uint8_t value)
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components(1);
     memory_management_unit.write_byte(address, value, false);
+    step_all_emulator_components(3);
+}
+
+void CentralProcessingUnit::step_all_emulator_components(uint8_t clock_cycles)
+{
+    for (uint8_t i = 0; i < clock_cycles; i++)
+    {
+        step_all_emulator_components_one_cycle_callback(current_machine_cycle_clock_index);
+        sample_pending_interrupts();
+        if (current_machine_cycle_clock_index == 3 && remaining_interrupt_service_delay_m_cycles > 0)
+        {
+            remaining_interrupt_service_delay_m_cycles--;
+        }
+        current_machine_cycle_clock_index = (current_machine_cycle_clock_index + 1) % 4;
+    }
+}
+
+void CentralProcessingUnit::sample_pending_interrupts()
+{
+    if (is_interrupt_pending ||
+        is_servicing_interrupt ||
+        (!is_halted && (interrupt_master_enable_ime != InterruptMasterEnableState::Enabled)))
+    {
+        return;
+    }
+    const uint8_t pending_interrupt_mask = memory_management_unit.get_pending_interrupt_mask();
+    if (pending_interrupt_mask == 0)
+    {
+        return;
+    }
+
+    // Timer and serial wake HALT one machine cycle later at cycle index 3 than STAT.
+    remaining_interrupt_service_delay_m_cycles = (current_machine_cycle_clock_index == 3) ? 2 : 1;
+    if (is_halted && (current_machine_cycle_clock_index != 0))
+    {
+        remaining_interrupt_service_delay_m_cycles = 2;
+        if (current_machine_cycle_clock_index == 3 && ((pending_interrupt_mask & 0b00000011) == 0))
+        {
+            remaining_interrupt_service_delay_m_cycles = 3;
+        }
+    }
+    is_interrupt_pending = true;
 }
 
 uint8_t CentralProcessingUnit::fetch_immediate8_and_step_emulator_components()
@@ -1055,7 +1111,7 @@ void CentralProcessingUnit::increment(uint8_t& register8)
 
 void CentralProcessingUnit::increment_and_step_emulator_components(uint16_t& register16)
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     register16++;
 }
 
@@ -1070,13 +1126,13 @@ void CentralProcessingUnit::decrement(uint8_t& register8)
 
 void CentralProcessingUnit::decrement_and_step_emulator_components(uint16_t& register16)
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     register16--;
 }
 
 void CentralProcessingUnit::add_hl(uint16_t value)
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     const bool does_half_carry_occur = (register_file.HL & 0x0FFF) + (value & 0x0FFF) > 0x0FFF;
     const bool does_carry_occur = static_cast<uint32_t>(register_file.HL) + value > 0xFFFF;
     register_file.HL += value;
@@ -1173,7 +1229,7 @@ void CentralProcessingUnit::jump_relative_conditional_signed_immediate8(bool is_
     const int8_t signed_offset = static_cast<int8_t>(fetch_immediate8_and_step_emulator_components());
     if (is_condition_met)
     {
-        emulator_step_single_machine_cycle_callback();
+        step_all_emulator_components();
         register_file.program_counter += signed_offset;
     }
 }
@@ -1183,7 +1239,7 @@ void CentralProcessingUnit::jump_conditional_immediate16(bool is_condition_met)
     const uint16_t jump_address = fetch_immediate16_and_step_emulator_components();
     if (is_condition_met)
     {
-        emulator_step_single_machine_cycle_callback();
+        step_all_emulator_components();
         register_file.program_counter = jump_address;
     }
 }
@@ -1212,7 +1268,7 @@ void CentralProcessingUnit::call_conditional_immediate16(bool is_condition_met)
 
 void CentralProcessingUnit::return_conditional(bool is_condition_met)
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     if (is_condition_met)
     {
         return_0xC9();
@@ -1444,7 +1500,7 @@ void CentralProcessingUnit::return_0xC9()
 {
     uint16_t stack_top = 0;
     pop_stack(stack_top);
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     register_file.program_counter = stack_top;
 }
 
@@ -1458,8 +1514,7 @@ void CentralProcessingUnit::add_stack_pointer_signed_immediate8_0xE8()
 {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_step_emulator_components();
-    emulator_step_single_machine_cycle_callback();
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components(8);
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0F) + (unsigned_offset & 0x0F) > 0x0F;
     const bool does_carry_occur = (register_file.stack_pointer & 0xFF) + (unsigned_offset & 0xFF) > 0xFF;
     register_file.stack_pointer += static_cast<int8_t>(unsigned_offset);
@@ -1489,7 +1544,7 @@ void CentralProcessingUnit::load_hl_stack_pointer_with_signed_offset_0xF8()
 {
     // Carries are based on the unsigned immediate byte while the result is based on its signed equivalent
     const uint8_t unsigned_offset = fetch_immediate8_and_step_emulator_components();
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     const bool does_half_carry_occur = (register_file.stack_pointer & 0x0F) + (unsigned_offset & 0x0F) > 0x0F;
     const bool does_carry_occur = (register_file.stack_pointer & 0xFF) + (unsigned_offset & 0xFF) > 0xFF;
     register_file.HL = register_file.stack_pointer + static_cast<int8_t>(unsigned_offset);
@@ -1501,7 +1556,7 @@ void CentralProcessingUnit::load_hl_stack_pointer_with_signed_offset_0xF8()
 
 void CentralProcessingUnit::load_stack_pointer_hl_0xF9()
 {
-    emulator_step_single_machine_cycle_callback();
+    step_all_emulator_components();
     register_file.stack_pointer = register_file.HL;
 }
 

@@ -26,7 +26,7 @@ class CentralProcessingUnit
 {
 public:
     CentralProcessingUnit(
-        std::function<void()> emulator_step_single_machine_cycle,
+        std::function<void(uint8_t clock_index_within_m_cycle)> step_all_emulator_components_one_cycle,
         MemoryManagementUnit& memory_management_unit_reference);
 
     void reset_state(bool should_add_startup_machine_cycle);
@@ -38,13 +38,20 @@ public:
     void execute_next_instruction();
 
 private:
-    std::function<void()> emulator_step_single_machine_cycle_callback;
+    std::function<void(uint8_t clock_index_within_m_cycle)> step_all_emulator_components_one_cycle_callback;
     MemoryManagementUnit& memory_management_unit;
     RegisterFile<std::endian::native> register_file;
     InterruptMasterEnableState interrupt_master_enable_ime{InterruptMasterEnableState::Disabled};
     uint8_t instruction_register_ir{};
     bool is_current_instruction_prefixed{};
     bool is_halted{};
+    bool is_interrupt_pending{};
+    bool is_servicing_interrupt{};
+    uint8_t remaining_interrupt_service_delay_m_cycles{};
+    uint8_t current_machine_cycle_clock_index{};
+
+    void step_all_emulator_components(uint8_t clock_cycles = 4);
+    void sample_pending_interrupts();
 
     void fetch_next_instruction();
     void service_interrupt();

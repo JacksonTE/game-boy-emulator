@@ -24,7 +24,7 @@ Emulator::Emulator()
       },
       central_processing_unit
       {
-          [this](){ this->step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit(); },
+          [this](uint8_t clock_index_within_m_cycle){ this->step_components_one_cycle_to_sync_with_cpu(clock_index_within_m_cycle); },
           *memory_management_unit
       }
 {
@@ -168,12 +168,11 @@ std::string Emulator::get_loaded_game_rom_title_thread_safe() const
     return game_rom_title;
 }
 
-void Emulator::step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit()
+void Emulator::step_components_one_cycle_to_sync_with_cpu(uint8_t clock_index_within_m_cycle)
 {
-    // This function is called from within the central_processing_unit whenever one machine cycle would have elapsed
-    internal_timer.step_forward_one_machine_cycle();
-    memory_management_unit->step_forward_one_machine_cycle();
-    pixel_processing_unit.step_forward_one_machine_cycle();
+    internal_timer.step_one_clock_cycle(clock_index_within_m_cycle);
+    pixel_processing_unit.step_one_clock_cycle();
+    memory_management_unit->step_one_clock_cycle(clock_index_within_m_cycle);
 }
 
 void Emulator::request_interrupt(uint8_t interrupt_flag_mask)

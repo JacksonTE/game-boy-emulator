@@ -14,7 +14,7 @@ public:
     void reset_state();
     void set_post_boot_state();
 
-    void step_forward_one_machine_cycle();
+    void step_one_clock_cycle(uint8_t clock_index_within_m_cycle);
 
     uint8_t read_div() const;
     uint8_t read_tima() const;

@@ -33,9 +33,7 @@ constexpr uint16_t SCANLINE_DURATION_DOTS = 456;
 constexpr uint16_t FIRST_SCANLINE_OF_VERTICAL_BLANK = 144;
 constexpr uint16_t FINAL_SCANLINE_OF_FRAME = 153;
 
-constexpr uint8_t FIRST_HORIZONTAL_BLANK_AFTER_LCD_ENABLE_DURATION_DOTS = 76;
-constexpr uint16_t FIRST_SCANLINE_AFTER_LCD_ENABLE_DURATION_DOTS = 452;
-constexpr uint8_t FINAL_SCANLINE_EARLY_LY_RESET_DOT_NUMBER = 5;
+constexpr uint8_t FINAL_SCANLINE_EARLY_LY_RESET_DOT_NUMBER = 2;
 
 enum class PixelProcessingUnitEnableStatus
 {
@@ -212,7 +210,7 @@ public:
     uint8_t read_byte_object_attribute_memory(uint16_t memory_address, bool is_access_unrestricted) const;
     void write_byte_object_attribute_memory(uint16_t memory_address, uint8_t value, bool is_access_unrestricted);
 
-    void step_forward_one_machine_cycle();
+    void step_one_clock_cycle();
 
 private:
     std::function<void(uint8_t)> request_interrupt_callback;
@@ -241,9 +239,13 @@ private:
 
     uint8_t stat_value_after_spurious_interrupt{};
     bool did_spurious_stat_interrupt_occur{};
-    bool should_previous_mode_update_early_for_stat_reads{};
     bool are_stat_interrupts_blocked{};
-    bool did_scan_line_end_during_this_machine_cycle{};
+    bool is_stat_interrupt_pending{};
+    uint8_t previous_ly_lcd_y_coordinate{};
+    uint8_t previous_lyc_lcd_y_coordinate_compare{};
+    uint8_t hblank_mode_delay_dots{};
+    bool is_vram_blocked{};
+    bool is_oam_blocked{};
     bool was_wy_condition_triggered_this_frame{};
 
     std::vector<ObjectAttributes> scanline_selected_objects;
@@ -262,6 +264,7 @@ private:
     void step_pixel_transfer_forward_one_dot();
     void step_horizontal_blank_forward_one_dot();
     void step_vertical_blank_forward_one_dot();
+    void update_previous_mode_for_current_dot();
     void trigger_stat_interrupts();
 
     void switch_to_mode(PixelProcessingUnitMode new_mode);

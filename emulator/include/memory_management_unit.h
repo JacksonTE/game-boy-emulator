@@ -53,13 +53,6 @@ enum class FileType
     BootROM
 };
 
-enum class ObjectAttributeMemoryDirectMemoryAccessStartupState
-{
-    NotStarting,
-    RegisterWrittenTo,
-    Starting
-};
-
 class MemoryManagementUnit
 {
 public:
@@ -82,7 +75,7 @@ public:
     virtual uint8_t read_byte(uint16_t address, bool is_access_unrestricted) const;
     virtual void write_byte(uint16_t address, uint8_t value, bool is_access_unrestricted);
 
-    void step_forward_one_machine_cycle();
+    void step_one_clock_cycle(uint8_t clock_index_within_m_cycle);
 
     void request_interrupt(uint8_t interrupt_flag_mask);
     void clear_interrupt_flag_bit(uint8_t interrupt_flag_mask);
@@ -113,7 +106,9 @@ private:
     uint8_t boot_rom_status{};
     uint8_t interrupt_enable_ie{};
 
-    ObjectAttributeMemoryDirectMemoryAccessStartupState oam_dma_startup_state{ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting};
+    uint8_t oam_dma_startup_ticks_remaining{};
+    bool is_oam_dma_byte_pending{};
+    bool are_interrupt_requests_blocked{};
     uint16_t oam_dma_source_address_base{};
     uint8_t oam_dma_machine_cycles_elapsed{};
 
