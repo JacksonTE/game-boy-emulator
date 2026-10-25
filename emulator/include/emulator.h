@@ -58,7 +58,7 @@ private:
     std::unique_ptr<MemoryManagementUnit> memory_management_unit;
     CentralProcessingUnit central_processing_unit;
 
-    void step_components_forward_one_machine_cycle_to_sync_with_central_processing_unit();
+    void step_components_one_cycle_to_sync_with_cpu(uint8_t clock_index_within_m_cycle);
     void request_interrupt(uint8_t interrupt_flag_mask);
 };
 

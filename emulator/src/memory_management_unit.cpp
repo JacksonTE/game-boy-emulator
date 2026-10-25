@@ -42,7 +42,10 @@ void MemoryManagementUnit::reset_state()
     boot_rom_status = 0x00;
     interrupt_enable_ie = 0b00000000;
 
-    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+    oam_dma_startup_ticks_remaining = 0;
+    is_oam_dma_byte_pending = false;
+    are_interrupt_requests_blocked = false;
+    pixel_processing_unit.is_oam_dma_in_progress = false;
     oam_dma_source_address_base = 0x0000;
     oam_dma_machine_cycles_elapsed = 0;
 }
@@ -77,7 +80,10 @@ void MemoryManagementUnit::set_post_boot_state()
     write_byte(0xFF26, 0xF1, false);
     interrupt_enable_ie = 0b00000000;
 
-    oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+    oam_dma_startup_ticks_remaining = 0;
+    is_oam_dma_byte_pending = false;
+    are_interrupt_requests_blocked = false;
+    pixel_processing_unit.is_oam_dma_in_progress = false;
     oam_dma_source_address_base = 0x0000;
     oam_dma_machine_cycles_elapsed = 0;
 }
@@ -336,6 +342,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 return;
             case 0xFF0F:
                 interrupt_flag_if = value | 0b11100000;
+                are_interrupt_requests_blocked = true;
                 return;
             case 0xFF40:
                 pixel_processing_unit.write_lcdc_lcd_control(value);
@@ -358,7 +365,7 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
                 return;
             case 0xFF46:
                 pixel_processing_unit.dma_object_attribute_memory_direct_memory_access = value;
-                oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo;
+                oam_dma_startup_ticks_remaining = 4;
                 return;
             case 0xFF47:
                 pixel_processing_unit.bgp_background_palette = value;
@@ -395,9 +402,35 @@ void MemoryManagementUnit::write_byte(uint16_t address, uint8_t value, bool is_a
     }
 }
 
-void MemoryManagementUnit::step_forward_one_machine_cycle()
+void MemoryManagementUnit::step_one_clock_cycle(uint8_t clock_index_within_m_cycle)
 {
-    if (pixel_processing_unit.is_oam_dma_in_progress)
+    if (clock_index_within_m_cycle % 2 == 0)
+    {
+        return;
+    }
+    if (clock_index_within_m_cycle == 3)
+    {
+        are_interrupt_requests_blocked = false;
+    }
+
+    if ((oam_dma_startup_ticks_remaining > 0) && (--oam_dma_startup_ticks_remaining == 0))
+    {
+        oam_dma_source_address_base =
+            pixel_processing_unit.dma_object_attribute_memory_direct_memory_access << 8;
+        if (oam_dma_source_address_base >= 0xE000)
+        {
+            oam_dma_source_address_base &= 0xDF00;
+        }
+        oam_dma_machine_cycles_elapsed = 0;
+        is_oam_dma_byte_pending = false;
+        pixel_processing_unit.is_oam_dma_in_progress = true;
+    }
+    if (!pixel_processing_unit.is_oam_dma_in_progress)
+    {
+        return;
+    }
+
+    if (is_oam_dma_byte_pending)
     {
         const uint16_t source_address = oam_dma_source_address_base + oam_dma_machine_cycles_elapsed;
         const uint8_t byte_to_copy = read_byte(source_address, true);
@@ -405,31 +438,25 @@ void MemoryManagementUnit::step_forward_one_machine_cycle()
         const uint16_t destination_address = OBJECT_ATTRIBUTE_MEMORY_START + oam_dma_machine_cycles_elapsed;
         write_byte(destination_address, byte_to_copy, true);
 
-        if (++oam_dma_machine_cycles_elapsed == OAM_DMA_MACHINE_CYCLE_DURATION)
-        {
-            pixel_processing_unit.is_oam_dma_in_progress = false;
-        }
+        oam_dma_machine_cycles_elapsed++;
+        is_oam_dma_byte_pending = false;
     }
-
-    if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::RegisterWrittenTo)
+    else if (oam_dma_machine_cycles_elapsed == OAM_DMA_MACHINE_CYCLE_DURATION)
     {
-        oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting;
+        pixel_processing_unit.is_oam_dma_in_progress = false;
     }
-    else if (oam_dma_startup_state == ObjectAttributeMemoryDirectMemoryAccessStartupState::Starting)
+    else
     {
-        oam_dma_source_address_base = ((pixel_processing_unit.dma_object_attribute_memory_direct_memory_access >= 0xFE)
-            ? pixel_processing_unit.dma_object_attribute_memory_direct_memory_access - 0x20
-            : pixel_processing_unit.dma_object_attribute_memory_direct_memory_access) << 8;
-
-        oam_dma_machine_cycles_elapsed = 0;
-        pixel_processing_unit.is_oam_dma_in_progress = true;
-        oam_dma_startup_state = ObjectAttributeMemoryDirectMemoryAccessStartupState::NotStarting;
+        is_oam_dma_byte_pending = true;
     }
 }
 
 void MemoryManagementUnit::request_interrupt(uint8_t interrupt_flag_mask)
 {
-    update_flag(interrupt_flag_if, interrupt_flag_mask, true);
+    if (!are_interrupt_requests_blocked)
+    {
+        update_flag(interrupt_flag_if, interrupt_flag_mask, true);
+    }
 }
 
 void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask)
@@ -439,18 +466,7 @@ void MemoryManagementUnit::clear_interrupt_flag_bit(uint8_t interrupt_flag_mask)
 
 uint8_t MemoryManagementUnit::get_pending_interrupt_mask() const
 {
-    for (uint8_t i = 0; i < NUMBER_OF_INTERRUPT_TYPES; i++)
-    {
-        const uint8_t interrupt_flag_mask = 1 << i;
-        const bool is_interrupt_type_requested = is_flag_set(interrupt_flag_if, interrupt_flag_mask);
-        const bool is_interrupt_type_enabled = is_flag_set(interrupt_enable_ie, interrupt_flag_mask);
-
-        if (is_interrupt_type_requested && is_interrupt_type_enabled)
-        {
-            return interrupt_flag_mask;
-        }
-    }
-    return 0x00;
+    return interrupt_flag_if & interrupt_enable_ie & 0b00011111;
 }
 
 void MemoryManagementUnit::update_button_pressed_state_thread_safe(uint8_t button_flag_mask, bool is_button_pressed)

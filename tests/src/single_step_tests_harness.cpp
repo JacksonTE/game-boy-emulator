@@ -273,7 +273,13 @@ public:
         std::unique_ptr<SingleStepTestMemory> memory,
         std::function<void()> no_memory_operation_callback,
         std::function<void(MachineCycleOperation)> memory_operation_callback)
-        : CentralProcessingUnit{no_memory_operation_callback, *memory},
+        : CentralProcessingUnit{[no_memory_operation_callback](uint8_t clock_index_within_m_cycle)
+          {
+              if (clock_index_within_m_cycle == 3)
+              {
+                  no_memory_operation_callback();
+              }
+          }, *memory},
           memory_management_unit{std::move(memory)},
           machine_cycle_memory_operation_callback{memory_operation_callback}
     {
