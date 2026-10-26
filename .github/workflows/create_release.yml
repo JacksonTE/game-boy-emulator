@@ -64,7 +64,9 @@ jobs:
 
       - if: matrix.platform == 'Windows'
         name: Windows setup
-        uses: microsoft/setup-msbuild@v2
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - if: matrix.platform == 'Linux'
         name: Linux setup
@@ -80,9 +82,10 @@ jobs:
         run: |
           if [ "${{ matrix.platform }}" == "Windows" ]; then
             cmake \
+              -S . \
               -B build \
-              -G "Visual Studio 17 2022" \
-              -A x64
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release
           elif [ "${{ matrix.platform }}" == "Linux" ]; then
             cmake \
               -B build \

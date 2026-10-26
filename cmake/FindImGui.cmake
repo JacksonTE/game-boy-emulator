@@ -23,6 +23,11 @@ target_include_directories(ImGui PUBLIC
 target_link_libraries(ImGui PUBLIC
     SDL3::SDL3)
 
+if(EMSCRIPTEN)
+    target_compile_options(ImGui PRIVATE
+        -pthread)
+endif()
+
 install(FILES "${imgui_SOURCE_DIR}/LICENSE.txt"
     DESTINATION third-party-licenses
     RENAME imgui_license.txt
