@@ -62,7 +62,7 @@ uint8_t MBC1::read_byte(uint16_t address)
     }
     else if (address >= 0xA000 && address < 0xC000)
     {
-        if (!is_ram_enabled)
+        if (!is_ram_enabled || cartridge_ram.empty())
         {
             return 0xFF;
         }
@@ -97,7 +97,7 @@ void MBC1::write_byte(uint16_t address, uint8_t value)
     }
     else if (address >= 0xA000 && address < 0xC000)
     {
-        if (!is_ram_enabled)
+        if (!is_ram_enabled || cartridge_ram.empty())
         {
             return;
         }

@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <unordered_set>
 #include <vector>
 
 #include "central_processing_unit.h"
@@ -103,6 +104,13 @@ struct SingleStepTestCase
     std::vector<MachineCycleOperation> expected_memory_interactions;
 };
 
+// Skip 'halt' and 'stop' tests - their correct functionality isn't tested well with the json tests
+static const std::unordered_set<std::filesystem::path> disabled_test_json_filenames
+{
+    "10.json",
+    "76.json"
+};
+
 static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
 {
     const std::filesystem::path directory = std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "single-step-tests" / "sm83" / "v1";
@@ -115,11 +123,9 @@ static std::vector<std::filesystem::path> get_ordered_json_test_file_paths()
 
     for (const auto& entry : std::filesystem::directory_iterator(directory))
     {
-        // Skip 'halt' and 'stop' tests - their correct functionality isn't tested well with the json tests
         if (entry.is_regular_file() &&
             entry.path().extension() == ".json" &&
-            entry.path().filename() != "10.json" &&
-            entry.path().filename() != "76.json")
+            !disabled_test_json_filenames.contains(entry.path().filename()))
         {
             json_test_file_paths.push_back(entry.path());
         }

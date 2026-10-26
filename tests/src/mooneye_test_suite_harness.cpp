@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <unordered_set>
 #include <vector>
 
 #include "emulator.h"
@@ -9,6 +10,21 @@ static std::filesystem::path get_test_directory_path()
 {
     return std::filesystem::path(PROJECT_ROOT) / "tests" / "data" / "mooneye-test-suite" / "mts-20240926-1737-443f6e1";
 }
+
+static const std::unordered_set<std::filesystem::path> disabled_test_rom_filenames
+{
+    "unused_hwio-GS.gb", // TODO add this test after APU is done
+    "boot_div-dmg0.gb",
+    "boot_div-S.gb",
+    "boot_div2-S.gb",
+    "boot_hwio-dmgABCmgb.gb", // TODO add this test after APU is done
+    "boot_hwio-dmg0.gb",
+    "boot_hwio-S.gb",
+    "boot_regs-dmg0.gb",
+    "boot_regs-mgb.gb",
+    "boot_regs-sgb.gb",
+    "boot_regs-sgb2.gb"
+};
 
 static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const std::filesystem::path& directory)
 {
@@ -21,18 +37,9 @@ static std::vector<std::filesystem::path> get_test_rom_paths_in_directory(const 
     for (const auto& entry : std::filesystem::directory_iterator(directory))
     {
         // Skip tests that are specific to other Game Boy models than DMG
-        if (entry.is_regular_file() && entry.path().extension() == ".gb" &&
-            entry.path().filename() != "unused_hwio-GS.gb" && // TODO add this test after APU is done
-            entry.path().filename() != "boot_div-dmg0.gb" &&
-            entry.path().filename() != "boot_div-S.gb" &&
-            entry.path().filename() != "boot_div2-S.gb" &&
-            entry.path().filename() != "boot_hwio-dmgABCmgb.gb" && // TODO add this test after APU is done
-            entry.path().filename() != "boot_hwio-dmg0.gb" &&
-            entry.path().filename() != "boot_hwio-S.gb" &&
-            entry.path().filename() != "boot_regs-dmg0.gb" &&
-            entry.path().filename() != "boot_regs-mgb.gb" &&
-            entry.path().filename() != "boot_regs-sgb.gb" &&
-            entry.path().filename() != "boot_regs-sgb2.gb")
+        if (entry.is_regular_file() &&
+            entry.path().extension() == ".gb" &&
+            !disabled_test_rom_filenames.contains(entry.path().filename()))
         {
             test_rom_paths.push_back(entry.path());
         }
