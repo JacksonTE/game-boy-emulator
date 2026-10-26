@@ -1,3 +1,5 @@
+#include <format>
+
 #include "display_utilities.h"
 #include "imgui_rendering.h"
 #include "input_events.h"
