@@ -93,6 +93,7 @@ jobs:
           fi
 
       - name: Build everything
+        shell: bash
         run: |
           cmake \
             --build build \
@@ -101,6 +102,7 @@ jobs:
 
       - name: Create binary packages
         working-directory: build
+        shell: bash
         run: |
           cpack \
             -C Release
